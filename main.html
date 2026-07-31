@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5f59">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="Panel principal modular del Sistema de Gestión de Flotas">
+  <title>Panel principal · Sistema de Gestión de Flotas</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="menu-principal.css?v=4.0.6">
+  <link rel="stylesheet" href="responsive.css?v=4.0.6">
+  <script src="tema.js?v=4.0.6"></script>
+</head>
+<body class="verificando-sesion">
+  <noscript><div class="sin-javascript">Debe habilitar JavaScript para utilizar el sistema.</div></noscript>
+
+  <div class="verificador-sesion" id="verificadorSesion"><img src="logo.svg" alt=""><div><b>Validando sesión</b><span>Preparando el panel principal…</span></div></div>
+
+  <div class="menu-shell" id="menuShell">
+    <aside class="menu-lateral" id="menuLateral" aria-hidden="true">
+      <header class="marca-menu">
+        <img id="logoEmpresaMenu" src="logo.svg" alt="Logotipo de la empresa">
+        <div><strong id="nombreEmpresaMenu">Sistema de Gestión de Flotas</strong><span>Panel principal</span></div>
+        <button class="boton-icono cerrar-menu" id="cerrarMenu" type="button" aria-label="Cerrar menú">×</button>
+      </header>
+      <nav id="navegacionModular" aria-label="Módulos del sistema"></nav>
+      <footer class="pie-menu">
+        <div class="usuario-menu"><span id="avatarMenu">US</span><div><b id="nombreUsuarioMenu">Usuario</b><small id="rolUsuarioMenu">Sesión pendiente</small></div></div>
+        <label class="modo-auto-oficina-menu" id="modoAutoOficinaMenu" hidden>
+          <span><b>Oficina Virtual</b><small>Modo automático</small></span>
+          <input id="interruptorModoAutoOficina" type="checkbox" aria-label="Activar modo automático de Oficina Virtual">
+          <i></i>
+        </label>
+        <label class="modo-auto-oficina-menu" id="avisosEmergentesMenu" hidden>
+          <span><b>Avisos emergentes</b><small>Los pendientes siguen en el icono</small></span>
+          <input id="interruptorAvisosEmergentes" type="checkbox" aria-label="Mostrar alertas y notificaciones emergentes">
+          <i></i>
+        </label>
+        <button class="boton-menu-secundario" id="sincronizarModulo" type="button">↻ Sincronizar módulo</button>
+        <button class="boton-menu-secundario cerrar-sesion" id="cerrarSesionMenu" type="button">↪ Cerrar sesión</button>
+      </footer>
+    </aside>
+
+    <div class="capa-menu" id="capaMenu"></div>
+
+    <main class="area-modular">
+      <header class="barra-modular">
+        <div class="titulo-modular">
+          <button class="boton-icono abrir-menu" id="abrirMenu" type="button" aria-label="Abrir menú">☰</button>
+          <div><span>Sistema / Módulos independientes</span><h1 id="tituloModulo">Panel principal</h1></div>
+        </div>
+        <div class="acciones-modulares">
+          <span class="estado-modular" id="estadoModulo"><i></i><span>Preparando módulo</span></span>
+          <button class="boton-icono boton-avisos-menu" id="notificacionesMenu" type="button" aria-label="Abrir centro de notificaciones">🔔<span id="contadorAvisosMenu" hidden>0</span></button>
+          <button class="boton-icono" id="cambiarTemaMenu" type="button" aria-label="Cambiar tema">☾</button>
+        </div>
+      </header>
+
+      <aside class="panel-avisos-menu" id="panelAvisosMenu" aria-hidden="true">
+        <header><div><span>AVISOS AUTOMÁTICOS</span><h2>Centro de notificaciones</h2></div><button class="boton-icono" id="cerrarAvisosMenu" type="button" aria-label="Cerrar avisos">×</button></header>
+        <div class="resumen-avisos-menu"><div><span>Notificaciones</span><b id="totalNotificacionesMenu">0</b></div><div><span>Alertas</span><b id="totalAlertasMenu">0</b></div></div>
+        <div class="lista-avisos-menu" id="listaAvisosMenu"><p class="sin-avisos-menu">No existen avisos pendientes.</p></div>
+        <footer><button type="button" data-abrir-avisos="notifications">Ver notificaciones</button><button type="button" data-abrir-avisos="alerts">Ver alertas</button></footer>
+      </aside>
+      <div class="toast-avisos-menu" id="toastAvisosMenu" aria-live="polite"></div>
+
+      <section class="contenedor-iframe" id="contenedorIframe">
+        <div class="cargando-modulo" id="cargandoModulo"><img src="logo.svg" alt=""><div><b>Abriendo módulo</b><span>Solo se cargará la sección seleccionada.</span></div></div>
+        <iframe id="marcoModulo" title="Módulo del Sistema de Gestión de Flotas" allow="geolocation; camera; wake-lock" referrerpolicy="same-origin"></iframe>
+      </section>
+    </main>
+  </div>
+
+  <script src="configuracion.js?v=4.0.6"></script>
+  <script src="conexion.js?v=4.0.6"></script>
+  <script src="menu-principal.js?v=4.0.6"></script>
+</body>
+</html>

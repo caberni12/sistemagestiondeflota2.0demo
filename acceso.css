@@ -1,0 +1,45 @@
+:root{
+  color-scheme:light;
+  --primario:#0b5f59;
+  --primario-fuerte:#064943;
+  --fondo:#eef5f4;
+  --superficie:#ffffff;
+  --texto:#15312f;
+  --suave:#667b78;
+  --borde:#d8e5e3;
+  --error:#b63d38;
+  --sombra:0 28px 70px rgba(12,62,57,.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--fondo);color:var(--texto)}
+button,input{font:inherit}
+button{cursor:pointer}
+.pagina-acceso{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(390px,.92fr);min-height:100vh}
+.presentacion-acceso{position:relative;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;padding:clamp(28px,5vw,76px);background:linear-gradient(145deg,var(--menu-fondo,#063f3b) 0%,var(--primario-fuerte,#08746a) 60%,var(--primario,#0d8b7d) 100%);color:#fff}
+.presentacion-acceso:before,.presentacion-acceso:after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.08)}
+.presentacion-acceso:before{width:430px;height:430px;right:-170px;top:-120px}.presentacion-acceso:after{width:330px;height:330px;left:-120px;bottom:-150px}
+.marca-acceso,.mensaje-acceso,.resumen-acceso{position:relative;z-index:1}
+.marca-acceso{display:flex;align-items:center;gap:14px}.marca-acceso img{width:56px;height:56px;border-radius:16px;background:#fff;padding:6px;object-fit:contain}.marca-acceso strong,.marca-acceso span{display:block}.marca-acceso strong{font-size:16px}.marca-acceso span{margin-top:4px;font-size:12px;color:#bce2dd}
+.mensaje-acceso{max-width:710px;margin:70px 0}.etiqueta{display:block;font-size:11px;font-weight:850;letter-spacing:.13em}.mensaje-acceso .etiqueta{color:#a9dfd8}.mensaje-acceso h1{max-width:750px;margin:16px 0 18px;font-size:clamp(34px,5vw,66px);line-height:1.04;letter-spacing:-.045em}.mensaje-acceso p{max-width:620px;margin:0;color:#d6eeeb;font-size:clamp(15px,1.7vw,19px);line-height:1.65}
+.resumen-acceso{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.resumen-acceso article{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(3,45,42,.26);backdrop-filter:blur(10px)}.resumen-acceso i{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.13);font-style:normal}.resumen-acceso b,.resumen-acceso span{display:block}.resumen-acceso b{font-size:13px}.resumen-acceso span{margin-top:3px;color:#bce2dd;font-size:10px}
+.panel-acceso{display:grid;place-items:center;padding:28px;background:radial-gradient(circle at top right,#fff 0,#f4f8f7 48%,#eaf2f1 100%)}
+.tarjeta-acceso{width:min(100%,470px);padding:clamp(25px,4vw,42px);border:1px solid rgba(216,229,227,.9);border-radius:24px;background:rgba(255,255,255,.94);box-shadow:var(--sombra)}
+.encabezado-formulario .etiqueta{color:var(--primario)}.encabezado-formulario h2{margin:9px 0 7px;font-size:32px;letter-spacing:-.035em}.encabezado-formulario p{margin:0;color:var(--suave);line-height:1.55}
+.estado-conexion{display:flex;align-items:center;gap:9px;margin:24px 0 19px;padding:10px 12px;border-radius:12px;background:#f0f6f5;color:var(--suave);font-size:12px}.estado-conexion i{width:9px;height:9px;border-radius:50%;background:#d6a63f;box-shadow:0 0 0 4px rgba(214,166,63,.14)}.estado-conexion.conectado i{background:#18a17b;box-shadow:0 0 0 4px rgba(24,161,123,.13)}.estado-conexion.error i{background:#d5544f;box-shadow:0 0 0 4px rgba(213,84,79,.13)}
+.campo{display:grid;gap:7px;margin:15px 0}.campo>span{font-size:12px;font-weight:800}.campo input{width:100%;height:49px;border:1px solid var(--borde);border-radius:12px;background:#fff;color:var(--texto);padding:0 14px;outline:none;transition:.18s}.campo input:focus{border-color:var(--primario);box-shadow:0 0 0 4px rgba(11,95,89,.11)}
+.campo-contrasena{position:relative}.campo-contrasena input{padding-right:53px}.campo-contrasena button{position:absolute;right:6px;top:6px;width:38px;height:37px;border:0;border-radius:9px;background:#edf4f3;color:var(--primario)}
+.boton-principal{width:100%;min-height:50px;margin-top:10px;border:0;border-radius:12px;background:var(--primario);color:#fff;font-weight:850;box-shadow:0 10px 24px rgba(11,95,89,.2)}.boton-principal:hover{background:var(--primario-fuerte)}.boton-principal:disabled{cursor:wait;opacity:.72}
+.boton-enlace{display:block;margin:12px auto 0;border:0;background:transparent;color:var(--primario);font-size:12px;font-weight:800}.detalle-servicio{display:block;margin-top:17px;text-align:center;color:var(--suave)}
+.mensaje-formulario{margin:0 0 15px;padding:11px 12px;border:1px solid #f0c9c6;border-radius:11px;background:#fff0ef;color:var(--error);font-size:13px;line-height:1.45}.mensaje-formulario.exito{border-color:#bee4d7;background:#edf9f5;color:#087153}.oculto{display:none!important}.aviso-sin-js{padding:16px;background:#ffe3e1;color:#8a2c27}
+@media(max-width:900px){.pagina-acceso{grid-template-columns:1fr}.presentacion-acceso{min-height:390px;padding:27px}.mensaje-acceso{margin:52px 0 34px}.mensaje-acceso h1{font-size:clamp(32px,8vw,52px)}.panel-acceso{padding:24px 16px 36px}.resumen-acceso{display:none}}
+@media(max-width:480px){.presentacion-acceso{min-height:320px}.marca-acceso img{width:48px;height:48px}.mensaje-acceso{margin:42px 0 10px}.mensaje-acceso h1{font-size:34px}.mensaje-acceso p{font-size:14px}.tarjeta-acceso{border-radius:19px;padding:24px 19px}.encabezado-formulario h2{font-size:28px}}
+
+
+/* Preconfiguración automática 2.8.2 */
+.preconfiguracion{width:min(760px,100%)}
+.preconfig-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.campo-completo{grid-column:1/-1}
+.aceptacion-preconfig{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--borde,#dce5e3);border-radius:12px;background:rgba(11,95,89,.05);font-size:.9rem;line-height:1.45}
+.aceptacion-preconfig input{margin-top:3px;min-width:18px;min-height:18px}
+.estado-conexion.preconfig i{background:#d89000;box-shadow:0 0 0 5px rgba(216,144,0,.13)}
+@media(max-width:720px){.preconfig-grid{grid-template-columns:1fr}.campo-completo{grid-column:auto}.preconfiguracion{padding:22px 18px}}

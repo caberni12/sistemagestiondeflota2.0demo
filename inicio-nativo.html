@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5f59">
+  <title>Iniciando · Sistema de Gestión de Flotas</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f7fa;color:#173047}
+    body{display:grid;place-items:center}.inicio{display:flex;align-items:center;gap:14px;padding:22px}.inicio img{width:46px;height:46px}.inicio span{display:block;color:#65798b;margin-top:4px}
+  </style>
+  <script src="configuracion.js?v=4.0.6"></script>
+</head>
+<body>
+  <div class="inicio"><img src="logo.svg" alt=""><div><strong>Preparando el sistema</strong><span>Recuperando la sesión segura del dispositivo…</span></div></div>
+  <script>
+    (()=>{
+      try{
+        const raw=window.AndroidConfig&&typeof window.AndroidConfig.obtenerSesionNativa==='function'
+          ? String(window.AndroidConfig.obtenerSesionNativa()||'{}'):'{}';
+        const auth=JSON.parse(raw||'{}');
+        if(auth&&auth.token){
+          localStorage.setItem(window.CONFIGURACION_FLOTAS.CLAVE_SESION_LOCAL,JSON.stringify(auth));
+          location.replace('main.html');
+          return;
+        }
+        if(window.AndroidConfig&&typeof window.AndroidConfig.cerrarSesionNativa==='function')window.AndroidConfig.cerrarSesionNativa('SIN_SESION_NATIVA');
+        else location.replace('index.html?sesion=expirada');
+      }catch(error){
+        if(window.AndroidConfig&&typeof window.AndroidConfig.cerrarSesionNativa==='function')window.AndroidConfig.cerrarSesionNativa('SESION_NATIVA_NO_LEGIBLE');
+        else location.replace('index.html?sesion=expirada');
+      }
+    })();
+  </script>
+</body>
+</html>
