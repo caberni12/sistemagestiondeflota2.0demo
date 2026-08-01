@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.0.5';
+  const VERSION='4.2.7';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -56,6 +56,8 @@
   let consultaOficinaPendiente=null;
   let oficinaConsultadaEn=0;
   let oficinaUsuarioConsultado='';
+  let temporizadorRevisionOficina=null;
+  let revisionOficinaPendiente=false;
 
   function iniciales(nombre='Usuario'){
     return String(nombre).trim().split(/\s+/).slice(0,2).map(parte=>parte[0]||'').join('').toUpperCase()||'US';
@@ -156,6 +158,7 @@
     construirMenu();
     programarInterruptorOficinaVirtual();
     actualizarInterruptorAvisosEmergentes();
+    programarRevisionAutomaticaOficina(1800);
   }
   function esAdministradorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR';}
   function claveAvisosEmergentesMenu(){return `flotas_avisos_emergentes_admin_v1_${String(usuario?.ID||usuario?.USUARIO_ID||'sin_usuario')}`;}
@@ -262,6 +265,18 @@
     },Math.max(100,Number(retraso||0)));
   }
   function iniciarAvisos(){if(temporizadorAvisos||consultaAvisosPendiente)return;programarAvisos(900);}
+  function programarRevisionAutomaticaOficina(retraso){
+    if(temporizadorRevisionOficina)clearTimeout(temporizadorRevisionOficina);
+    if(!usuario||!esAdministradorMenu()||cerrandoSesion)return;
+    temporizadorRevisionOficina=setTimeout(async()=>{
+      temporizadorRevisionOficina=null;
+      if(revisionOficinaPendiente||document.hidden){programarRevisionAutomaticaOficina(60000);return;}
+      revisionOficinaPendiente=true;
+      try{const status=await api.request('officeQuickStatus',{cache:false});if(status.modoAutomatico){await api.request('officeRun',{data:{ORIGEN:'MENU_AUTOMATICO'}});actualizarAvisos();}}
+      catch(_){ }
+      finally{revisionOficinaPendiente=false;programarRevisionAutomaticaOficina(window.CONFIGURACION_FLOTAS.INTERVALO_OFICINA_VIRTUAL_MILISEGUNDOS||300000);}
+    },Math.max(500,Number(retraso||0)));
+  }
   function abrirPanelAvisos(){$('#panelAvisosMenu').classList.add('abierto');$('#panelAvisosMenu').setAttribute('aria-hidden','false');actualizarAvisos();}
   function cerrarPanelAvisos(){$('#panelAvisosMenu').classList.remove('abierto');$('#panelAvisosMenu').setAttribute('aria-hidden','true');}
   function alternarPanelAvisos(){if($('#panelAvisosMenu').classList.contains('abierto'))cerrarPanelAvisos();else abrirPanelAvisos();}
@@ -280,6 +295,26 @@
   function enviar(mensaje){
     try{marco.contentWindow?.postMessage(mensaje,'*');}catch(_){ }
   }
+  function enviarAutenticacionModulo(){
+    const auth=api?.getAuth?.()||{};
+    if(!auth.token||!auth.user)return false;
+    enviar({tipo:'flotas:autenticacion',auth:{token:auth.token,sessionId:auth.sessionId||'',user:auth.user,expiresAt:auth.expiresAt||''}});
+    return true;
+  }
+  function confirmarModuloVisiblePorContenido(){
+    if(marcoListo)return true;
+    try{
+      const shell=marco.contentDocument?.querySelector('#appShell');
+      const content=marco.contentDocument?.querySelector('#content');
+      if(shell&&!shell.classList.contains('hidden')&&content){
+        marcoListo=true;
+        $('#cargandoModulo').classList.add('oculto');
+        cambiarEstado('Módulo activo','listo');
+        return true;
+      }
+    }catch(_){ }
+    return false;
+  }
   function aplicarTema(){
     window.TemaFlotas?.aplicarGuardado?.();
     document.body.classList.toggle('oscuro',oscuro);
@@ -290,6 +325,7 @@
     if(cerrandoSesion)return;
     cerrandoSesion=true;
     if(temporizadorAvisos)clearInterval(temporizadorAvisos);
+    if(temporizadorRevisionOficina)clearTimeout(temporizadorRevisionOficina);
     const boton=$('#cerrarSesionMenu');
     boton.disabled=true;
     boton.textContent='Cerrando sesión…';
@@ -380,7 +416,10 @@
     if(data.tipo==='flotas:navegar'&&modulos.has(data.seccion))abrirModulo(data.seccion);
     if(data.tipo==='flotas:actualizar-avisos')actualizarAvisos();
     if(data.tipo==='flotas:sesion-cerrada'){api.setAuth({});irAcceso('cerrada');}
-    if(data.tipo==='flotas:autenticacion-requerida')validarSesion({desdeModulo:true});
+    if(data.tipo==='flotas:autenticacion-requerida'){
+      if(enviarAutenticacionModulo())return;
+      validarSesion({desdeModulo:true}).then(valida=>{if(valida)enviarAutenticacionModulo();});
+    }
     if(data.tipo==='flotas:error-modulo')cambiarEstado(data.mensaje||'Error del módulo','error');
     if(data.tipo==='flotas:empresa'){
       if(data.nombre)$('#nombreEmpresaMenu').textContent=data.nombre;
@@ -399,6 +438,17 @@
   window.addEventListener('flotas:sesion-invalida',()=>validarSesion({desdeModulo:true}));
   marco.addEventListener('load',()=>{
     marcoListo=false;
+    // Cuando la Web se abre directamente desde Windows (file://), cada HTML
+    // puede tener un almacenamiento local distinto. El panel entrega la sesión
+    // al módulo mediante postMessage para que el iframe no quede esperando.
+    setTimeout(enviarAutenticacionModulo,30);
+    setTimeout(enviarAutenticacionModulo,250);
+    setTimeout(()=>{if(!marcoListo){enviarAutenticacionModulo();confirmarModuloVisiblePorContenido();}},900);
+    setTimeout(()=>{
+      if(marcoListo||confirmarModuloVisiblePorContenido())return;
+      cambiarEstado('El módulo no confirmó la apertura · reintentando','advertencia');
+      enviarAutenticacionModulo();
+    },3500);
     if(seccionActual==='connections'){
       setTimeout(()=>{
         if(seccionActual!=='connections'||marcoListo)return;

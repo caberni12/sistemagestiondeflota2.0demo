@@ -1,0 +1,11 @@
+PRUEBAS DE ESTABILIDAD 3.14.7
+
+OK - Conexiones: acción actual.
+OK - Conexiones: respaldo por resumenTiempoReal.
+OK - Conexiones: respaldo final por listados genéricos.
+OK - Solicitudes enviadas con accion, action y ACCION.
+OK - Notificaciones: una copia por evento y por destinatario.
+OK - Alertas: sin notificación espejo duplicada.
+OK - Lectura: persistencia confirmada con fecha y usuario.
+OK - Depuración histórica: conserva el estado leído.
+OK - Sintaxis de todos los JavaScript y Codigo_Completo.gs.

@@ -365,8 +365,7 @@
           this.nodosMarcadores.set(clave, boton);
           this.capaMarcadores.appendChild(boton);
         }
-        boton.style.left = `${punto.x - izquierda}px`;
-        boton.style.top = `${punto.y - arriba}px`;
+        boton.style.transform = `translate3d(${punto.x - izquierda}px, ${punto.y - arriba}px, 0) translate(-50%, -50%)`;
         const firmaContenido = `${item.activo ? '1' : '0'}|${item.seguido ? '1' : '0'}|${item.nombre || ''}|${item.detalle || ''}`;
         if (boton.dataset.firmaContenido !== firmaContenido) {
           const abierto = boton.classList.contains('abierto');
