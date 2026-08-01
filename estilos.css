@@ -65,14 +65,14 @@
 .mapa-marcador{position:absolute;pointer-events:auto;transform:translate3d(0,0,0) translate(-50%,-50%);transition:transform .32s linear;will-change:transform;border:0;background:transparent;display:flex;align-items:center;gap:7px;color:#183448;white-space:nowrap;z-index:2}
 .mapa-marcador>i{width:34px;height:34px;border:4px solid #fff;border-radius:50%;display:grid;place-items:center;background:var(--primary);color:#fff;font-style:normal;box-shadow:0 6px 18px rgba(7,59,66,.32);animation:marcadorActivo 1.8s infinite}
 .mapa-marcador.antiguo>i{background:#8a98a7;animation:none}
-.mapa-marcador>span{max-width:150px;overflow:hidden;text-overflow:ellipsis;padding:6px 9px;border:1px solid rgba(12,51,62,.12);border-radius:9px;background:rgba(255,255,255,.94);font-size:11px;font-weight:800;box-shadow:0 5px 16px rgba(17,45,61,.13)}
+.mapa-marcador>span{max-width:240px;overflow:hidden;padding:6px 9px;border:1px solid rgba(12,51,62,.12);border-radius:9px;background:rgba(255,255,255,.94);font-size:11px;font-weight:800;box-shadow:0 5px 16px rgba(17,45,61,.13);text-align:left}.mapa-marcador>span>strong,.mapa-marcador>span>small{display:block;overflow:hidden;text-overflow:ellipsis}.mapa-marcador>span>small{max-width:220px;margin-top:2px;font-size:9px;font-weight:650;color:#526b7c}
 .mapa-detalle{display:none;position:absolute;left:16px;bottom:43px;min-width:210px;padding:12px;border-radius:12px;background:#071521;color:#fff;text-align:left;box-shadow:0 16px 38px rgba(0,0,0,.28)}
 .mapa-detalle b,.mapa-detalle span,.mapa-detalle small{display:block}.mapa-detalle span{margin-top:3px;font-size:11px;color:#c4d3df}.mapa-detalle small{margin-top:7px;color:#91a7b7;font-size:10px}
 .mapa-marcador.abierto{z-index:9}.mapa-marcador.abierto .mapa-detalle{display:block}
 @keyframes marcadorActivo{50%{box-shadow:0 0 0 9px rgba(14,159,145,.18),0 6px 18px rgba(7,59,66,.32)}}
 body.dark .mapa-aviso,body.dark .mapa-marcador>span{background:rgba(13,28,43,.94);color:#eef5f8;border-color:rgba(255,255,255,.1)}
 body.dark .mapa-aviso span{color:#9eb2c0}
-@media(max-width:720px){.fleet-map{min-height:390px}.mapa-marcador>span{display:none}.mapa-detalle{left:-85px;bottom:44px}.mapa-controles button{width:39px;height:39px}}
+@media(max-width:720px){.fleet-map{min-height:390px}.mapa-marcador>span{display:block;max-width:132px;padding:4px 6px}.mapa-marcador>span>small{max-width:118px;font-size:8px}.mapa-detalle{left:-85px;bottom:44px}.mapa-controles button{width:39px;height:39px}}
 
 /* Rutas, presencia y notificaciones */
 .notification-button{position:relative}.notification-button span{position:absolute;right:-4px;top:-5px;min-width:19px;height:19px;padding:0 5px;border:2px solid var(--surface);border-radius:20px;background:var(--red);color:#fff;font-size:10px;font-weight:900;display:grid;place-items:center}
@@ -507,5 +507,43 @@ body.dark .operation-location-status.valid.imprecise{background:#3d3218;color:#f
 @media(max-width:720px){.permission-button-grid{grid-template-columns:1fr}.permission-button-section{padding:11px}}
 
 
-/* Documentos 4.2.7: revisión y aprobación administrativa */
+/* Documentos 4.2.10: revisión y aprobación administrativa */
 .document-review-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap}.document-review-badge i{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-weight:900}.document-review-badge.approved{color:#176534;background:rgba(22,163,74,.12)}.document-review-badge.approved i{background:#16a34a;color:#fff}.document-review-badge.pending{color:#7a5700;background:#fff3cf}.document-review-badge.pending i{background:#d89616;color:#fff}.document-review-badge.rejected{color:#9f2525;background:rgba(199,71,71,.12)}.document-review-badge.rejected i{background:#c74747;color:#fff}.document-validity{display:block;margin-top:6px;color:var(--muted)}.document-review-actions{align-items:flex-start}.document-review-panel{display:flex;align-items:flex-start;gap:13px;padding:15px;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft)}.document-review-panel .document-review-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:13px;background:var(--amber);color:#fff;font-size:21px;font-weight:900}.document-review-panel.ok{border-color:rgba(22,163,74,.34);background:rgba(22,163,74,.07)}.document-review-panel.ok .document-review-icon{background:#16a34a}.document-review-panel.bad{border-color:rgba(199,71,71,.35);background:rgba(199,71,71,.07)}.document-review-panel.bad .document-review-icon{background:#c74747}.document-review-panel b,.document-review-panel span,.document-review-panel small{display:block}.document-review-panel span,.document-review-panel small{margin-top:4px;color:var(--muted);line-height:1.4}.document-review-readonly{font-weight:800}.document-review-readonly.ok{border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.08);color:#176534}.document-review-readonly.warn{border-color:rgba(216,150,22,.38);background:#fff8e7;color:#7a5700}.document-review-readonly.bad{border-color:rgba(199,71,71,.38);background:rgba(199,71,71,.07);color:#9f2525}.document-auto-approved{border-color:rgba(22,163,74,.38)!important;background:rgba(22,163,74,.07)!important}.document-auto-approved>i{background:#16a34a!important;color:#fff!important}
+
+
+/* Precisión visual del GPS 4.2.16 */
+.mapa-radio.precision-gps{border-width:1.5px;background:rgba(14,159,145,.055);box-shadow:none;opacity:.8}
+.mapa-radio.precision-gps.alta{border-color:rgba(22,163,74,.75);background:rgba(22,163,74,.07)}
+.mapa-radio.precision-gps.media{border-color:rgba(14,159,145,.7);background:rgba(14,159,145,.065)}
+.mapa-radio.precision-gps.aceptable{border-color:rgba(217,119,6,.75);background:rgba(245,158,11,.075)}
+.mapa-radio.precision-gps>span{display:none}
+.map-status-legend .gps-accuracy{border:1.5px solid var(--primary);background:rgba(14,159,145,.08)}
+.gps-quality{display:block;margin-top:4px;font-size:10px;font-weight:800}.gps-quality.alta{color:#176534}.gps-quality.media{color:var(--primary)}.gps-quality.aceptable{color:#9a5b00}
+body.dark .gps-quality.alta{color:#79d69b}body.dark .gps-quality.aceptable{color:#f4c66a}
+
+/* Dirección visible en el marcador único 4.2.16 */
+body.dark .mapa-marcador>span>small{color:#b7c7d2}
+
+/* 4.2.16 · Estado único del usuario en el mapa */
+.mapa-estado-linea{display:inline-flex!important;align-items:center;gap:6px;margin-top:7px!important;padding:5px 8px;border-radius:999px;font-size:10px!important;font-weight:850}
+.mapa-estado-linea>i{display:block;width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.mapa-estado-linea.en-linea{background:rgba(22,163,74,.18);color:#b8f5ca!important}.mapa-estado-linea.en-linea>i{background:var(--active-green);box-shadow:0 0 0 4px rgba(22,163,74,.18)}
+.mapa-estado-linea.desconectado{background:rgba(220,38,38,.18);color:#ffc4c4!important}.mapa-estado-linea.desconectado>i{background:var(--inactive-red)}
+.mapa-marcador.activo>i{background:var(--active-green)!important}.mapa-marcador.activo .mapa-estado-linea.desconectado{display:none!important}
+.mapa-marcador.antiguo>i{background:var(--inactive-red)!important}.mapa-marcador.antiguo .mapa-estado-linea.en-linea{display:none!important}
+
+/* 4.2.16 · KPI activos del Panel principal */
+.metric-card-button{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;appearance:none;-webkit-appearance:none;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.metric-card-button:hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 12px 28px rgba(14,159,145,.14)}
+.metric-card-button:focus-visible{outline:3px solid var(--primary-soft);outline-offset:2px}
+.metric-card-button:active{transform:translateY(0)}
+
+/* 4.2.16 · Cronómetro de rutas y respaldo general */
+.route-clock{display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft,#f6f8fb)}
+.route-clock i{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;font-style:normal;background:rgba(20,125,78,.12);color:var(--success,#147d4e);font-weight:800}
+.route-clock span{display:flex;flex-direction:column;gap:1px}.route-clock small{color:var(--muted);font-size:.75rem}.route-clock b{font-variant-numeric:tabular-nums;font-size:1.08rem;letter-spacing:.04em}
+.route-clock.running b{color:var(--primary)}.route-clock.stopped i{background:rgba(20,125,78,.14)}
+.route-clock.compact{margin:0;padding:6px 8px;min-width:130px}.route-clock.compact i{width:25px;height:25px}.route-clock.compact small{font-size:.67rem}.route-clock.compact b{font-size:.9rem}
+.backup-database-shell{margin-top:18px}.backup-database-card{overflow:hidden}.backup-feature-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.backup-feature-list span{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-soft,#f6f8fb);font-size:.88rem}
+.backup-status{margin:12px 0;padding:11px 13px;border-radius:10px;background:var(--surface-soft,#f6f8fb);color:var(--muted)}.backup-status.working{color:var(--primary);border:1px solid rgba(41,98,255,.22)}.backup-status.ok{color:var(--success,#147d4e);border:1px solid rgba(20,125,78,.22)}.backup-status.error{color:var(--danger,#b42318);border:1px solid rgba(180,35,24,.22)}
+@media(max-width:760px){.backup-feature-list{grid-template-columns:1fr}.route-clock.compact{min-width:112px}}

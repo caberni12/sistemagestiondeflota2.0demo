@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  const VERSION='4.2.7';
+  const VERSION='4.2.16';
   const MIME={
     csv:'text/csv;charset=utf-8',
     xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

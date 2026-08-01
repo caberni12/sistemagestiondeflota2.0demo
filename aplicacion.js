@@ -21,8 +21,10 @@
   let currentSection = initialSection;
   let mapaFlota = null;
   let promesaComponenteMapa = null;
-  let promesaInicializacionMapa = null;
+  let promesaInicializacionMapaGps = null;
+  let promesaInicializacionMapaConexiones = null;
   let ultimaUbicacionEnviada = null;
+  let ultimaPosicionConfiableNavegador = null;
   let ultimaPosicionConocida = cargarUltimaUbicacionDispositivo();
   let gpsRefreshTimer = null;
   let gpsRefreshPending = null;
@@ -53,6 +55,7 @@
   let realtimeTimer = null;
   let heartbeatTimer = null;
   let notificationTimer = null;
+  let routeClockInterval = null;
   let notificationSnapshotReady = false;
   let notificationCenterState = { notifications:[], alerts:[] };
   let knownNotificationIds = new Set();
@@ -69,6 +72,7 @@
   const addressLookupCache = new Map();
   const addressLookupPending = new Map();
   let addressQueueRunning = false;
+  let gpsAddressQueueRunning = false;
   let lastAddressRequestAt = 0;
   let lastAddressSearchAt = 0;
   let addressSearchQueue = Promise.resolve();
@@ -382,12 +386,12 @@
   function translateError(error) {
     const key = String(error?.message || error || 'ERROR');
     const messages = {
-      CREDENCIALES_INVALIDAS:'Correo o contraseña incorrectos. El propietario puede ejecutar prepararAccesoAdministrador() en Apps Script.', CLAVE_INSTALACION_INVALIDA:'La clave de instalación no coincide con la generada por instalarSistema().',
+      CREDENCIALES_INVALIDAS:'Correo o contraseña incorrectos. Solicite al Administrador revisar la cuenta y restablecer el acceso.', CLAVE_INSTALACION_INVALIDA:'La clave de instalación no coincide con la generada por instalarSistema().',
       CLAVE_INSTALACION_REQUERIDA:'Ingrese una clave de instalación.', CONTRASENA_REQUERIDA:'Ingrese la contraseña elegida.',
       DATOS_DE_ADMINISTRADOR_INVALIDOS:'Complete los datos del administrador e ingrese una contraseña.',
       SISTEMA_YA_INICIALIZADO:'El sistema ya tiene usuarios registrados.', AUTENTICACION_REQUERIDA:'La sesión no está disponible.', SESION_INVALIDA:'La sesión dejó de ser válida.',
       SESION_EXPIRADA:'La sesión expiró.', PERMISO_DENEGADO:'Su rol no tiene permiso para realizar esta acción.', ULTIMO_ADMINISTRADOR_PROTEGIDO:'No se puede quitar o desactivar al último administrador activo.', CONTRASENAS_NO_COINCIDEN:'Las contraseñas no coinciden.', RECURSO_NO_ENCONTRADO:'El recurso solicitado no existe.',
-      REGISTRO_NO_ENCONTRADO:'El registro no existe.', NOMBRE_USUARIO_REQUERIDO:'Ingrese el nombre completo del usuario.', ROL_USUARIO_INVALIDO:'Seleccione un rol válido para el usuario.', USUARIO_VALOR_NUMERICO_INVALIDO:'La base de datos tenía un límite numérico insuficiente para la versión de permisos. Ejecute el SQL correctivo 4.2.7 y vuelva a intentar.', VALOR_NUMERICO_FUERA_DE_RANGO:'Uno de los valores numéricos supera el límite permitido.', USUARIO_NO_CONFIRMADO:'El servidor no pudo confirmar el usuario guardado.', SIN_CAMBIOS_PARA_GUARDAR:'No se detectaron cambios para guardar.', NO_PUEDE_ELIMINAR_SU_PROPIA_CUENTA:'No puede eliminar la cuenta con la que tiene la sesión abierta.', ULTIMO_ADMINISTRADOR_NO_PUEDE_MODIFICARSE:'Debe existir al menos otro Administrador activo antes de cambiar este rol o estado.', ULTIMO_ADMINISTRADOR_NO_PUEDE_ELIMINARSE:'No se puede eliminar el último Administrador activo.', VEHICULO_NO_DISPONIBLE:'El vehículo no está disponible.', CONDUCTOR_NO_DISPONIBLE:'El conductor no está disponible.',
+      REGISTRO_NO_ENCONTRADO:'El registro no existe.', NOMBRE_USUARIO_REQUERIDO:'Ingrese el nombre completo del usuario.', ROL_USUARIO_INVALIDO:'Seleccione un rol válido para el usuario.', USUARIO_VALOR_NUMERICO_INVALIDO:'La base de datos tenía un límite numérico insuficiente para la versión de permisos. Ejecute el SQL correctivo 4.2.3 y vuelva a intentar.', VALOR_NUMERICO_FUERA_DE_RANGO:'Uno de los valores numéricos supera el límite permitido.', USUARIO_NO_CONFIRMADO:'El servidor no pudo confirmar el usuario guardado.', SIN_CAMBIOS_PARA_GUARDAR:'No se detectaron cambios para guardar.', NO_PUEDE_ELIMINAR_SU_PROPIA_CUENTA:'No puede eliminar la cuenta con la que tiene la sesión abierta.', ULTIMO_ADMINISTRADOR_NO_PUEDE_MODIFICARSE:'Debe existir al menos otro Administrador activo antes de cambiar este rol o estado.', ULTIMO_ADMINISTRADOR_NO_PUEDE_ELIMINARSE:'No se puede eliminar el último Administrador activo.', VEHICULO_NO_DISPONIBLE:'El vehículo no está disponible.', CONDUCTOR_NO_DISPONIBLE:'El conductor no está disponible.',
       OPERACION_NO_ACTIVA:'La operación ya no está activa.', CORREO_YA_EXISTE:'El correo ya está registrado.', DIRECCION_APLICACION_NO_CONFIGURADA:'Falta configurar la dirección de la aplicación en configuracion.js.',
       ID_HOJA_NO_CONFIGURADO:'La base de datos central no está configurada correctamente.', TIEMPO_DE_ESPERA_AGOTADO:'La base de datos tardó demasiado en responder.',
       CONTRASENA_ACTUAL_INVALIDA:'La contraseña actual no es correcta.', FORMATO_LOGOTIPO_INVALIDO:'El formato del logotipo no es válido.', LOGOTIPO_DEMASIADO_GRANDE:'El logotipo supera el tamaño máximo de 1,5 MB.',
@@ -396,7 +400,7 @@
       QR_NO_RECONOCIDO:'El código QR no corresponde a un vehículo registrado.', CODIGO_QR_REQUERIDO:'Ingrese o escanee un código QR.', ETIQUETA_QR_ROL_NO_AUTORIZADO:'Solo los Administradores y Supervisores pueden generar o imprimir etiquetas QR de vehículos.', GENERADOR_QR_NO_DISPONIBLE:'No se pudo cargar el generador QR local. Recargue la aplicación e inténtelo nuevamente.', VEHICULO_PATENTE_REQUERIDA:'El vehículo debe tener una patente válida para generar su QR.', VEHICULO_REQUERIDO:'Seleccione un vehículo para generar la etiqueta QR.', RUTA_NO_ENCONTRADA:'La ruta no existe.',
       ALERTA_OPERACIONAL_REQUIERE_ADMINISTRADOR:'Esta alerta operacional debe ser validada y cerrada por un Administrador real después de comprobar la situación en terreno.',
       ESTADO_RUTA_INVALIDO:'El estado solicitado para la ruta no es válido.', DESTINATARIO_REQUERIDO:'Seleccione un destinatario.', USUARIO_DESTINATARIO_NO_ENCONTRADO:'El usuario destinatario no existe o no está activo.', SIN_DESTINATARIOS_PARA_EL_ALCANCE:'No existen cuentas activas que coincidan con el grupo seleccionado.', TITULO_Y_MENSAJE_REQUERIDOS:'Complete el título y el mensaje.', TIPO_AVISO_INVALIDO:'Seleccione una clase de aviso válida.', ALCANCE_AVISO_INVALIDO:'Seleccione un grupo de destinatarios válido.', NOTIFICACION_NO_ENCONTRADA:'La notificación no existe.', ALERTA_NO_ENCONTRADA:'La alerta no existe.', LECTURA_NOTIFICACION_NO_CONFIRMADA:'La notificación no confirmó su estado leído en la base central.', LECTURA_ALERTA_NO_CONFIRMADA:'La alerta no confirmó su estado leído en la base central.',
-      COORDENADAS_INVALIDAS:'Las coordenadas recibidas no son válidas.', OFICINA_INCIDENTES_NO_DISPONIBLES:'No fue posible consultar los incidentes de Oficina Virtual.', DETALLE_FALLA_REQUERIDO:'Describa la falla con al menos diez caracteres.', PREGUNTA_REQUERIDA:'Escriba una consulta para Oficina Virtual.', CARGA_DOCUMENTAL_REQUIERE_CONEXION_CENTRAL:'La carga documental requiere conexión con Supabase.', AUTORIZACION_QR_INVALIDA:'Valide nuevamente el QR del vehículo. La autorización dura cinco minutos.',
+      COORDENADAS_INVALIDAS:'Las coordenadas recibidas no son válidas.', OFICINA_INCIDENTES_NO_DISPONIBLES:'No fue posible consultar los incidentes de Oficina Virtual.', DETALLE_FALLA_REQUERIDO:'Describa la falla con al menos diez caracteres.', PREGUNTA_REQUERIDA:'Escriba una consulta para Oficina Virtual.', CARGA_DOCUMENTAL_REQUIERE_CONEXION_CENTRAL:'La carga documental requiere conexión con la Base de Datos central.', AUTORIZACION_QR_INVALIDA:'Valide nuevamente el QR del vehículo. La autorización dura cinco minutos.',
       ACCION_ESPECIAL_REQUERIDA:'Utilice el botón específico del módulo para realizar esta acción.',
       SINCRONIZACION_NO_COMPLETADA:'La base de datos no respondió correctamente durante la sincronización.',
       CHECKIN_REQUERIDO:'Debe seleccionar un check-in aprobado antes de iniciar la operación.', CHECKIN_DIARIO_REQUERIDO:'Debe realizar un check-in hoy para este mismo vehículo y conductor antes de iniciar la ruta.', CHECKIN_NO_ENCONTRADO:'El check-in seleccionado no existe.',
@@ -407,7 +411,7 @@
       CHECKIN_CRITICO_NO_APROBABLE:'Un check-in con fallas críticas no puede aprobarse. Debe corregirse la falla y realizar una inspección nueva.',
       PUNTO_OPERACION_NO_CONFIGURADO:'El Administrador debe configurar el punto base de inicio y finalización en Configuración.', PUNTO_OPERACION_NO_CONFIRMADO:'El servidor no confirmó el punto operacional. Ejecute la reparación del sistema y vuelva a guardarlo.', VALIDACION_UBICACION_DESACTIVADA:'La validación geográfica de operaciones está desactivada. Debe activarse en Configuración.',
       UBICACION_OPERACION_REQUERIDA:'Debe permitir el acceso al GPS y obtener la ubicación antes de continuar.', PRECISION_GPS_REQUERIDA:'El dispositivo no informó la precisión de la ubicación.',
-      UBICACION_GPS_IMPRECISA:'La señal GPS es demasiado imprecisa. Salga a un lugar abierto y vuelva a intentarlo.', FUERA_DEL_PUNTO_DE_INICIO:'No puede iniciar la operación fuera del punto autorizado por el Administrador.',
+      UBICACION_GPS_IMPRECISA:'La señal GPS es demasiado imprecisa. Salga a un lugar abierto y vuelva a intentarlo.', UBICACION_GPS_COORDENADAS_INVALIDAS:'La lectura GPS contiene coordenadas no válidas.', UBICACION_GPS_PRECISION_REQUERIDA:'El dispositivo no informó la precisión necesaria.', UBICACION_SIMULADA_RECHAZADA:'La ubicación simulada fue rechazada por seguridad.', UBICACION_RED_IMPRECISA:'La ubicación aproximada de red no tiene precisión suficiente. Espere señal GPS.', FECHA_GPS_ANTIGUA:'La ubicación recibida es antigua y no reemplazará la última posición confiable.', FECHA_GPS_FUTURA:'La fecha del dispositivo no es válida para registrar el GPS.', FECHA_GPS_ANTERIOR:'Se descartó una ubicación anterior a la última señal aceptada.', SALTO_GPS_IMPOSIBLE:'Se descartó un salto de ubicación incompatible con el movimiento real del vehículo.', UBICACION_GPS_DEGRADADA:'La nueva lectura es mucho menos precisa y fue descartada.', FUERA_DEL_PUNTO_DE_INICIO:'No puede iniciar la operación fuera del punto autorizado por el Administrador.',
       FUERA_DEL_PUNTO_DE_FINALIZACION:'No puede finalizar la operación hasta regresar al punto autorizado.', RADIO_OPERACION_INVALIDO:'Los radios y la precisión permitida deben estar entre 10 y 5.000 metros.',
       RUTA_NO_DISPONIBLE:'La ruta seleccionada ya no está disponible.', RUTA_NO_CONFIRMADA_EN_CURSO:'El servidor respondió, pero no confirmó la ruta en estado En curso. Publique nuevamente Codigo_Completo.gs.', RUTA_VEHICULO_REQUERIDO:'La ruta necesita un vehículo asignado o una operación activa con vehículo.', RUTA_VEHICULO_NO_COINCIDE_OPERACION:'La operación activa utiliza otro vehículo distinto al asignado en la ruta.', RUTA_NO_COINCIDE_CONDUCTOR:'La ruta no corresponde al conductor seleccionado.', RUTA_NO_COINCIDE_VEHICULO:'La ruta no corresponde al vehículo seleccionado.', RUTA_YA_VINCULADA:'La ruta ya está vinculada a otra operación activa.',
       PUNTO_OPERACION_ROL_NO_AUTORIZADO:'Solo un Administrador o Supervisor puede configurar o cambiar el punto base.', CIERRE_EXCEPCIONAL_NO_AUTORIZADO:'Solo un Administrador o Supervisor puede cerrar una operación fuera de la base.',
@@ -423,7 +427,7 @@
       COMBUSTIBLE_OPERACION_NO_AUTORIZADA:'La operación seleccionada pertenece a otro conductor.', COMBUSTIBLE_RUTA_NO_AUTORIZADA:'La ruta seleccionada pertenece a otro conductor.', CONDUCTOR_NO_ASOCIADO_USUARIO:'Su cuenta todavía no está asociada a un registro de conductor.',
       DOCUMENTO_CONDUCTOR_NO_ENCONTRADO:'El conductor seleccionado no existe.', DOCUMENTO_USUARIO_NO_ENCONTRADO:'La cuenta seleccionada no existe.',
       IMPORTACION_SIN_FILAS:'La planilla no contiene filas para importar.', IMPORTACION_DEMASIADAS_FILAS:'La planilla supera el máximo de 1.500 filas por carga.', LECTOR_XLSX_NO_DISPONIBLE:'No se cargó el lector de Excel. Recargue la página con Ctrl + F5.', FORMATO_IMPORTACION_INVALIDO:'Use una plantilla XLSX o CSV válida.', EXPORTADOR_REPORTES_NO_DISPONIBLE:'No se cargó el componente de exportación. Recargue la página con Ctrl + F5.', FORMATO_REPORTE_NO_SOPORTADO:'El formato solicitado no está disponible.', JSZip_NO_DISPONIBLE:'No se pudo cargar el generador de archivos Excel.', PLANILLA_SIN_HOJA_DATOS:'La planilla no contiene la hoja de datos esperada.', ASOCIADO_NO_ENCONTRADO:'No se encontró el vehículo, conductor o empresa indicado en el documento.',
-      ARCHIVO_REQUERIDO:'Seleccione un archivo para subir.', ARCHIVO_LEGADO_DRIVE_REQUIERE_RECARGA:'Este adjunto pertenece al almacenamiento anterior. Edite el documento y vuelva a cargar el archivo para migrarlo a Supabase.', DOCUMENTO_SIN_ARCHIVO_ADJUNTO:'Este documento no tiene un archivo adjunto disponible.', ARCHIVO_REQUIERE_SESION:'La sesión debe estar activa para visualizar este archivo.', PERMISO_ARCHIVO_DENEGADO:'No tiene permisos para visualizar este archivo.', ARCHIVO_NO_ENCONTRADO:'El archivo no está disponible en el almacenamiento privado.', LIMPIEZA_NO_CONFIRMADA:'El servidor no confirmó la limpieza de los datos operativos.', CONFIRMACION_REQUERIDA:'Escriba LIMPIAR DATOS para confirmar la limpieza.', DIRECCION_REQUERIDA:'No se recibió una dirección válida para la ubicación.', DESTINO_ARCHIVO_INVALIDO:'La carpeta de destino no es válida.', CARGA_DOCUMENTOS_BLOQUEADA_ADMIN:'El Administrador bloqueó temporalmente la carga de documentos para esta cuenta.', FORMATO_ARCHIVO_DRIVE_INVALIDO:'Use una imagen para fotos o un archivo PDF para documentos PDF.', ARCHIVO_BASE64_INVALIDO:'No se pudo procesar el archivo seleccionado.', ARCHIVO_DRIVE_DEMASIADO_GRANDE:'El archivo supera el máximo permitido de 12 MB.', CARPETA_DRIVE_NO_DISPONIBLE:'No se pudo acceder al almacenamiento privado configurado.', DRIVE_REQUIERE_CONEXION_CENTRAL:'La carga de archivos requiere conexión con la API central de Supabase.', EVIDENCIA_RUTA_NO_AUTORIZADA:'La fotografía no pertenece a esta ruta o no está autorizada.', EVIDENCIA_RUTA_NO_DISPONIBLE:'La fotografía no está disponible en almacenamiento privado.', EVIDENCIA_RUTA_NO_ES_IMAGEN:'El respaldo seleccionado no es una imagen válida.', EVIDENCIA_RUTA_DEMASIADO_GRANDE:'La imagen es demasiado grande para mostrarse.'
+      ARCHIVO_REQUERIDO:'Seleccione un archivo para subir.', ARCHIVO_LEGADO_DRIVE_REQUIERE_RECARGA:'Este adjunto pertenece al almacenamiento anterior. Edite el documento y vuelva a cargar el archivo en el almacenamiento privado.', DOCUMENTO_SIN_ARCHIVO_ADJUNTO:'Este documento no tiene un archivo adjunto disponible.', ARCHIVO_REQUIERE_SESION:'La sesión debe estar activa para visualizar este archivo.', PERMISO_ARCHIVO_DENEGADO:'No tiene permisos para visualizar este archivo.', ARCHIVO_NO_ENCONTRADO:'El archivo no está disponible en el almacenamiento privado.', LIMPIEZA_NO_CONFIRMADA:'El servidor no confirmó la limpieza de los datos operativos.', CONFIRMACION_REQUERIDA:'Escriba LIMPIAR DATOS para confirmar la limpieza.', DIRECCION_REQUERIDA:'No se recibió una dirección válida para la ubicación.', DESTINO_ARCHIVO_INVALIDO:'La carpeta de destino no es válida.', CARGA_DOCUMENTOS_BLOQUEADA_ADMIN:'El Administrador bloqueó temporalmente la carga de documentos para esta cuenta.', FORMATO_ARCHIVO_DRIVE_INVALIDO:'Use una imagen para fotos o un archivo PDF para documentos PDF.', ARCHIVO_BASE64_INVALIDO:'No se pudo procesar el archivo seleccionado.', ARCHIVO_DRIVE_DEMASIADO_GRANDE:'El archivo supera el máximo permitido de 12 MB.', CARPETA_DRIVE_NO_DISPONIBLE:'No se pudo acceder al almacenamiento privado configurado.', DRIVE_REQUIERE_CONEXION_CENTRAL:'La carga de archivos requiere conexión con el servicio central de la Base de Datos.', EVIDENCIA_RUTA_NO_AUTORIZADA:'La fotografía no pertenece a esta ruta o no está autorizada.', EVIDENCIA_RUTA_NO_DISPONIBLE:'La fotografía no está disponible en almacenamiento privado.', EVIDENCIA_RUTA_NO_ES_IMAGEN:'El respaldo seleccionado no es una imagen válida.', EVIDENCIA_RUTA_DEMASIADO_GRANDE:'La imagen es demasiado grande para mostrarse.'
     };
     if (messages[key]) return messages[key];
     if (key.startsWith('CAMPO_REQUERIDO_')) return `El campo ${key.replace('CAMPO_REQUERIDO_','')} es obligatorio.`;
@@ -535,7 +539,7 @@
   async function sendHeartbeat(state='En línea'){
     if(!currentUser)return;
     try{
-      const last=ultimaPosicionConocida||{};const result=await api.request('heartbeat',{data:{DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,GPS_ACTIVO:gpsWatchId===null?'NO':'SI',PAGINA_VISIBLE:document.hidden?'NO':'SI',ESTADO:state,PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,TIPO_RED:connectionType(),BATERIA_PORCENTAJE:batteryLevel,IP_PUBLICA:clientPublicIp,LATITUD:last.latitud??'',LONGITUD:last.longitud??'',PRECISION_METROS:last.precision??'',FECHA_GPS:last.fecha?new Date(last.fecha).toISOString():'',FUENTE_GPS:last.fuente||'Última ubicación del dispositivo',DIRECCION:last.direccion||lastAddressLookup.address||''}});
+      const stored=ultimaPosicionConocida||{},last=ubicacionLocalConfiable(stored)?stored:{};const result=await api.request('heartbeat',{data:{DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,GPS_ACTIVO:gpsWatchId===null?'NO':'SI',PAGINA_VISIBLE:document.hidden?'NO':'SI',ESTADO:state,PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,TIPO_RED:connectionType(),BATERIA_PORCENTAJE:batteryLevel,IP_PUBLICA:clientPublicIp,LATITUD:last.latitud??'',LONGITUD:last.longitud??'',PRECISION_METROS:last.precision??'',FECHA_GPS:last.fecha?new Date(last.fecha).toISOString():'',FUENTE_GPS:last.fuente||'',DIRECCION:last.direccion||''}});
       if(result?.user){
         const previousVersion=Number(currentUser.VERSION_PERMISOS||0),nextVersion=Number(result.user.VERSION_PERMISOS||0);
         const previousRole=String(currentUser.ROL_ID||''),nextRole=String(result.user.ROL_ID||'');
@@ -796,7 +800,7 @@
     const title=labels[section]||'Módulo';
     return decorarModuloConSincronizacion(
       heading('CARGA MANUAL',title,'Este módulo inicia sin datos para que el sistema abra de inmediato.',`<button class="btn primary" type="button" data-sync>↻ Sincronizar ahora</button>`)+
-      `<article class="card manual-load-empty">${empty('↻','Módulo listo para sincronizar','No se ha consultado Google Sheets. Pulse Sincronizar para cargar únicamente la información de este módulo.','<button class="btn primary" type="button" data-sync>Sincronizar datos</button>')}</article>`,section);
+      `<article class="card manual-load-empty">${empty('↻','Módulo listo para sincronizar','No se ha consultado la Base de Datos. Pulse Sincronizar para cargar únicamente la información de este módulo.','<button class="btn primary" type="button" data-sync>Sincronizar datos</button>')}</article>`,section);
   }
 
   function esqueletoModulo() {
@@ -894,6 +898,7 @@
   }
 
   function cleanupSection() {
+    stopRouteClocks();
     if (gpsRefreshTimer) clearTimeout(gpsRefreshTimer); gpsRefreshTimer=null;
     if (connectionsRefreshTimer) clearTimeout(connectionsRefreshTimer); connectionsRefreshTimer=null;
     if (connectionTrackingLiveTimer) clearTimeout(connectionTrackingLiveTimer); connectionTrackingLiveTimer=null;
@@ -913,20 +918,44 @@
         { key:'dashboard', action:'dashboard' },
         { key:'realtime', action:'realtimeSummary' },
       ]);
-      const data=batch.dashboard||{},realtime=batch.realtime||{},m=data.metrics || {};
-      const operations=(data.recentOperations||[]).map(op=>`<tr><td><strong>${esc(op.ID)}</strong></td><td>${esc(op.VEHICULO_ID)}</td><td>${esc(op.CONDUCTOR_ID)}</td><td>${fmtDate(op.FECHA_INICIO,true)}</td><td>${status(op.ESTADO)}</td><td>${esc(op.ORIGEN||'')} → ${esc(op.DESTINO||'')}</td></tr>`).join('');
+      const data=batch.dashboard||{},realtime=batch.realtime||{};if(data.error)throw new Error(data.error);const raw=data.metrics||{};
+      const numeric=(...values)=>{for(const value of values){const parsed=Number(value);if(Number.isFinite(parsed))return parsed;}return 0;};
+      const m={
+        vehicles:numeric(raw.vehicles,raw.totalVehicles),availableVehicles:numeric(raw.availableVehicles),
+        drivers:numeric(raw.drivers,raw.totalDrivers),availableDrivers:numeric(raw.availableDrivers),
+        activeOperations:numeric(raw.activeOperations,data.activeOperations?.length),activeRoutes:numeric(raw.activeRoutes,raw.assignedRoutes),
+        unreadAlerts:numeric(raw.unreadAlerts),unreadNotifications:numeric(raw.unreadNotifications),
+        openMaintenance:numeric(raw.openMaintenance,raw.pendingMaintenance),expiredDocuments:numeric(raw.expiredDocuments),expiringDocuments:numeric(raw.expiringDocuments),
+        fuelLoadsMonth:numeric(raw.fuelLoadsMonth),fuelLitersMonth:numeric(raw.fuelLitersMonth),fuelCostMonth:numeric(raw.fuelCostMonth,raw.fuelMonthCost),
+        onlineDevices:numeric(raw.onlineDevices),pendingCheckins:numeric(raw.pendingCheckins),blockedCheckins:numeric(raw.blockedCheckins),approvedCheckins:numeric(raw.approvedCheckins)
+      };
+      const operationRows=Array.isArray(data.recentOperations)?data.recentOperations:(Array.isArray(data.activeOperations)?data.activeOperations:[]);
+      const routeRows=Array.isArray(data.routes)?data.routes:(Array.isArray(data.recentRoutes)?data.recentRoutes:[]);
+      const operations=operationRows.map(op=>`<tr><td><strong>${esc(op.ID)}</strong></td><td>${esc(op.VEHICULO_ID)}</td><td>${esc(op.CONDUCTOR_ID)}</td><td>${fmtDate(op.FECHA_INICIO||op.CREADO_EN,true)}</td><td>${status(op.ESTADO)}</td><td>${esc(op.ORIGEN||'')} → ${esc(op.DESTINO||'')}</td></tr>`).join('');
       const notifications=(data.notifications||[]).map(notificationCard).join('');
-      const routes=(data.routes||[]).filter(r=>['Asignada','En curso'].includes(r.ESTADO));
+      const normalizeState=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+      const routes=routeRows.filter(r=>['asignada','en curso','iniciada','activa'].includes(normalizeState(r.ESTADO)));
       const headingActions=`<button class="btn soft" data-sync>↻ Sincronizar</button>${hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>＋ Asignar ruta</button>':''}`;
       const driverHero=currentUser.ROL_ID==='ROL-CONDUCTOR'&&routes.length?`<div class="driver-home"><article class="card driver-route-hero"><div class="card-header"><div><h3>Próxima ruta asignada</h3><p>Lista para iniciar navegación</p></div>${status(routes[0].ESTADO)}</div>${routeCard(routes[0],true)}</article><article class="card"><div class="card-header"><div><h3>Mi conexión</h3><p>Estado del dispositivo</p></div></div><div class="tracking-notice ${gpsWatchId===null?'inactive':'active'}" data-tracking-notice><i data-tracking-icon>${gpsWatchId===null?'○':'●'}</i><div><b data-tracking-title>${gpsWatchId===null?'Ubicación continua detenida':'Ubicación continua activada'}</b><span data-tracking-detail>${trackingDetail()}</span></div></div><button class="btn ${gpsWatchId===null?'primary':'danger'} full" data-toggle-tracking>${gpsWatchId===null?'Activar ubicación continua':'Detener ubicación continua'}</button></article></div>`:'';
-      return heading('RESUMEN OPERACIONAL',`Hola, ${esc(currentUser.NOMBRE.split(' ')[0])}`,'Información actualizada de flota, rutas, dispositivos y avisos según sus permisos.',headingActions)+
+      const kpis=[
+        hasPermission('VEHICULOS','LEER')?metric('▣','Vehículos',m.vehicles,`${m.availableVehicles} disponibles`,'vehicles'):'',
+        hasPermission('CONDUCTORES','LEER')?metric('♙','Conductores',m.drivers,`${m.availableDrivers} disponibles`,'drivers'):'',
+        hasPermission('OPERACIONES','LEER')?metric('⇄','Operaciones activas',m.activeOperations,'Seguimiento en curso','operations'):'',
+        hasPermission('RUTAS','LEER')?metric('➜','Rutas activas',m.activeRoutes,'Asignadas o en curso','routes'):'',
+        hasPermission('ALERTAS','LEER')?metric('!','Alertas pendientes',m.unreadAlerts,`${m.unreadNotifications} notificaciones sin leer`,'alerts'):'',
+        hasPermission('DOCUMENTOS','LEER')?metric('▤','Documentos vencidos',m.expiredDocuments,`${m.expiringDocuments} vencen en 30 días`,'documents'):'',
+        hasPermission('COMBUSTIBLE','LEER')?metric('⛽','Combustible del mes',`${decimal(m.fuelLitersMonth,1)} L`,`${m.fuelLoadsMonth} cargas · ${clp(m.fuelCostMonth)}`,'fuel'):'',
+        hasPermission('MANTENCIONES','LEER')?metric('⚙','Mantenciones abiertas',m.openMaintenance,'Pendientes o en proceso','maintenance'):''
+      ].join('');
+      const onlineCount=numeric(realtime.totals?.onlineDevices,realtime.totals?.activos,m.onlineDevices);
+      return heading('RESUMEN OPERACIONAL',`Hola, ${esc(currentUser.NOMBRE.split(' ')[0])}`,'Indicadores calculados desde la Base de Datos y limitados a la información autorizada para su rol.',headingActions)+
         driverHero+
-        `<div class="kpi-grid">${metric('▣','Vehículos',m.vehicles||0,`${m.availableVehicles||0} disponibles`)}${metric('♙','Conductores',m.drivers||0,`${m.availableDrivers||0} disponibles`)}${metric('⇄','Operaciones activas',m.activeOperations||0,'Seguimiento en curso')}${metric('!','Alertas',m.unreadAlerts||0,`${m.expiredDocuments||0} documentos vencidos`)}${hasPermission('COMBUSTIBLE','LEER')?metric('⛽','Combustible del mes',`${decimal(m.fuelLitersMonth||0,1)} L`,clp(m.fuelCostMonth||0)):''}</div>`+
-        `<div class="live-strip">${liveStat('⌖','Sesiones abiertas',realtime.totals?.onlineDevices??m.onlineDevices??0,'online')}${liveStat('🚐','Conduciendo',realtime.totals?.drivingSessions||0,'online')}${liveStat('✓','Check-ins aprobados',m.approvedCheckins||0,'online')}${liveStat('!','Check-ins por atender',(m.pendingCheckins||0)+(m.blockedCheckins||0),((m.pendingCheckins||0)+(m.blockedCheckins||0))?'warning':'')}</div>`+
+        `<div class="kpi-grid">${kpis||metric('✓','Panel disponible',0,'No hay módulos adicionales habilitados')}</div>`+
+        `<div class="live-strip">${liveStat('⌖','Sesiones abiertas',onlineCount,'online')}${liveStat('🚐','Conduciendo',numeric(realtime.totals?.drivingSessions),'online')}${liveStat('✓','Check-ins aprobados',m.approvedCheckins,'online')}${liveStat('!','Check-ins por atender',m.pendingCheckins+m.blockedCheckins,(m.pendingCheckins+m.blockedCheckins)?'warning':'')}</div>`+
         `<div class="dashboard-insights"><article class="card"><div class="card-header"><div><h3>Operaciones de los últimos 7 días</h3><p>Actividad diaria visible para su rol</p></div></div>${weeklyBars(data.charts?.operationsByDay||[])}</article><article class="card"><div class="card-header"><div><h3>Estado de la flota</h3><p>Distribución actual de vehículos</p></div></div>${stateDonut(data.charts?.vehicleStates||[])}</article><article class="card"><div class="card-header"><div><h3>Acciones rápidas</h3><p>Accesos según sus permisos</p></div></div>${quickActions()}</article></div>`+
         `${hasPermission('CONEXIONES','LEER')?`<article class="card session-control-card"><div class="card-header"><div><h3>Control de sesiones abiertas</h3><p>Usuario, conductor, módulo abierto, vehículo, operación, ruta y GPS por cada sesión.</p></div><button class="link-button" data-nav="gps">Abrir monitoreo</button></div><div class="device-list dashboard-session-list">${(realtime.devices||[]).slice(0,12).map(deviceCard).join('')||empty('○','Sin sesiones registradas','Las sesiones aparecerán cuando los usuarios ingresen al sistema.')}</div></article>`:''}`+
         `<div class="dashboard-grid"><article class="card"><div class="card-header"><div><h3>Operaciones recientes</h3><p>Movimientos creados en el sistema</p></div></div>${operations?table(['Operación','Vehículo','Conductor','Inicio','Estado','Ruta'],operations):empty('⇄','Aún no hay operaciones','No existen recorridos visibles para esta cuenta.',hasPermission('OPERACIONES','CREAR')?'<button class="btn primary" data-nav="operations">Crear operación</button>':'')}</article>`+
-        `<article class="card"><div class="card-header"><div><h3>Notificaciones pendientes</h3><p>Mensajes dirigidos al usuario</p></div><button class="link-button" data-nav="notifications">Ver todas</button></div><div class="notification-list">${notifications||empty('✓','Sin notificaciones','No existen mensajes pendientes.')}</div></article></div>`;
+        `<article class="card"><div class="card-header"><div><h3>Notificaciones pendientes</h3><p>Mensajes dirigidos al usuario</p></div>${hasPermission('NOTIFICACIONES','LEER')?'<button class="link-button" data-nav="notifications">Ver todas</button>':''}</div><div class="notification-list">${notifications||empty('✓','Sin notificaciones','No existen mensajes pendientes.')}</div></article></div>`;
     },
     async office(){return renderOficinaVirtual();},
     async vehicles(){return renderResourcePage('vehicles','FLOTA','Vehículos','Administre las unidades, patentes, kilometraje y códigos QR.',vehicleRows,['Vehículo','Patente','Año','Kilometraje','Estado','QR','']);},
@@ -951,7 +980,7 @@
     async settings(){return renderSettings();}
   };
 
-  function metric(icon,label,value,detail){return `<article class="metric-card"><i class="metric-icon">${icon}</i><div><span>${label}</span><b>${value}</b><small>${detail}</small></div></article>`;}
+  function metric(icon,label,value,detail,section=''){const content=`<i class="metric-icon">${icon}</i><div><span>${label}</span><b>${value}</b><small>${detail}</small></div>`;return section?`<button class="metric-card metric-card-button" type="button" data-nav="${esc(section)}">${content}</button>`:`<article class="metric-card">${content}</article>`;}
   function liveStat(icon,label,value,mode=''){return `<article class="live-stat ${mode}"><i>${icon}</i><div><span>${label}</span><b>${number(value)}</b></div></article>`;}
   function navigationUrl(route){
     const latitude=Number(route.DESTINO_LATITUD),longitude=Number(route.DESTINO_LONGITUD);
@@ -961,6 +990,27 @@
     if(route.ORIGEN&&route.ORIGEN!=='Ubicación actual')params.set('origin',route.ORIGEN);
     return `https://www.google.com/maps/dir/?${params.toString()}`;
   }
+
+  function formatRouteElapsed(totalValue){
+    const total=Math.max(0,Math.floor(Number(totalValue)||0)),hours=Math.floor(total/3600),minutes=Math.floor((total%3600)/60),seconds=total%60;
+    return [hours,minutes,seconds].map(value=>String(value).padStart(2,'0')).join(':');
+  }
+  function routeClockData(route,now=Date.now()){
+    const item=route||{},state=String(item.ESTADO||'Asignada'),startValue=item.CRONOMETRO_INICIO||item.FECHA_ASIGNACION||item.CREADO_EN,start=new Date(startValue||0).getTime();
+    const stopped=['Completada','Cancelada'].includes(state),endValue=item.CRONOMETRO_FIN||item.FECHA_FIN,end=new Date(endValue||0).getTime();
+    let seconds=Number(item.TIEMPO_TRANSCURRIDO_SEGUNDOS||0);
+    if(Number.isFinite(start)&&start>0)seconds=Math.max(0,Math.floor(((stopped&&Number.isFinite(end)&&end>0?end:now)-start)/1000));
+    return{seconds,text:item.TIEMPO_TRANSCURRIDO_TEXTO||formatRouteElapsed(seconds),running:!stopped&&start>0,start:startValue||'',end:endValue||'',state};
+  }
+  function routeClockMarkup(route,compact=false){
+    const clock=routeClockData(route),id=String(route?.ID||'');
+    return `<div class="route-clock ${clock.running?'running':'stopped'} ${compact?'compact':''}" data-route-clock="${esc(id)}" data-route-clock-start="${esc(clock.start)}" data-route-clock-end="${esc(clock.end)}" data-route-clock-state="${esc(clock.state)}" data-route-clock-seconds="${clock.seconds}"><i>${clock.running?'◷':'✓'}</i><span><small>${clock.running?'Tiempo transcurrido':'Tiempo registrado'}</small><b data-route-clock-value>${esc(clock.text)}</b></span></div>`;
+  }
+  function updateRouteClocks(){
+    $$('[data-route-clock]').forEach(node=>{const state=String(node.dataset.routeClockState||''),start=new Date(node.dataset.routeClockStart||0).getTime(),end=new Date(node.dataset.routeClockEnd||0).getTime(),stopped=['Completada','Cancelada'].includes(state);let seconds=Number(node.dataset.routeClockSeconds||0);if(Number.isFinite(start)&&start>0)seconds=Math.max(0,Math.floor(((stopped&&Number.isFinite(end)&&end>0?end:Date.now())-start)/1000));const value=$('[data-route-clock-value]',node);if(value)value.textContent=formatRouteElapsed(seconds);});
+  }
+  function stopRouteClocks(){if(routeClockInterval){clearInterval(routeClockInterval);routeClockInterval=null;}}
+  function startRouteClocks(){stopRouteClocks();updateRouteClocks();if($('[data-route-clock].running'))routeClockInterval=setInterval(updateRouteClocks,1000);}
 
   function routeCard(route,hero=false){
     const item=route||{};
@@ -985,7 +1035,7 @@
     if(id&&canEvidence)actions.push(`<button class="btn soft small" type="button" data-route-evidence="${esc(id)}">📷 Respaldo</button>`);
     if(evidenceCount)actions.push(botonGaleriaRuta(item,`Ver ${evidenceCount} foto(s)`));
     if(item.CONDUCTOR_TELEFONO&&item.CONDUCTOR_ID)actions.push(`<button class="btn whatsapp small" type="button" data-whatsapp-driver="${esc(item.CONDUCTOR_ID)}">WhatsApp</button>`);
-    return `<article class="route-card ${hero?'route-card-hero':''}"><header><div><h4>${esc(item.NOMBRE||id||'Ruta asignada')}</h4><p>${esc(driver)} · ${esc(vehicle)}</p></div><span class="priority ${esc(priority.toLowerCase())}">${esc(priority)}</span></header><div class="route-path"><i></i><span><b>Origen</b><br>${esc(origin)}</span><i class="end"></i><span><b>Destino</b><br>${esc(destination)}</span></div>${instructions?`<p class="route-instructions"><b>Indicaciones:</b> ${esc(instructions)}</p>`:''}<div class="route-meta"><span>${status(state)}</span><span>Asignada ${fmtDate(item.FECHA_ASIGNACION||item.CREADO_EN,true)}</span>${item.PROVEEDOR_NAVEGACION?`<span>${esc(item.PROVEEDOR_NAVEGACION)}</span>`:''}${item.OPERACION_ID?`<span>Operación ${esc(item.OPERACION_ID)}</span>`:''}</div><div class="route-actions">${actions.join('')}</div></article>`;
+    return `<article class="route-card ${hero?'route-card-hero':''}"><header><div><h4>${esc(item.NOMBRE||id||'Ruta asignada')}</h4><p>${esc(driver)} · ${esc(vehicle)}</p></div><span class="priority ${esc(priority.toLowerCase())}">${esc(priority)}</span></header><div class="route-path"><i></i><span><b>Origen</b><br>${esc(origin)}</span><i class="end"></i><span><b>Destino</b><br>${esc(destination)}</span></div>${instructions?`<p class="route-instructions"><b>Indicaciones:</b> ${esc(instructions)}</p>`:''}${routeClockMarkup(item)}<div class="route-meta"><span>${status(state)}</span><span>Asignada ${fmtDate(item.FECHA_ASIGNACION||item.CREADO_EN,true)}</span>${item.PROVEEDOR_NAVEGACION?`<span>${esc(item.PROVEEDOR_NAVEGACION)}</span>`:''}${item.OPERACION_ID?`<span>Operación ${esc(item.OPERACION_ID)}</span>`:''}</div><div class="route-actions">${actions.join('')}</div></article>`;
   }
 
   const cacheImagenesEvidenciaRuta=new Map();
@@ -1167,7 +1217,7 @@
     const estado=linked
       ? `<div class="drive-upload-status ${legacy?'warning':'ready'}" data-drive-upload-status><i>${legacy?'!':'✓'}</i><span>${legacy?'Archivo legado no migrado: edite el registro y vuelva a cargar el adjunto una sola vez para dejarlo disponible en todos los dispositivos.':`Archivo privado disponible${name?` · ${esc(name)}`:''}`}</span></div>`
       : `<div class="drive-upload-status" data-drive-upload-status><i>○</i><span>Sin archivo adjunto.</span></div>`;
-    return `<div class="drive-fast-upload secure-storage-upload" data-drive-upload="${combustible?'fuel':'documents'}"><label class="drive-file-picker"><input type="file" data-drive-file accept="${accept}"${capture}><i>⇧</i><span><b>${combustible?'Tomar foto o elegir comprobante':'Elegir foto o PDF'}</b><small>Se almacena de forma privada en Supabase y solo se muestra a usuarios autorizados.</small></span></label>${estado}<input name="${campo}" type="hidden" value="${esc(url)}" data-drive-url><input name="ARCHIVO_BUCKET" type="hidden" value="${esc(bucket)}" data-file-bucket><input name="ARCHIVO_RUTA" type="hidden" value="${esc(path)}" data-file-path><input name="NOMBRE_ARCHIVO" type="hidden" value="${esc(name)}" data-file-name><input name="TIPO_MIME" type="hidden" value="${esc(mime)}" data-file-mime><input name="TAMANO_BYTES" type="hidden" value="${esc(size)}" data-file-size></div>`;
+    return `<div class="drive-fast-upload secure-storage-upload" data-drive-upload="${combustible?'fuel':'documents'}"><label class="drive-file-picker"><input type="file" data-drive-file accept="${accept}"${capture}><i>⇧</i><span><b>${combustible?'Tomar foto o elegir comprobante':'Elegir foto o PDF'}</b><small>Se almacena de forma privada en la Base de Datos y solo se muestra a usuarios autorizados.</small></span></label>${estado}<input name="${campo}" type="hidden" value="${esc(url)}" data-drive-url><input name="ARCHIVO_BUCKET" type="hidden" value="${esc(bucket)}" data-file-bucket><input name="ARCHIVO_RUTA" type="hidden" value="${esc(path)}" data-file-path><input name="NOMBRE_ARCHIVO" type="hidden" value="${esc(name)}" data-file-name><input name="TIPO_MIME" type="hidden" value="${esc(mime)}" data-file-mime><input name="TAMANO_BYTES" type="hidden" value="${esc(size)}" data-file-size></div>`;
   }
   function contextoArchivoFormulario(form,tipo){
     if(tipo==='fuel')return [form.elements.NUMERO_DOCUMENTO?.value,form.elements.VEHICULO_ID?.value].filter(Boolean).join(' - ')||'Boleta combustible';
@@ -1535,11 +1585,15 @@
     if(configured&&effective!==company)currentCompany={...(currentCompany||{}),...effective};
     return{configurada:configured,nombre:effective.PUNTO_OPERACION_NOMBRE||'Base operacional',direccion:effective.PUNTO_OPERACION_DIRECCION||effective.DIRECCION||'Sin dirección',latitud:latitude,longitud:longitude,radioInicio:Math.max(10,Number(effective.RADIO_INICIO_METROS||150)),radioFin:Math.max(10,Number(effective.RADIO_FIN_METROS||150)),precisionMaxima:Math.max(10,Number(effective.PRECISION_GPS_MAXIMA_METROS||120)),origen:effective.PUNTO_OPERACION_ORIGEN||'SERVIDOR',confirmadoEn:effective.PUNTO_OPERACION_CONFIRMADO_EN||''};
   }
+  function ubicacionLocalConfiable(location={},maxAge=180000){
+    const lat=Number(location.latitud),lng=Number(location.longitud),precision=Number(location.precision),fecha=Number(location.fecha||0);
+    return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180&&!(Math.abs(lat)<0.000001&&Math.abs(lng)<0.000001)&&Number.isFinite(precision)&&precision>0&&precision<=Number(config.PRECISION_GPS_MAPA_MAXIMA_METROS||120)&&fecha>0&&Date.now()-fecha<=maxAge&&Date.now()-fecha>=-60000&&location.confiable!==false;
+  }
   function guardarUltimaUbicacionDispositivo(location={}){
     const latitud=Number(location.latitud),longitud=Number(location.longitud),precision=Math.max(1,Number(location.precision||9999)),fecha=Number(location.fecha||Date.now());
     if(!Number.isFinite(latitud)||!Number.isFinite(longitud))return null;
     const direccion=String(location.direccion||ultimaPosicionConocida?.direccion||lastAddressLookup.address||'').trim();
-    const clean={latitud,longitud,precision,fecha,fuente:location.fuente||'GPS del dispositivo',direccion};
+    const clean={latitud,longitud,precision,fecha,fuente:location.fuente||'GPS del dispositivo',direccion,confiable:location.confiable!==false};
     ultimaPosicionConocida=clean;
     try{localStorage.setItem(lastKnownLocationDeviceKey,JSON.stringify(clean));}catch(_){}
     return clean;
@@ -1548,7 +1602,8 @@
     try{
       const row=JSON.parse(localStorage.getItem(lastKnownLocationDeviceKey)||'null');
       if(!row||!Number.isFinite(Number(row.latitud))||!Number.isFinite(Number(row.longitud)))return null;
-      return{latitud:Number(row.latitud),longitud:Number(row.longitud),precision:Math.max(1,Number(row.precision||9999)),fecha:Number(row.fecha||0),fuente:row.fuente||'Última ubicación conocida',direccion:String(row.direccion||'')};
+      const clean={latitud:Number(row.latitud),longitud:Number(row.longitud),precision:Math.max(1,Number(row.precision||9999)),fecha:Number(row.fecha||0),fuente:row.fuente||'Última ubicación conocida',direccion:String(row.direccion||''),confiable:row.confiable!==false};
+      return ubicacionLocalConfiable(clean,1800000)?clean:null;
     }catch(_){return null;}
   }
   function posicionNavegadorUnaVez({enableHighAccuracy=true,timeout=5000,maximumAge=15000}={}){
@@ -1686,12 +1741,12 @@
     if(!base.configurada)prerequisites.push(`<div class="module-diagnostic warning"><i>⌖</i><div><b>La ruta puede asignarse sin geocerca</b><span>Defina manualmente el origen y el destino. El punto operacional solo será obligatorio cuando se intente iniciar o finalizar una operación.</span></div>${puedeAdministrarPuntoOperacion()?'<button class="btn soft" data-nav="settings">Configurar punto para operaciones</button>':''}</div>`);
     if(hasPermission('RUTAS','CREAR')&&!driversResult.rows.length)prerequisites.push(`<div class="module-diagnostic warning"><i>♙</i><div><b>No existen conductores disponibles</b><span>Registre un conductor antes de crear la primera asignación.</span></div><button class="btn soft" data-nav="drivers">Abrir conductores</button></div>`);
     if(hasPermission('RUTAS','CREAR')&&!vehiclesResult.rows.length)prerequisites.push(`<div class="module-diagnostic warning"><i>▣</i><div><b>No existen vehículos registrados</b><span>Registre una unidad para asociarla a la ruta.</span></div><button class="btn soft" data-nav="vehicles">Abrir vehículos</button></div>`);
-    const routeRows=routes.slice().sort((a,b)=>new Date(b.FECHA_ASIGNACION||0)-new Date(a.FECHA_ASIGNACION||0)).map(route=>`<tr data-filter-date="${esc(route.FECHA_ASIGNACION||route.CREADO_EN||'')}" data-search-row="${esc(`${route.ID} ${route.NOMBRE} ${route.CONDUCTOR_NOMBRE} ${route.VEHICULO_PATENTE} ${route.DESTINO} ${route.ESTADO}`.toLowerCase())}"><td><strong>${esc(route.ID)}</strong><span class="muted">${esc(route.NOMBRE||'Ruta')}</span></td><td>${esc(route.CONDUCTOR_NOMBRE||'Sin conductor')}</td><td>${esc(route.VEHICULO_PATENTE||'Sin vehículo')}</td><td>${esc(route.ORIGEN||base.direccion)} → ${esc(route.DESTINO||'Sin destino')}</td><td>${fmtDate(route.FECHA_ASIGNACION,true)}</td><td>${status(route.ESTADO)}</td><td>${evidenciasRuta(route).length?botonGaleriaRuta(route,`Ver ${evidenciasRuta(route).length} foto(s)`):'Sin fotos'}</td><td><div class="row-button-stack"><a class="btn soft small" href="${esc(navigationUrl(route))}" target="_blank" rel="noopener">Navegar</a><button class="btn soft small" data-route-evidence="${route.ID}">📷 Respaldo</button>${driverMap[route.CONDUCTOR_ID]?.TELEFONO?`<button class="btn whatsapp small" data-whatsapp-driver="${esc(route.CONDUCTOR_ID)}">WhatsApp</button>`:''}</div></td></tr>`).join('');
+    const routeRows=routes.slice().sort((a,b)=>new Date(b.FECHA_ASIGNACION||0)-new Date(a.FECHA_ASIGNACION||0)).map(route=>`<tr data-filter-date="${esc(route.FECHA_ASIGNACION||route.CREADO_EN||'')}" data-search-row="${esc(`${route.ID} ${route.NOMBRE} ${route.CONDUCTOR_NOMBRE} ${route.VEHICULO_PATENTE} ${route.DESTINO} ${route.ESTADO}`.toLowerCase())}"><td><strong>${esc(route.ID)}</strong><span class="muted">${esc(route.NOMBRE||'Ruta')}</span></td><td>${esc(route.CONDUCTOR_NOMBRE||'Sin conductor')}</td><td>${esc(route.VEHICULO_PATENTE||'Sin vehículo')}</td><td>${esc(route.ORIGEN||base.direccion)} → ${esc(route.DESTINO||'Sin destino')}</td><td>${fmtDate(route.FECHA_ASIGNACION,true)}</td><td>${routeClockMarkup(route,true)}</td><td>${status(route.ESTADO)}</td><td>${evidenciasRuta(route).length?botonGaleriaRuta(route,`Ver ${evidenciasRuta(route).length} foto(s)`):'Sin fotos'}</td><td><div class="row-button-stack"><a class="btn soft small" href="${esc(navigationUrl(route))}" target="_blank" rel="noopener">Navegar</a><button class="btn soft small" data-route-evidence="${route.ID}">📷 Respaldo</button>${driverMap[route.CONDUCTOR_ID]?.TELEFONO?`<button class="btn whatsapp small" data-whatsapp-driver="${esc(route.CONDUCTOR_ID)}">WhatsApp</button>`:''}</div></td></tr>`).join('');
     return heading('PLANIFICACIÓN OPERACIONAL','Asignación de rutas','Cree, supervise y cierre rutas vinculadas al conductor, vehículo y punto base.',actions)+
       prerequisites.join('')+
       `<div class="live-strip">${liveStat('➜','Asignadas',assigned.length,assigned.length?'warning':'')}${liveStat('●','En curso',running.length,running.length?'online':'')}${liveStat('✓','Completadas',completed.length,'online')}${liveStat('×','Canceladas',cancelled.length,cancelled.length?'warning':'')}</div>`+
       `<div class="route-dashboard"><article class="card"><div class="card-header"><div><h3>Rutas activas</h3><p>${active.length} asignaciones pendientes o en ejecución</p></div></div><div class="route-list">${active.map(route=>routeCard(route)).join('')||empty('➜','Sin rutas activas','Asigne una ruta para comenzar la planificación.',hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>Asignar primera ruta</button>':'')}</div></article><article class="card"><div class="card-header"><div><h3>Flujo de la ruta</h3><p>Reglas coordinadas con Operaciones</p></div></div><div class="requirement-list"><div><i>1</i><span><b>Origen planificado</b><small>${esc(base.configurada?base.direccion:'Se define al asignar la ruta')}</small></span></div><div><i>2</i><span><b>Destino asignado</b><small>Se envía al conductor con Google Maps o Waze.</small></span></div><div><i>3</i><span><b>Check-in diario por conductor y vehículo</b><small>Se exige al iniciar la primera salida del día. Solo se reutiliza para el mismo conductor y el mismo vehículo.</small></span></div><div><i>4</i><span><b>GPS durante toda la ruta</b><small>Al iniciar se vincula con la operación activa y envía ubicación hasta completar o cancelar la ruta.</small></span></div></div></article></div>`+
-      `<article class="card"><div class="card-header"><div><h3>Historial de rutas</h3><p>Todos los estados y destinos registrados</p></div></div><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar ruta, conductor, vehículo o destino"></label>${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="routes">Exportar CSV</button>':''}</div><div data-filter-table>${table(['Ruta','Conductor','Vehículo','Recorrido','Asignación','Estado','Evidencias','Acciones'],routeRows,'No existen rutas registradas.')}</div></article>`;
+      `<article class="card"><div class="card-header"><div><h3>Historial de rutas</h3><p>Todos los estados y destinos registrados</p></div></div><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar ruta, conductor, vehículo o destino"></label>${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="routes">Exportar CSV</button>':''}</div><div data-filter-table>${table(['Ruta','Conductor','Vehículo','Recorrido','Asignada','Tiempo','Estado','Evidencias','Acciones'],routeRows,'No existen rutas registradas.')}</div></article>`;
   }
 
   async function renderNotifications() {
@@ -1710,7 +1765,7 @@
     return heading('CENTRO DE COMUNICACIONES','Notificaciones','Mensajes dirigidos, lectura, dictado y comandos de voz desde una sola bandeja.',actions)+
       `<div class="voice-command-panel"><div><span class="eyebrow">CONTROL POR VOZ</span><h3>Comandos disponibles</h3><p id="voiceCommandStatus">Diga “leer notificaciones”, “marcar todas como leídas”, “crear notificación” o “detener lectura”.</p></div><div class="voice-command-actions"><button class="btn primary" data-voice-command>🎙 Escuchar comando</button><button class="btn soft" data-speak-notifications>🔊 Leer</button><button class="btn soft" data-stop-voice>■ Detener</button></div></div>`+
       `<div class="live-strip">${liveStat('🔔','Total',notifications.length)}${liveStat('●','Pendientes',unread.length,unread.length?'warning':'online')}${liveStat('!','Alta o urgente',urgent.length,urgent.length?'warning':'')}${liveStat('✓','Leídas',notifications.length-unread.length,'online')}</div>`+
-      `<div class="notification-dashboard"><article class="card"><div class="card-header"><div><h3>Pendientes</h3><p>Mensajes que requieren atención</p></div>${unread.length?'<button class="link-button" data-read-all-notifications>Marcar todas como leídas</button>':''}</div><div class="notification-list">${unread.map(notificationCard).join('')||empty('✓','Bandeja al día','No existen mensajes pendientes.')}</div></article><article class="card"><div class="card-header"><div><h3>Estado del servicio</h3><p>Validaciones de comunicación</p></div></div><div class="requirement-list"><div><i>✓</i><span><b>Bandeja central</b><small>${api.isRemote()?'Sincronizada con Google Sheets':'Activa en este dispositivo'}</small></span></div><div><i>🎙</i><span><b>Comando de voz</b><small>${reconocimientoDisponible()?'Disponible en este navegador':'Reconocimiento no disponible; lectura sí puede funcionar'}</small></span></div><div><i>♙</i><span><b>Destinatarios</b><small>${driversResult.rows.length} conductores disponibles para mensajería</small></span></div></div></article></div>`+
+      `<div class="notification-dashboard"><article class="card"><div class="card-header"><div><h3>Pendientes</h3><p>Mensajes que requieren atención</p></div>${unread.length?'<button class="link-button" data-read-all-notifications>Marcar todas como leídas</button>':''}</div><div class="notification-list">${unread.map(notificationCard).join('')||empty('✓','Bandeja al día','No existen mensajes pendientes.')}</div></article><article class="card"><div class="card-header"><div><h3>Estado del servicio</h3><p>Validaciones de comunicación</p></div></div><div class="requirement-list"><div><i>✓</i><span><b>Bandeja central</b><small>${api.isRemote()?'Sincronizada con la Base de Datos':'Activa en este dispositivo'}</small></span></div><div><i>🎙</i><span><b>Comando de voz</b><small>${reconocimientoDisponible()?'Disponible en este navegador':'Reconocimiento no disponible; lectura sí puede funcionar'}</small></span></div><div><i>♙</i><span><b>Destinatarios</b><small>${driversResult.rows.length} conductores disponibles para mensajería</small></span></div></div></article></div>`+
       `<article class="card"><div class="card-header"><div><h3>Historial de notificaciones</h3><p>Mensajes enviados y recibidos</p></div></div><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar título, mensaje o destinatario"></label>${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="notifications">Exportar CSV</button>':''}</div><div data-filter-table>${table(['Estado','Mensaje','Destinatario','Prioridad','Tipo','Fecha','Acción'],rows,'No existen notificaciones registradas.')}</div></article>`;
   }
 
@@ -1812,22 +1867,60 @@
     await go('gps',{force:true});
   }
 
+  function gpsUserMarkerKey(row={}) {
+    const marker=String(row.MARCADOR_ID||'').trim();
+    if(marker)return marker;
+    const userId=String(row.USUARIO_ID||'').trim();
+    if(userId)return `USUARIO-${userId}`;
+    const driverId=String(row.CONDUCTOR_ID||'').trim();
+    if(driverId)return `CONDUCTOR-${driverId}`;
+    const vehicleId=String(row.VEHICULO_ID||'').trim();
+    if(vehicleId)return `VEHICULO-${vehicleId}`;
+    const deviceId=String(row.DISPOSITIVO_ID||row.CLAVE_SEGUIMIENTO||'').trim();
+    if(deviceId)return `DISPOSITIVO-${deviceId}`;
+    return `UBICACION-${String(row.ID||'SIN-ID')}`;
+  }
+  function deduplicateGpsLocations(rows=[]) {
+    const latestByUser=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      const key=gpsUserMarkerKey(row),previous=latestByUser.get(key);
+      const currentTime=new Date(row.FECHA_HORA||row.ACTUALIZADO_EN||row.CREADO_EN||0).getTime()||0;
+      const previousTime=previous?(new Date(previous.FECHA_HORA||previous.ACTUALIZADO_EN||previous.CREADO_EN||0).getTime()||0):-1;
+      const currentPrecision=Number(row.PRECISION_METROS||Number.MAX_SAFE_INTEGER);
+      const previousPrecision=Number(previous?.PRECISION_METROS||Number.MAX_SAFE_INTEGER);
+      if(!previous||currentTime>previousTime||(currentTime===previousTime&&currentPrecision<previousPrecision)){
+        latestByUser.set(key,{...row,MARCADOR_ID:key});
+      }
+    });
+    return [...latestByUser.values()].sort((a,b)=>(new Date(b.FECHA_HORA||0).getTime()||0)-(new Date(a.FECHA_HORA||0).getTime()||0));
+  }
+  function normalizeGpsSummary(result={}) {
+    const rawLocations=Array.isArray(result.locations)?result.locations:Array.isArray(result.rows)?result.rows:[];
+    const locations=deduplicateGpsLocations(rawLocations);
+    const devices=Array.isArray(result.devices)?result.devices:[];
+    const trackingVehicles=Array.isArray(result.trackingVehicles)?result.trackingVehicles:[];
+    const trackingDrivers=Array.isArray(result.trackingDrivers)?result.trackingDrivers:[];
+    return {...result,locations,rows:locations,devices,trackingVehicles,trackingDrivers,totals:{locations:locations.length,onlineDevices:0,drivingSessions:0,sessionsWithoutGps:0,...(result.totals||{})}};
+  }
+  function gpsRoleNotice(){
+    if(currentUser?.ROL_ID==='ROL-CONDUCTOR')return `<div class="tracking-notice active"><i>✓</i><div><b>Vista privada del Conductor</b><span>El servidor entrega únicamente su propia ubicación, vehículo, operación, ruta y sesión asociada.</span></div></div>`;
+    if(currentUser?.ROL_ID==='ROL-SUPERVISOR')return `<div class="tracking-notice active"><i>◉</i><div><b>Vista general del Supervisor</b><span>Puede visualizar toda la flota y aplicar filtros, sin controles administrativos delicados.</span></div></div>`;
+    return `<div class="tracking-notice active"><i>◆</i><div><b>Control total del Administrador</b><span>Visualización completa de la flota, sesiones, filtros, precisión GPS y estados operacionales.</span></div></div>`;
+  }
   async function renderGps() {
-    const realtime=ultimoResumenGps&&Array.isArray(ultimoResumenGps.locations)
-      ? ultimoResumenGps
-      : {locations:[],devices:[],trackingVehicles:[],totals:{}};
+    const realtime=normalizeGpsSummary(ultimoResumenGps);
     ultimoResumenGps=realtime;
     api.request('realtimeSummary',{...gpsFilterPayload(),force:true})
-      .then(result=>{ultimoResumenGps=result;if(currentSection==='gps')paintGpsData(result,true);})
-      .catch(()=>{});
-    const locations={rows:realtime.locations||[],total:realtime.totals?.locations||0};
-    return heading('MONITOREO','GPS en tiempo real','Posición, dirección escrita, velocidad y conexión de los teléfonos autorizados.',`<button class="btn soft" data-refresh-locations>↻ Sincronizar</button><button class="btn soft" data-capture-gps>⌖ Enviar ahora</button><button class="btn ${gpsWatchId===null?'primary':'danger'}" data-toggle-tracking>${gpsWatchId===null?'Activar ubicación continua':'Detener ubicación continua'}</button>`)+
-      gpsDriverFilterControls(realtime)+
-      gpsFilterControls(realtime)+
-      `<div class="tracking-notice ${gpsWatchId===null?'inactive':'active'}" data-tracking-notice><i data-tracking-icon>${gpsWatchId===null?'○':'●'}</i><div><b data-tracking-title>${gpsWatchId===null?'Ubicación continua detenida':'Ubicación continua activada'}</b><span data-tracking-detail>${trackingDetail()}</span></div></div>`+
-      `<div class="tracking-details"><div><span>Permiso del navegador</span><b data-tracking-permission>${permissionLabel()}</b></div><div><span>Reactivación automática</span><b data-tracking-preference>${trackingPreferenceEnabled()?'Activada':'Desactivada'}</b></div><div><span>Protección de pantalla activa</span><b data-wake-lock>${wakeLockLabel()}</b></div></div>`+
-      `<div class="live-strip"><article class="live-stat"><i>⌖</i><div><span>Ubicaciones visibles</span><b id="gpsVisibleCount">${locations.total}</b></div></article><article class="live-stat online"><i>●</i><div><span>Sesiones abiertas</span><b id="gpsOnlineCount">${realtime.totals?.onlineDevices||0}</b></div></article><article class="live-stat online"><i>🚐</i><div><span>Conduciendo</span><b id="gpsDrivingCount">${realtime.totals?.drivingSessions||0}</b></div></article><article class="live-stat ${(realtime.totals?.sessionsWithoutGps||0)?'warning':''}"><i>!</i><div><span>Operación sin GPS</span><b id="gpsWithoutCount">${realtime.totals?.sessionsWithoutGps||0}</b></div></article></div>`+
-      `<div class="gps-layout"><article class="card map-card" id="mapCard"><div class="map-fullscreen-bar"><button class="btn soft small" type="button" data-map-fullscreen>⛶ Pantalla completa</button></div><div id="fleetMap" class="fleet-map"></div><div class="map-toolbar"><span class="gps-live"><i></i> Consulta rápida cada ${Math.round(config.INTERVALO_TIEMPO_REAL_MILISEGUNDOS/1000)} segundos</span><span class="map-status-legend"><b class="active"></b> Activo <b class="inactive"></b> Inactivo <b class="geofence"></b> Radio base</span><span class="muted" id="gpsLastSync">Datos iniciales cargados</span><span class="muted push">Mapa © OpenStreetMap, CARTO o Esri</span></div></article><article class="card"><div class="card-header"><div><h3>Últimas posiciones</h3><p id="locationCount">${locations.total} vehículos visibles</p></div></div><div class="driver-location-list" id="driverLocationList">${locationList(locations.rows)}</div><div class="card-header" style="margin-top:18px"><div><h3>Sesiones y conductores</h3><p>Usuario, actividad y sección abierta</p></div></div><div class="device-list" id="deviceList">${(realtime.devices||[]).map(deviceCard).join('')||empty('○','Sin sesiones','Esperando señales de los dispositivos.')}</div></article></div>`;
+      .then(result=>{ultimoResumenGps=normalizeGpsSummary(result);if(currentSection==='gps')paintGpsData(ultimoResumenGps,true);})
+      .catch(error=>{if(currentSection==='gps'){setConnection(false,'Error GPS');const sync=$('#gpsLastSync');if(sync)sync.textContent=`No se pudo consultar: ${translateError(error)}`;}});
+    const locations={rows:realtime.locations,total:realtime.totals.locations||realtime.locations.length};
+    const conductor=currentUser?.ROL_ID==='ROL-CONDUCTOR';
+    const controls=`<button class="btn soft" data-refresh-locations>↻ Sincronizar</button>${conductor?`<button class="btn soft" data-capture-gps>⌖ Enviar ahora</button><button class="btn ${gpsWatchId===null?'primary':'danger'}" data-toggle-tracking>${gpsWatchId===null?'Activar ubicación continua':'Detener ubicación continua'}</button>`:''}`;
+    const trackingPanel=conductor?`<div class="tracking-notice ${gpsWatchId===null?'inactive':'active'}" data-tracking-notice><i data-tracking-icon>${gpsWatchId===null?'○':'●'}</i><div><b data-tracking-title>${gpsWatchId===null?'Ubicación continua detenida':'Ubicación continua activada'}</b><span data-tracking-detail>${trackingDetail()}</span></div></div><div class="tracking-details"><div><span>Permiso del navegador</span><b data-tracking-permission>${permissionLabel()}</b></div><div><span>Reactivación automática</span><b data-tracking-preference>${trackingPreferenceEnabled()?'Activada':'Desactivada'}</b></div><div><span>Protección de pantalla activa</span><b data-wake-lock>${wakeLockLabel()}</b></div></div>`:'';
+    return heading('MONITOREO','GPS en tiempo real',conductor?'Visualice y envíe únicamente su propia ubicación autorizada.':'Posición confiable, dirección, velocidad y conexión de la flota autorizada.',controls)+
+      gpsRoleNotice()+gpsDriverFilterControls(realtime)+gpsFilterControls(realtime)+trackingPanel+
+      `<div class="live-strip"><article class="live-stat"><i>⌖</i><div><span>Ubicaciones visibles</span><b id="gpsVisibleCount">${locations.total}</b></div></article><article class="live-stat online"><i>●</i><div><span>Sesiones abiertas</span><b id="gpsOnlineCount">${realtime.totals.onlineDevices||0}</b></div></article><article class="live-stat online"><i>🚐</i><div><span>Conduciendo</span><b id="gpsDrivingCount">${realtime.totals.drivingSessions||0}</b></div></article><article class="live-stat ${(realtime.totals.sessionsWithoutGps||0)?'warning':''}"><i>!</i><div><span>Operación sin GPS</span><b id="gpsWithoutCount">${realtime.totals.sessionsWithoutGps||0}</b></div></article></div>`+
+      `<div class="gps-layout"><article class="card map-card" id="mapCard"><div class="map-fullscreen-bar"><button class="btn soft small" type="button" data-map-fullscreen>⛶ Pantalla completa</button></div><div id="fleetMap" class="fleet-map"></div><div class="map-toolbar"><span class="gps-live"><i></i> Consulta rápida cada ${Math.round(config.INTERVALO_TIEMPO_REAL_MILISEGUNDOS/1000)} segundos</span><span class="map-status-legend"><b class="active"></b> Activo <b class="inactive"></b> Inactivo <b class="geofence"></b> Radio base </span><span class="muted" id="gpsLastSync">Datos iniciales cargados</span><span class="muted push">Mapa © OpenStreetMap, CARTO o Esri</span></div></article><article class="card"><div class="card-header"><div><h3>Últimas posiciones</h3><p id="locationCount">${visibleVehiclesLabel(locations.total)}</p></div></div><div class="driver-location-list" id="driverLocationList">${locationList(locations.rows)}</div><div class="card-header" style="margin-top:18px"><div><h3>${conductor?'Mi sesión y actividad':'Sesiones y conductores'}</h3><p>${conductor?'Información de su propio dispositivo':'Usuario, actividad y sección abierta'}</p></div></div><div class="device-list" id="deviceList">${realtime.devices.map(deviceCard).join('')||empty('○','Sin sesiones','Esperando señales de los dispositivos.')}</div></article></div>`;
   }
 
   function connectionFilterPayload(){
@@ -1839,8 +1932,10 @@
     return Number.isFinite(numero)?numero:null;
   }
   function coordenadasConexionValidas(row){
-    const lat=numeroCoordenadaConexion(row?.LATITUD??row?.latitud),lng=numeroCoordenadaConexion(row?.LONGITUD??row?.longitud);
-    return lat!==null&&lng!==null&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180&&!(Math.abs(lat)<0.000001&&Math.abs(lng)<0.000001);
+    const lat=numeroCoordenadaConexion(row?.LATITUD??row?.latitud),lng=numeroCoordenadaConexion(row?.LONGITUD??row?.longitud),precision=numeroCoordenadaConexion(row?.PRECISION_METROS??row?.precision_metros);
+    const trust=row?.UBICACION_CONFIABLE??row?.ubicacionConfiable??row?.UBICACION_VALIDA;
+    if(trust===false||String(trust||'').toUpperCase()==='NO')return false;
+    return lat!==null&&lng!==null&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180&&!(Math.abs(lat)<0.000001&&Math.abs(lng)<0.000001)&&precision!==null&&precision>0&&precision<=Number(config.PRECISION_GPS_MAPA_MAXIMA_METROS||120);
   }
   function normalizarFilaConexionMapa(row){
     const copia={...(row||{})};
@@ -2216,7 +2311,7 @@
         return;
       }
       const script=document.createElement('script');
-      script.src='mapa.js?v=4.2.1';
+      script.src='mapa.js?v=4.2.10';
       script.async=true;
       script.dataset.mapaFlotas='dinamico';
       script.onload=comprobar;
@@ -2240,11 +2335,11 @@
   async function initConnectionsMap(){
     const container=$('#connectionsMap');
     if(!container||currentSection!=='connections')return;
-    if(promesaInicializacionMapa)return promesaInicializacionMapa;
-    promesaInicializacionMapa=(async()=>{
+    if(promesaInicializacionMapaConexiones)return promesaInicializacionMapaConexiones;
+    promesaInicializacionMapaConexiones=(async()=>{
       await asegurarComponenteMapa();
       const visible=await esperarTamanoMapa(container,60);
-      if(!visible||currentSection!=='connections'||!container.isConnected)return;
+      if(!visible||currentSection!=='connections'||!container.isConnected){if(currentSection==='connections'&&container.isConnected)setTimeout(()=>initConnectionsMap(),250);return;}
       mapaFlota?.eliminar?.();
       mapaFlota=new window.MapaFlotas(container,{centro:config.CENTRO_MAPA,nivel:config.NIVEL_ACERCAMIENTO_MAPA});
       paintConnectionsOnline(ultimoResumenConexiones,true);
@@ -2252,8 +2347,8 @@
       setTimeout(()=>mapaFlota?.redibujar?.(),300);
       scheduleConnectionsRefresh();
       scheduleConnectionTrackingLive(100);
-    })().catch(error=>{toast('Mapa no disponible',translateError(error),'error');}).finally(()=>{promesaInicializacionMapa=null;});
-    return promesaInicializacionMapa;
+    })().catch(error=>{toast('Mapa no disponible',translateError(error),'error');}).finally(()=>{promesaInicializacionMapaConexiones=null;});
+    return promesaInicializacionMapaConexiones;
   }
   function scheduleConnectionsRefresh(delay){
     if(connectionsRefreshTimer)clearTimeout(connectionsRefreshTimer);
@@ -2359,7 +2454,7 @@
     return refreshConnectionsOnline(true,true);
   }
 
-  function locationList(rows){return rows.length?rows.map(row=>{const active=antiguedadUbicacion(row.FECHA_HORA)<=config.ANTIGUEDAD_UBICACION_ACTIVA_MILISEGUNDOS;return `<button class="driver-location ${active?'active':'inactive'}" data-focus-location="${row.LATITUD},${row.LONGITUD}"><i>●</i><div><b>${esc(row.CONDUCTOR_NOMBRE||row.CONDUCTOR_ID||'Sin conductor')}</b><span>${esc(row.VEHICULO_PATENTE||row.VEHICULO_ID||'Sin vehículo')} · ${Number(row.VELOCIDAD_KMH||0).toFixed(0)} km/h · ${active?'Activo':'Inactivo'}</span><span class="address-line">${esc(row.DIRECCION||`${Number(row.LATITUD).toFixed(5)}, ${Number(row.LONGITUD).toFixed(5)}`)}</span></div><time>${fmtDate(row.FECHA_HORA,true)}</time></button>`;}).join(''):empty('⌖','Sin ubicaciones','Cuando un conductor autorice y envíe su GPS, aparecerá aquí.');}
+  function locationList(rows){const validas=(Array.isArray(rows)?rows:[]).filter(coordenadasConexionValidas);return validas.length?validas.map(row=>{const active=row.EN_LINEA===true||String(row.EN_LINEA||'').toUpperCase()==='SI'||String(row.ESTADO_CONEXION||'').toLowerCase()==='activo',precision=Math.max(1,Number(row.PRECISION_METROS||9999)),calidad=precision<=25?'Alta':precision<=50?'Media':'Aceptable',device=row.PLATAFORMA||row.DISPOSITIVO_ID||'Dispositivo no identificado';return `<button class="driver-location ${active?'active':'inactive'}" data-focus-location="${row.LATITUD},${row.LONGITUD}"><i>●</i><div><b>${esc(row.CONDUCTOR_NOMBRE||row.USUARIO_NOMBRE||row.CONDUCTOR_ID||'Sin conductor')}</b><span>${esc(row.VEHICULO_PATENTE||row.VEHICULO_ID||'Sin vehículo')} · ${Number(row.VELOCIDAD_KMH||0).toFixed(0)} km/h · ${active?'En línea':'Desconectado'}</span><span class="address-line">${esc(row.DIRECCION||`${Number(row.LATITUD).toFixed(5)}, ${Number(row.LONGITUD).toFixed(5)}`)}</span><small>${esc(device)} · IP ${esc(row.IP_PUBLICA||'no disponible')}</small><small class="gps-quality ${calidad.toLowerCase()}">Precisión ${calidad} · margen ±${Math.round(precision)} m</small></div><time>${fmtDate(row.ULTIMA_CONEXION||row.FECHA_HORA,true)}</time></button>`;}).join(''):empty('⌖','Sin ubicación precisa','El sistema está esperando una señal GPS confiable. Las posiciones aproximadas no moverán el mapa.');}
 
   async function renderHistory(){
     const resources=['history','routes','notifications','alerts','checkins'];
@@ -2542,6 +2637,28 @@
       }catch(error){setSave('Error al guardar','error');toast('No se pudieron guardar los colores',translateError(error),'error');}
     });
   }
+  async function generarRespaldoGeneralXlsx(button){
+    if(currentUser?.ROL_ID!=='ROL-ADMIN'||!hasPermission('CONFIGURACION','RESPALDO_GENERAL'))throw new Error('RESPALDO_GENERAL_SOLO_ADMINISTRADOR');
+    const exporter=window.ExportadorReportesFlotas;if(!exporter?.exportarHojas)throw new Error('EXPORTADOR_XLSX_NO_DISPONIBLE');
+    const statusNode=$('[data-backup-status]');
+    const updateStatus=(text,mode='')=>{if(!statusNode)return;statusNode.className=`backup-status ${mode}`;statusNode.textContent=text;};
+    updateStatus('Preparando catálogo de la Base de Datos…','working');
+    const catalog=await api.request('backupCatalog',{cache:false});const sheets=[],available=(catalog.tables||[]).filter(item=>item.disponible);
+    sheets.push({nombre:'RESUMEN',headers:['CAMPO','VALOR'],rows:[
+      {CAMPO:'Sistema',VALOR:'Sistema de Gestión de Flotas'},{CAMPO:'Versión',VALOR:catalog.version||config.VERSION},{CAMPO:'Fecha del respaldo',VALOR:catalog.generadoEn||new Date().toISOString()},
+      {CAMPO:'Generado por',VALOR:catalog.generadoPor||currentUser?.NOMBRE||currentUser?.CORREO||''},{CAMPO:'Tablas incluidas',VALOR:catalog.totalTablas||available.length},{CAMPO:'Registros incluidos',VALOR:catalog.totalRegistros||0},
+      {CAMPO:'Protección',VALOR:'Contraseñas, sales, tokens, claves privadas y credenciales se reemplazan por [PROTEGIDO].'}
+    ]});
+    let completed=0;
+    for(const table of available){
+      const rows=[];let page=0,finished=false;
+      while(!finished){const result=await api.request('backupTable',{data:{TABLA:table.resource,PAGINA:page,TAMANO:500},cache:false});rows.push(...(result.rows||[]));finished=Boolean(result.fin)||(result.rows||[]).length===0;page+=1;updateStatus(`Leyendo ${table.sheet}: ${rows.length} de ${result.total??table.total??0} registros…`,'working');}
+      const headers=[...new Set(rows.flatMap(row=>Object.keys(row||{})))];sheets.push({nombre:String(table.sheet||table.table).slice(0,31),headers,rows});completed+=1;updateStatus(`Tabla ${completed} de ${available.length} preparada…`,'working');
+    }
+    const file=await exporter.exportarHojas(sheets,{formato:'xlsx',nombre:'Respaldo_General_Base_de_Datos',titulo:'Respaldo general de la Base de Datos',subtitulo:`${catalog.totalRegistros||0} registros`,autor:'Desarrollado por Alejandro Silva',fecha:catalog.generadoEn});
+    updateStatus(`Respaldo generado correctamente: ${file}`,'ok');toast('Respaldo general descargado',`${catalog.totalTablas||available.length} tablas y ${catalog.totalRegistros||0} registros fueron incluidos.`);return file;
+  }
+
   async function renderSettings(){
     await sincronizarPuntoOperacionDispositivo({silencioso:true});
     const remote=api.isRemote();let company=empresaConPuntoDispositivo(currentCompany||{});
@@ -2549,7 +2666,8 @@
     const tema=window.TemaFlotas?.normalizar?.(company)||company;
     return heading('PARÁMETROS','Configuración','Defina la conexión, el modo de visualización y la identidad cromática de todo el sistema.')+
     `<div class="settings-grid"><article class="card"><div class="card-header"><div><h3>Base de datos</h3><p>Estado de la información del sistema</p></div>${status(remote?'Central conectada':'Local activa')}</div><div class="info-grid"><div class="info-item"><span>Tipo</span><b>${remote?'Base de datos central':'Base de datos local'}</b></div><div class="info-item"><span>Sincronización</span><b>${remote?'Activa entre dispositivos':'Solo en este dispositivo'}</b></div></div></article><article class="card"><div class="card-header"><div><h3>Modo de pantalla</h3><p>Preferencia individual de este dispositivo</p></div></div><div class="setting-row"><div><b>Modo oscuro</b><span>Puede cambiarlo sin modificar la paleta guardada</span></div><label class="switch"><input id="darkSwitch" type="checkbox" ${document.body.classList.contains('dark')?'checked':''}><i></i></label></div><button class="btn soft" data-nav="company">Abrir datos de empresa</button></article></div>`+
-    `<section class="system-health-shell"><article class="card system-health-card"><div class="card-header"><div><h3>Diagnóstico y reparación</h3><p>Comprueba hojas, columnas, permisos y requisitos de los módulos críticos.</p></div><span class="status" id="systemHealthStatus">Sin ejecutar</span></div><div id="systemHealthResult" class="system-health-result"><div class="module-diagnostic"><i>✓</i><div><b>Herramienta de mantenimiento disponible</b><span>Ejecute el diagnóstico después de actualizar Google Apps Script. La reparación no elimina registros.</span></div></div></div><div class="form-actions">${hasPermission('OFICINA_VIRTUAL','DIAGNOSTICAR')?'<button class="btn soft" type="button" data-diagnose-system>Revisar sistema</button>':''}${hasPermission('OFICINA_VIRTUAL','REPARAR')?'<button class="btn primary" type="button" data-repair-system>Reparar estructura</button>':''}</div></article></section>`+
+    `<section class="system-health-shell"><article class="card system-health-card"><div class="card-header"><div><h3>Diagnóstico y reparación</h3><p>Comprueba tablas, campos, permisos y requisitos de los módulos críticos.</p></div><span class="status" id="systemHealthStatus">Sin ejecutar</span></div><div id="systemHealthResult" class="system-health-result"><div class="module-diagnostic"><i>✓</i><div><b>Herramienta de mantenimiento disponible</b><span>Ejecute el diagnóstico después de actualizar el servicio central. La reparación no elimina registros.</span></div></div></div><div class="form-actions">${hasPermission('OFICINA_VIRTUAL','DIAGNOSTICAR')?'<button class="btn soft" type="button" data-diagnose-system>Revisar sistema</button>':''}${hasPermission('OFICINA_VIRTUAL','REPARAR')?'<button class="btn primary" type="button" data-repair-system>Reparar estructura</button>':''}</div></article></section>`+
+    `${currentUser?.ROL_ID==='ROL-ADMIN'&&hasPermission('CONFIGURACION','RESPALDO_GENERAL')?'<section class="backup-database-shell"><article class="card backup-database-card"><div class="card-header"><div><span class="eyebrow">RESPALDO GENERAL</span><h3>Descargar Base de Datos en XLSX</h3><p>Genera un libro Excel con una hoja por cada tabla y todos los registros disponibles hasta la fecha.</p></div><span class="status ok">Solo Administrador</span></div><div class="backup-feature-list"><span>✓ Incluye registros activos e históricos</span><span>✓ Protege contraseñas, tokens y credenciales</span><span>✓ Agrega resumen de tablas y totales</span></div><div class="backup-status" data-backup-status>Listo para generar el respaldo.</div><div class="form-actions"><button class="btn primary" type="button" data-backup-database>⬇ Descargar respaldo XLSX</button></div></article></section>':''}`+
     `<section class="theme-settings-shell"><article class="card theme-editor-card"><div class="theme-intro"><div><span class="eyebrow">IDENTIDAD VISUAL GLOBAL</span><h3>Colores del sistema</h3><p>Los colores se guardan en la base central y se aplican automáticamente al inicio de sesión, al menú principal y a cada módulo independiente.</p></div>${status('Vista previa automática')}</div><div class="theme-presets">${preajustesTemaMarkup()}</div><form id="themeForm"><div class="theme-mode-row"><label class="field"><span>Tema predeterminado para nuevos dispositivos</span><select name="TEMA_PREDETERMINADO"><option ${tema.TEMA_PREDETERMINADO==='Sistema'?'selected':''}>Sistema</option><option ${tema.TEMA_PREDETERMINADO==='Claro'?'selected':''}>Claro</option><option ${tema.TEMA_PREDETERMINADO==='Oscuro'?'selected':''}>Oscuro</option></select></label><p class="helper">Cada usuario puede alternar temporalmente entre claro y oscuro desde el botón superior.</p></div><div class="theme-config-layout"><div class="theme-color-sections"><section class="theme-color-group"><h4>Marca y acciones</h4><p>Botones, enlaces, indicadores y estados del sistema.</p><div class="theme-color-grid">${campoColorTema('COLOR_PRINCIPAL','Color principal',tema.COLOR_PRINCIPAL)}${campoColorTema('COLOR_SECUNDARIO','Color principal intenso',tema.COLOR_SECUNDARIO)}${campoColorTema('COLOR_ACENTO','Color de acento',tema.COLOR_ACENTO)}${campoColorTema('COLOR_EXITO','Éxito y conectado',tema.COLOR_EXITO)}${campoColorTema('COLOR_ADVERTENCIA','Advertencias',tema.COLOR_ADVERTENCIA)}${campoColorTema('COLOR_PELIGRO','Errores y bloqueos',tema.COLOR_PELIGRO)}</div></section><section class="theme-color-group"><h4>Modo claro</h4><p>Fondos, tarjetas, textos y bordes de la interfaz clara.</p><div class="theme-color-grid">${campoColorTema('COLOR_FONDO','Fondo general',tema.COLOR_FONDO)}${campoColorTema('COLOR_SUPERFICIE','Tarjetas y paneles',tema.COLOR_SUPERFICIE)}${campoColorTema('COLOR_TEXTO','Texto principal',tema.COLOR_TEXTO)}${campoColorTema('COLOR_TEXTO_SECUNDARIO','Texto secundario',tema.COLOR_TEXTO_SECUNDARIO)}${campoColorTema('COLOR_BORDE','Bordes',tema.COLOR_BORDE)}${campoColorTema('COLOR_MENU','Menú lateral',tema.COLOR_MENU)}${campoColorTema('COLOR_MENU_SECUNDARIO','Degradado del menú',tema.COLOR_MENU_SECUNDARIO)}</div></section><section class="theme-color-group"><h4>Modo oscuro</h4><p>Colores usados cuando el usuario activa el modo oscuro.</p><div class="theme-color-grid">${campoColorTema('COLOR_FONDO_OSCURO','Fondo oscuro',tema.COLOR_FONDO_OSCURO)}${campoColorTema('COLOR_SUPERFICIE_OSCURO','Tarjetas oscuras',tema.COLOR_SUPERFICIE_OSCURO)}${campoColorTema('COLOR_TEXTO_OSCURO','Texto oscuro',tema.COLOR_TEXTO_OSCURO)}${campoColorTema('COLOR_TEXTO_SECUNDARIO_OSCURO','Texto secundario oscuro',tema.COLOR_TEXTO_SECUNDARIO_OSCURO)}${campoColorTema('COLOR_BORDE_OSCURO','Bordes oscuros',tema.COLOR_BORDE_OSCURO)}</div></section></div><aside class="theme-preview-panel"><div class="theme-preview-window"><div class="theme-preview-top"><i></i><b>Vista previa del sistema</b></div><div class="theme-preview-body"><div class="theme-preview-menu"><span class="active"></span><span></span><span></span><span></span></div><div class="theme-preview-content"><h4>Panel principal</h4><div class="theme-preview-kpis"><div><b>24</b><small>Vehículos</small></div><div><b>18</b><small>En operación</small></div><div><b>6</b><small>Disponibles</small></div><div><b>2</b><small>Alertas</small></div></div><button class="theme-preview-button" type="button">Acción principal</button></div></div></div><article class="card"><div class="card-header"><div><h3>Contraste</h3><p>Lectura recomendada: 4.5:1 o superior</p></div></div><div class="theme-contrast-list" id="themeContrastList">${contrasteTemaMarkup(tema)}</div></article></aside></div><div class="theme-form-actions"><button class="btn soft" type="button" data-theme-discard>Descartar vista previa</button><button class="btn soft" type="button" data-theme-defaults>Restaurar colores originales</button><button class="btn primary" type="submit">Guardar colores del sistema</button></div></form></article></section>`+
     `<section class="operation-location-settings"><article class="card"><div class="card-header"><div><span class="eyebrow">CONTROL GEOGRÁFICO</span><h3>Punto de inicio y finalización</h3><p>Esta ubicación bloquea el inicio y el cierre fuera del perímetro autorizado.</p></div>${configuracionPuntoOperacion(company).configurada?status('Configurado'):status('Pendiente')}</div><form id="operationLocationForm" class="form-grid"><input type="hidden" name="VALIDAR_UBICACION_OPERACION" value="SI"><div class="operation-policy-fixed full"><i>🔒</i><div><b>Validación GPS obligatoria</b><span>Se aplica al inicio y al cierre. El inicio exige precisión suficiente; al finalizar, una señal imprecisa puede aceptarse con tolerancia limitada, dejando evidencia completa.</span></div></div><label class="field"><span>Nombre del punto base</span><input name="PUNTO_OPERACION_NOMBRE" value="${companyValue(company,'PUNTO_OPERACION_NOMBRE','Base operacional')}" required></label><label class="field full"><span>Dirección del punto base</span><input name="PUNTO_OPERACION_DIRECCION" value="${companyValue(company,'PUNTO_OPERACION_DIRECCION',company.DIRECCION||'')}" data-address-autocomplete data-lat-target="PUNTO_OPERACION_LATITUD" data-lng-target="PUNTO_OPERACION_LONGITUD" required placeholder="Seleccione una dirección exacta"></label><label class="field"><span>Latitud</span><input name="PUNTO_OPERACION_LATITUD" type="number" step="any" value="${companyValue(company,'PUNTO_OPERACION_LATITUD')}" required></label><label class="field"><span>Longitud</span><input name="PUNTO_OPERACION_LONGITUD" type="number" step="any" value="${companyValue(company,'PUNTO_OPERACION_LONGITUD')}" required></label><label class="field"><span>Radio para iniciar</span><div class="input-suffix"><input name="RADIO_INICIO_METROS" type="number" min="10" max="5000" value="${companyValue(company,'RADIO_INICIO_METROS','150')}" required><span>metros</span></div></label><label class="field"><span>Radio para finalizar</span><div class="input-suffix"><input name="RADIO_FIN_METROS" type="number" min="10" max="5000" value="${companyValue(company,'RADIO_FIN_METROS','150')}" required><span>metros</span></div></label><label class="field"><span>Precisión GPS máxima</span><div class="input-suffix"><input name="PRECISION_GPS_MAXIMA_METROS" type="number" min="10" max="5000" value="${companyValue(company,'PRECISION_GPS_MAXIMA_METROS','120')}" required><span>metros</span></div></label><input type="hidden" name="RETORNO_BASE_OBLIGATORIO" value="SI"><div class="operation-location-status full" data-settings-location-status><i>⌖</i><div><b>${configuracionPuntoOperacion(company).configurada?'Punto guardado':'Ubicación pendiente'}</b><span>${configuracionPuntoOperacion(company).configurada?`${esc(configuracionPuntoOperacion(company).direccion)} · ${number(configuracionPuntoOperacion(company).radioInicio)} m al iniciar · ${number(configuracionPuntoOperacion(company).radioFin)} m al finalizar · guardado en este dispositivo`:'Seleccione una dirección o capture la ubicación actual.'}</span></div></div><div class="form-actions"><button class="btn soft" type="button" data-capture-base-location>⌖ Usar mi ubicación actual</button><button class="btn primary" type="submit">Guardar punto operacional</button></div></form></article></section>`+
     `<div class="danger-zone" style="margin-top:18px"><h3>Limpiar datos operativos</h3><p>Elimina vehículos, conductores, operaciones, check-ins, GPS, rutas, conexiones, mantenciones, documentos, notificaciones, alertas, reportes y bitácora. Conserva usuarios, roles, empresa y colores.</p><button class="btn danger" data-clear-data>Limpiar datos operativos</button></div>`;
@@ -2782,6 +2900,38 @@
     return [];
   }
 
+  function resumenCombustibleDesdeFilas(rows=[]){
+    const lista=Array.isArray(rows)?rows:[],sum=(items,field)=>items.reduce((total,row)=>total+Number(row?.[field]||0),0);
+    const totalCargas=lista.length,totalLitros=sum(lista,'LITROS'),gastoTotal=sum(lista,'COSTO_TOTAL');
+    const consumo=lista.filter(row=>Number(row?.DISTANCIA_DESDE_ULTIMA_CARGA_KM||0)>0&&Number(row?.LITROS||0)>0);
+    const distancia=sum(consumo,'DISTANCIA_DESDE_ULTIMA_CARGA_KM'),litrosConsumo=sum(consumo,'LITROS');
+    const inicioMes=new Date();inicioMes.setDate(1);inicioMes.setHours(0,0,0,0);
+    const mes=lista.filter(row=>{const fecha=new Date(row?.FECHA_HORA||row?.CREADO_EN||0);return Number.isFinite(fecha.getTime())&&fecha>=inicioMes;});
+    return{
+      totalCargas,totalLitros,gastoTotal,
+      precioPromedioLitro:totalLitros>0?gastoTotal/totalLitros:0,
+      consumoPromedioKmL:distancia>0&&litrosConsumo>0?distancia/litrosConsumo:0,
+      consumoPromedioL100Km:distancia>0&&litrosConsumo>0?litrosConsumo/distancia*100:0,
+      mesActual:{cargas:mes.length,litros:sum(mes,'LITROS'),gasto:sum(mes,'COSTO_TOTAL')}
+    };
+  }
+
+  function normalizarResumenCombustible(respuesta,rows=[]){
+    const raw=respuesta?.data&&typeof respuesta.data==='object'?respuesta.data:(respuesta||{}),fallback=resumenCombustibleDesdeFilas(rows);
+    const valor=(...values)=>{for(const value of values){const numberValue=Number(value);if(Number.isFinite(numberValue))return numberValue;}return 0;};
+    const totalCargas=valor(raw.totalCargas,raw.total,raw.registros,fallback.totalCargas);
+    const totalLitros=valor(raw.totalLitros,raw.litrosTotal,raw.litros,fallback.totalLitros);
+    const gastoTotal=valor(raw.gastoTotal,raw.costoTotal,raw.totalCosto,fallback.gastoTotal);
+    const precioPromedioLitro=valor(raw.precioPromedioLitro,raw.precioPromedio,totalLitros>0?gastoTotal/totalLitros:0,fallback.precioPromedioLitro);
+    const consumoPromedioKmL=valor(raw.consumoPromedioKmL,raw.consumoPromedio,raw.rendimientoPromedio,fallback.consumoPromedioKmL);
+    const consumoPromedioL100Km=valor(raw.consumoPromedioL100Km,consumoPromedioKmL>0?100/consumoPromedioKmL:0,fallback.consumoPromedioL100Km);
+    const mesRaw=raw.mesActual||raw.mes||{};
+    return{
+      ...raw,totalCargas,totalLitros,gastoTotal,precioPromedioLitro,consumoPromedioKmL,consumoPromedioL100Km,
+      mesActual:{cargas:valor(mesRaw.cargas,mesRaw.total,fallback.mesActual.cargas),litros:valor(mesRaw.litros,mesRaw.litrosTotal,fallback.mesActual.litros),gasto:valor(mesRaw.gasto,mesRaw.costoTotal,fallback.mesActual.gasto)}
+    };
+  }
+
   async function renderFuel(){
     const queries=[
       {key:'loads',action:'list',payload:{resource:'fuel'}},
@@ -2792,7 +2942,7 @@
       {key:'routes',action:'list',payload:{resource:'routes'}},
     ];
     if(currentUser.ROL_ID!=='ROL-CONDUCTOR')queries.push({key:'authorizations',action:'list',payload:{resource:'fuelAuthorizations'}});
-    const batch=await api.requestBatch(queries,{force:true}),loads=guardarListaFormulario('fuel',filasRespuestaLote(batch.loads)),vehicles=guardarListaFormulario('vehicles',filasRespuestaLote(batch.vehicles)),drivers=guardarListaFormulario('drivers',filasRespuestaLote(batch.drivers)),operations=guardarListaFormulario('operations',filasRespuestaLote(batch.operations)),routes=guardarListaFormulario('routes',filasRespuestaLote(batch.routes)),authorizations=guardarListaFormulario('fuelAuthorizations',filasRespuestaLote(batch.authorizations)),summary=batch.summary||{};
+    const batch=await api.requestBatch(queries,{force:true}),loads=guardarListaFormulario('fuel',filasRespuestaLote(batch.loads)),vehicles=guardarListaFormulario('vehicles',filasRespuestaLote(batch.vehicles)),drivers=guardarListaFormulario('drivers',filasRespuestaLote(batch.drivers)),operations=guardarListaFormulario('operations',filasRespuestaLote(batch.operations)),routes=guardarListaFormulario('routes',filasRespuestaLote(batch.routes)),authorizations=guardarListaFormulario('fuelAuthorizations',filasRespuestaLote(batch.authorizations)),summary=normalizarResumenCombustible(batch.summary,loads);
     const ordered=[...loads].sort((a,b)=>new Date(b.FECHA_HORA||b.CREADO_EN||0)-new Date(a.FECHA_HORA||a.CREADO_EN||0));
     const rows=ordered.map(row=>{
       const auth=fuelAuthorizationFor(row.ID,authorizations),consumption=Number(row.CONSUMO_KM_L||0)>0?`${decimal(row.CONSUMO_KM_L)} km/L`:'Sin cálculo';
@@ -2907,6 +3057,7 @@
     $$('[data-route-evidence]').forEach(btn=>btn.addEventListener('click',()=>openRouteEvidenceModal(btn.dataset.routeEvidence)));
     enlazarVisoresRuta($('#content'));
     enlazarGaleriasRuta($('#content'));
+    startRouteClocks();
     $$('[data-new-notification]').forEach(btn=>btn.addEventListener('click',openNotificationModal));
     $$('[data-read-notification]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,'Actualizando…',()=>readNotification(btn.dataset.readNotification))));
     $('[data-read-all-notifications]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Actualizando…',marcarTodasNotificacionesLeidas));
@@ -2961,6 +3112,7 @@
       $('[data-capture-base-location]',operationLocationForm)?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Obteniendo GPS…',async()=>{try{const location=await obtenerUbicacionNavegador({aceptarRespaldo:false,maximumAgeAproximada:0});operationLocationForm.elements.PUNTO_OPERACION_LATITUD.value=location.latitud;operationLocationForm.elements.PUNTO_OPERACION_LONGITUD.value=location.longitud;const node=$('[data-settings-location-status]',operationLocationForm);if(node){node.className='operation-location-status valid';node.innerHTML=`<i>✓</i><div><b>Coordenadas capturadas</b><span>${location.latitud.toFixed(6)}, ${location.longitud.toFixed(6)} · precisión ±${Math.round(location.precision)} m</span></div>`;}toast('Ubicación capturada','Revise la dirección y guarde la configuración.');}catch(error){toast('No se obtuvo la ubicación',translateError(error),'error');}}));
       operationLocationForm.addEventListener('submit',event=>{event.preventDefault();const button=$('button[type="submit"]',operationLocationForm);conCargaBoton(button,'Guardando punto…',async()=>{try{const data=Object.fromEntries(new FormData(operationLocationForm).entries());data.VALIDAR_UBICACION_OPERACION='SI';data.IP_PUBLICA=clientPublicIp;const result=await api.request('saveOperationalPoint',{data});const devicePoint=guardarPuntoOperacionDispositivo({...result,row:result.row||data},'SERVIDOR');currentCompany={...(currentCompany||{}),...(result.row||data),...(devicePoint||{})};const savedBase=configuracionPuntoOperacion(currentCompany);if(!savedBase.configurada)throw new Error('PUNTO_OPERACION_NO_CONFIRMADO');invalidarListasFormulario('companies');['settings','operations','routes','gps'].forEach(section=>cacheVistasModulo.delete(section));toast('Punto operacional confirmado',`${savedBase.nombre} · ${savedBase.latitud.toFixed(6)}, ${savedBase.longitud.toFixed(6)} · radio de inicio ${savedBase.radioInicio} m.`);actualizarSeccionEnSegundoPlano('settings');}catch(error){toast('No se guardó el punto',translateError(error),'error');}});});
     }
+    $('[data-backup-database]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Generando respaldo…',async()=>{try{await generarRespaldoGeneralXlsx(event.currentTarget);}catch(error){const node=$('[data-backup-status]');if(node){node.className='backup-status error';node.textContent=translateError(error);}toast('No se pudo generar el respaldo',translateError(error),'error');}}));
     $('[data-clear-data]')?.addEventListener('click',event=>clearData(event.currentTarget));
     $('#darkSwitch')?.addEventListener('change',event=>setTheme(event.target.checked));
     const themeForm=$('#themeForm');if(themeForm){
@@ -3866,21 +4018,22 @@
     updateGpsFilterUi();
   }
   function paintGpsData(result, ajustar=false) {
-    ultimoResumenGps=result||ultimoResumenGps;
-    const filas=ultimoResumenGps.locations||[];
-    const marcadores=filas.map(row=>{const latitud=Number(row.LATITUD),longitud=Number(row.LONGITUD);if(!Number.isFinite(latitud)||!Number.isFinite(longitud))return null;const activo=antiguedadUbicacion(row.FECHA_HORA)<=config.ANTIGUEDAD_UBICACION_ACTIVA_MILISEGUNDOS;const nombre=row.CONDUCTOR_NOMBRE||row.CONDUCTOR_ID||'Conductor',vehiculo=row.VEHICULO_PATENTE||row.VEHICULO_ID||'Sin vehículo';return{id:row.VEHICULO_ID||row.CONDUCTOR_ID||row.ID,latitud,longitud,nombre:`${vehiculo} · ${nombre}`,activo,detalle:`<b>${esc(vehiculo)}</b><span>${esc(nombre)}</span><span>${esc(row.DIRECCION||`${latitud.toFixed(5)}, ${longitud.toFixed(5)}`)}</span><span>${Number(row.VELOCIDAD_KMH||0).toFixed(0)} km/h</span><small>${activo?'Activo · Ubicación reciente':'Inactivo · Sin actualización reciente'} · ${fmtDate(row.FECHA_HORA,true)}</small>`};}).filter(Boolean);
+    ultimoResumenGps=normalizeGpsSummary(result||ultimoResumenGps);
+    const filas=ultimoResumenGps.locations.filter(coordenadasConexionValidas);
+    const marcadores=filas.map(row=>{const latitud=Number(row.LATITUD),longitud=Number(row.LONGITUD),precision=Math.max(1,Number(row.PRECISION_METROS||9999));const enLinea=row.EN_LINEA===true||String(row.EN_LINEA||'').toUpperCase()==='SI'||String(row.ESTADO_CONEXION||'').toLowerCase()==='activo'||String(row.ESTADO_CONEXION||'').toLowerCase()==='en línea';const nombre=row.CONDUCTOR_NOMBRE||row.USUARIO_NOMBRE||row.CONDUCTOR_ID||'Usuario',vehiculo=row.VEHICULO_PATENTE||row.VEHICULO_ID||'Sin vehículo',calidad=precision<=25?'Alta':precision<=50?'Media':'Aceptable';const direccion=direccionLegible(row.DIRECCION)?String(row.DIRECCION).trim():'Buscando dirección…',ip=String(row.IP_PUBLICA||'No disponible'),dispositivo=String(row.PLATAFORMA||row.DISPOSITIVO_NOMBRE||row.DISPOSITIVO_ID||'No identificado'),navegador=String(row.NAVEGADOR||''),red=String(row.TIPO_RED||'No identificada'),ultimaConexion=row.ULTIMA_CONEXION||row.FECHA_HORA;const estadoHtml=enLinea?'<span class="mapa-estado-linea en-linea"><i></i>En línea</span>':'<span class="mapa-estado-linea desconectado"><i></i>Desconectado</span>';return{id:gpsUserMarkerKey(row),latitud,longitud,nombre:`${vehiculo} · ${nombre}`,direccion,activo:enLinea,estadoConexion:enLinea?'EN_LINEA':'DESCONECTADO',detalle:`<b>${esc(vehiculo)}</b><span>${esc(nombre)}</span>${estadoHtml}<span><strong>Dirección:</strong> ${esc(direccion)}</span><span><strong>IP:</strong> ${esc(ip)}</span><span><strong>Dispositivo:</strong> ${esc(dispositivo)}</span>${navegador?`<span><strong>Navegador:</strong> ${esc(navegador)}</span>`:''}<span><strong>Red:</strong> ${esc(red)}</span><span>${Number(row.VELOCIDAD_KMH||0).toFixed(0)} km/h · precisión ${esc(calidad)} ±${Math.round(precision)} m</span><small>Última conexión: ${fmtDate(ultimaConexion,true)} · última ubicación: ${fmtDate(row.FECHA_HORA,true)}</small>`};}).filter(Boolean);
     const base=configuracionPuntoOperacion();if(base.configurada)marcadores.unshift({id:'PUNTO-OPERACIONAL',latitud:base.latitud,longitud:base.longitud,nombre:`Base · ${base.nombre}`,activo:true,detalle:`<b>${esc(base.nombre)}</b><span>${esc(base.direccion)}</span><span>Inicio ${number(base.radioInicio)} m · cierre ${number(base.radioFin)} m</span><small>Punto operacional configurado</small>`});
     const circulosBase=base.configurada?(base.radioInicio===base.radioFin?[{id:'BASE',latitud:base.latitud,longitud:base.longitud,radio:base.radioInicio,clase:'operacional',etiqueta:`Base autorizada · ${number(base.radioInicio)} m`}]:[{id:'BASE-INICIO',latitud:base.latitud,longitud:base.longitud,radio:base.radioInicio,clase:'inicio',etiqueta:`Inicio · ${number(base.radioInicio)} m`},{id:'BASE-FIN',latitud:base.latitud,longitud:base.longitud,radio:base.radioFin,clase:'fin',etiqueta:`Finalización · ${number(base.radioFin)} m`}]) : [];
     mapaFlota?.actualizarCirculos?.(circulosBase);
     mapaFlota?.actualizarMarcadores(marcadores,ajustar);
-    const locationKey=filas.map(row=>`${row.ID||''}:${row.FECHA_HORA||''}:${row.LATITUD||''}:${row.LONGITUD||''}:${row.VELOCIDAD_KMH||''}:${row.DIRECCION||''}`).join('|');
-    const list=$('#driverLocationList');if(list&&locationKey!==gpsLocationsPaintKey){gpsLocationsPaintKey=locationKey;list.innerHTML=locationList(filas);const count=$('#locationCount');if(count)count.textContent=visibleVehiclesLabel(filas.length);$$('[data-focus-location]',list).forEach(btn=>btn.onclick=()=>{const[lat,lng]=btn.dataset.focusLocation.split(',').map(Number);mapaFlota?.establecerVista(lat,lng,17);});}
+    programarDireccionesGps(filas).catch(()=>{});
+    const locationKey=filas.map(row=>`${gpsUserMarkerKey(row)}:${row.FECHA_HORA||''}:${row.LATITUD||''}:${row.LONGITUD||''}:${row.VELOCIDAD_KMH||''}:${row.DIRECCION||''}:${row.PRECISION_METROS||''}:${row.EN_LINEA||''}:${row.ESTADO_CONEXION||''}:${row.ULTIMA_CONEXION||''}:${row.IP_PUBLICA||''}:${row.DISPOSITIVO_ID||''}:${row.PLATAFORMA||''}:${row.TIPO_RED||''}`).join('|');
+    const list=$('#driverLocationList');if(list&&locationKey!==gpsLocationsPaintKey){gpsLocationsPaintKey=locationKey;list.innerHTML=locationList(filas);const count=$('#locationCount');if(count)count.textContent=visibleVehiclesLabel(filas.length);$$('[data-focus-location]',list).forEach(btn=>btn.onclick=()=>{const[lat,lng]=btn.dataset.focusLocation.split(',').map(Number);mapaFlota?.establecerVista(lat,lng,18);});}
     const deviceRows=ultimoResumenGps.devices||[];const deviceKey=deviceRows.map(row=>`${row.ID||''}:${row.ULTIMA_CONEXION||''}:${row.ACTIVIDAD||''}:${row.VEHICULO_ID||''}:${row.GPS_ACTIVO||''}`).join('|');
     const devices=$('#deviceList');if(devices&&deviceKey!==gpsDevicesPaintKey){gpsDevicesPaintKey=deviceKey;devices.innerHTML=deviceRows.map(deviceCard).join('')||empty('○','Sin conexiones','Esperando señales de dispositivos.');}
     const totals=ultimoResumenGps.totals||{};const totalsKey=`${filas.length}:${totals.onlineDevices||0}:${totals.drivingSessions||0}:${totals.sessionsWithoutGps||0}`;if(totalsKey!==gpsTotalsPaintKey){gpsTotalsPaintKey=totalsKey;if($('#gpsVisibleCount'))$('#gpsVisibleCount').textContent=filas.length;if($('#gpsOnlineCount'))$('#gpsOnlineCount').textContent=totals.onlineDevices||0;if($('#gpsDrivingCount'))$('#gpsDrivingCount').textContent=totals.drivingSessions||0;if($('#gpsWithoutCount'))$('#gpsWithoutCount').textContent=totals.sessionsWithoutGps||0;}
     refreshGpsVehicleOptions(ultimoResumenGps);
     refreshGpsDriverFilterOptions(ultimoResumenGps);
-    const sync=$('#gpsLastSync');if(sync)sync.textContent=`Última consulta: ${new Intl.DateTimeFormat('es-CL',{timeStyle:'medium'}).format(new Date())}`;
+    const sync=$('#gpsLastSync');if(sync)sync.textContent=`Última consulta precisa: ${new Intl.DateTimeFormat('es-CL',{timeStyle:'medium'}).format(new Date())}`;
   }
   function gpsRefreshDelay() {
     const base=document.hidden?Number(config.INTERVALO_TIEMPO_REAL_OCULTO_MILISEGUNDOS||15000):Number(config.INTERVALO_TIEMPO_REAL_MILISEGUNDOS||3000);
@@ -3905,12 +4058,12 @@
   async function initMap() {
     const contenedor=$('#fleetMap');
     if(!contenedor||currentSection!=='gps')return;
-    if(promesaInicializacionMapa)return promesaInicializacionMapa;
+    if(promesaInicializacionMapaGps)return promesaInicializacionMapaGps;
     contenedor.classList.add('mapa-iniciando');
-    promesaInicializacionMapa=(async()=>{
+    promesaInicializacionMapaGps=(async()=>{
       await asegurarComponenteMapa();
       const visible=await esperarTamanoMapa(contenedor,60);
-      if(!visible||currentSection!=='gps'||!contenedor.isConnected)return;
+      if(!visible||currentSection!=='gps'||!contenedor.isConnected){contenedor.classList.remove('mapa-iniciando');if(currentSection==='gps'&&contenedor.isConnected)setTimeout(()=>initMap(),250);return;}
       mapaFlota?.eliminar?.();
       mapaFlota=new window.MapaFlotas(contenedor,{centro:config.CENTRO_MAPA,nivel:config.NIVEL_ACERCAMIENTO_MAPA});
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -3925,22 +4078,24 @@
       contenedor.classList.remove('mapa-iniciando');
       contenedor.innerHTML='<div class="mapa-error"><b>No se pudo mostrar el mapa</b><span>Pulse Sincronizar para volver a intentarlo.</span></div>';
       toast('Mapa no disponible',translateError(error),'error');
-    }).finally(()=>{promesaInicializacionMapa=null;});
-    return promesaInicializacionMapa;
+    }).finally(()=>{promesaInicializacionMapaGps=null;});
+    return promesaInicializacionMapaGps;
   }
   async function refreshLocations(showToast=true,ajustar=false) {
     if(gpsRefreshPending){gpsRefreshQueued=true;return gpsRefreshPending;}
-    gpsRefreshPending=(async()=>{try{const result=await api.request('realtimeSummary',{...gpsFilterPayload(),marcaTiempo:Date.now(),force:true});gpsRefreshFailures=0;paintGpsData(result,ajustar);if(showToast)toast('Mapa actualizado',`${result.locations?.length||0} ubicaciones visibles.`);setConnection(true,api.isRemote()?'Base de datos conectada':'Base de datos local activa');return result;}catch(error){gpsRefreshFailures+=1;setConnection(false,'Error GPS');if(showToast)toast('No se pudo actualizar',translateError(error),'error');return null;}finally{gpsRefreshPending=null;const rerun=gpsRefreshQueued;gpsRefreshQueued=false;if(currentSection==='gps')scheduleGpsRefresh(rerun?300:gpsRefreshDelay());}})();
+    gpsRefreshPending=(async()=>{try{const result=normalizeGpsSummary(await api.request('realtimeSummary',{...gpsFilterPayload(),marcaTiempo:Date.now(),force:true}));gpsRefreshFailures=0;paintGpsData(result,ajustar);if(showToast)toast('Mapa actualizado',`${result.locations.length} ubicaciones visibles.`);setConnection(true,api.isRemote()?'Base de datos conectada':'Base de datos local activa');return result;}catch(error){gpsRefreshFailures+=1;setConnection(false,'Error GPS');if(showToast)toast('No se pudo actualizar',translateError(error),'error');return null;}finally{gpsRefreshPending=null;const rerun=gpsRefreshQueued;gpsRefreshQueued=false;if(currentSection==='gps')scheduleGpsRefresh(rerun?300:gpsRefreshDelay());}})();
     return gpsRefreshPending;
   }
 
   function captureGps() {
-    if (!navigator.geolocation) {toast('GPS no compatible','Este navegador no ofrece geolocalización.','error');return Promise.resolve(false);}
-    return new Promise(resolve=>navigator.geolocation.getCurrentPosition(
-      async position => {geolocationPermissionState='granted';updateTrackingUi();await sendPosition(position,'GPS real',true);resolve(true);},
-      error => {handleTrackingError(error,'No se obtuvo ubicación');resolve(false);},
-      {enableHighAccuracy:true,timeout:20000,maximumAge:3000}
-    ));
+    if(!navigator.geolocation){toast('GPS no compatible','Este navegador no ofrece geolocalización.','error');return Promise.resolve(false);}
+    return new Promise(resolve=>{
+      let mejor=null,finalizado=false,watchId=null;
+      const objetivo=Number(config.PRECISION_GPS_OBJETIVO_METROS||25),maxima=Number(config.PRECISION_GPS_ENVIO_MAXIMA_METROS||60);
+      const cerrar=async exito=>{if(finalizado)return;finalizado=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);clearTimeout(timer);if(exito&&mejor){geolocationPermissionState='granted';updateTrackingUi();await sendPosition(mejor,'GPS preciso',true);resolve(true);return;}toast('Señal GPS insuficiente',`No se obtuvo una precisión menor o igual a ${maxima} metros. Active ubicación precisa y espere unos segundos al aire libre.`,'error');resolve(false);};
+      const timer=setTimeout(()=>cerrar(Boolean(mejor&&Number(mejor.coords?.accuracy)<=maxima)),18000);
+      watchId=navigator.geolocation.watchPosition(position=>{const precision=Number(position.coords?.accuracy||Infinity);if(!Number.isFinite(precision)||precision<=0)return;if(!mejor||precision<Number(mejor.coords?.accuracy||Infinity))mejor=position;if(precision<=objetivo)cerrar(true);},error=>{if(error?.code===1){handleTrackingError(error,'No se obtuvo ubicación');cerrar(false);}}, {enableHighAccuracy:true,timeout:17000,maximumAge:0});
+    });
   }
 
   function trackingPreferenceEnabled(){return localStorage.getItem(trackingPreferenceKey)==='1';}
@@ -4086,23 +4241,52 @@
     finally{addressQueueRunning=false;}
   }
 
+  async function programarDireccionesGps(rows){
+    if(gpsAddressQueueRunning||currentSection!=='gps'||!config.RESOLVER_DIRECCIONES)return;
+    const unicos=new Map();
+    (rows||[]).filter(row=>coordenadasConexionValidas(row)&&!direccionLegible(row.DIRECCION)).forEach(row=>{const key=gpsUserMarkerKey(row);if(!unicos.has(key))unicos.set(key,row);});
+    const pending=[...unicos.values()].slice(0,Math.min(4,Number(config.MAXIMO_DIRECCIONES_POR_CICLO||8)));
+    if(!pending.length)return;
+    gpsAddressQueueRunning=true;let changed=false;
+    try{
+      for(const row of pending){
+        if(currentSection!=='gps')break;
+        const address=await resolveAddress(Number(row.LATITUD),Number(row.LONGITUD));
+        if(!direccionLegible(address))continue;
+        row.DIRECCION=address;changed=true;
+        const markerKey=gpsUserMarkerKey(row);
+        (ultimoResumenGps.locations||[]).forEach(item=>{if(gpsUserMarkerKey(item)===markerKey)item.DIRECCION=address;});
+        try{await api.request('updateLocationAddress',{data:{GPS_ID:row.ID,DISPOSITIVO_ID:row.DISPOSITIVO_ID,LATITUD:row.LATITUD,LONGITUD:row.LONGITUD,DIRECCION:address}});}catch(_){}
+      }
+      if(changed&&currentSection==='gps')paintGpsData(ultimoResumenGps,false);
+    }finally{gpsAddressQueueRunning=false;}
+  }
+
   function validarPosicionNavegador(position){
     const c=position?.coords||{},lat=Number(c.latitude),lng=Number(c.longitude),precision=Number(c.accuracy||0);
     const fecha=Number(position?.timestamp||Date.now()),edad=Math.max(0,Math.round((Date.now()-fecha)/1000));
     if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180||(Math.abs(lat)<0.000001&&Math.abs(lng)<0.000001))throw new Error('COORDENADAS_INVALIDAS');
     if(!Number.isFinite(precision)||precision<=0)throw new Error('PRECISION_GPS_REQUERIDA');
-    if(precision>120)throw new Error('UBICACION_GPS_IMPRECISA');
-    if(edad>180)throw new Error('UBICACION_GPS_ANTIGUA');
+    if(precision>Number(config.PRECISION_GPS_ENVIO_MAXIMA_METROS||60))throw new Error('UBICACION_GPS_IMPRECISA');
+    if(edad>Number(config.EDAD_GPS_MAPA_MAXIMA_SEGUNDOS||180))throw new Error('UBICACION_GPS_ANTIGUA');
+    if(fecha-Date.now()>60000)throw new Error('FECHA_GPS_FUTURA');
+    const anterior=ultimaPosicionConfiableNavegador;
+    if(anterior&&fecha>anterior.fecha&&fecha-anterior.fecha<=600000){
+      const distancia=distanciaMetros(anterior.lat,anterior.lng,lat,lng),segundos=Math.max(1,(fecha-anterior.fecha)/1000),incertidumbre=Math.max(precision,anterior.precision||precision),velocidad=Math.max(0,distancia-incertidumbre*2)/segundos*3.6;
+      if(distancia>Math.max(250,incertidumbre*4)&&velocidad>Number(config.VELOCIDAD_SALTO_GPS_MAXIMA_KMH||180))throw new Error('SALTO_GPS_IMPOSIBLE');
+    }
     return{lat,lng,precision,fecha,edad};
   }
   async function procesarColaGps(position,source,forzar) {
     const c=position.coords,ahora=Date.now(),validacion=validarPosicionNavegador(position);
-    guardarUltimaUbicacionDispositivo({latitud:validacion.lat,longitud:validacion.lng,precision:validacion.precision,fecha:validacion.fecha,fuente:source||'GPS del dispositivo'});
     if(!forzar&&ultimaUbicacionEnviada){const tiempo=ahora-ultimaUbicacionEnviada.tiempo,movimiento=distanciaMetros(ultimaUbicacionEnviada.latitud,ultimaUbicacionEnviada.longitud,validacion.lat,validacion.lng);if(tiempo<config.INTERVALO_GPS_MILISEGUNDOS&&movimiento<Number(config.DISTANCIA_MINIMA_ENVIO_GPS_METROS||6))return;}
     const fallback=`${validacion.lat.toFixed(6)}, ${validacion.lng.toFixed(6)}`;
     const cachedAddress=lastAddressLookup.address&&distanciaMetros(validacion.lat,validacion.lng,lastAddressLookup.latitude,lastAddressLookup.longitude)<50?lastAddressLookup.address:fallback;
-    await api.request('saveLocation',{data:{LATITUD:validacion.lat,LONGITUD:validacion.lng,PRECISION_METROS:validacion.precision,VELOCIDAD_KMH:c.speed==null?0:c.speed*3.6,RUMBO:c.heading||0,DIRECCION:cachedAddress,BATERIA_PORCENTAJE:batteryLevel,DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,PAGINA_VISIBLE:document.hidden?'NO':'SI',TIPO_RED:connectionType(),PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,FECHA_HORA:new Date(validacion.fecha).toISOString(),TIEMPO_CAPTURA_MS:validacion.fecha,EDAD_SEGUNDOS:validacion.edad,PROVEEDOR:'BROWSER_HIGH_ACCURACY',ES_SIMULADA:'NO',FUENTE:source,RUTA_ID:routeTrackingContext?.RUTA_ID||'',OPERACION_ID:routeTrackingContext?.OPERACION_ID||'',VEHICULO_ID:routeTrackingContext?.VEHICULO_ID||'',CONDUCTOR_ID:routeTrackingContext?.CONDUCTOR_ID||'',CONTEXTO_RUTA_EXPLICITO:'SI'}});
-    ultimaUbicacionEnviada={tiempo:ahora,latitud:validacion.lat,longitud:validacion.lng};setSave('Ubicación sincronizada');
+    const resultadoGps=await api.request('saveLocation',{data:{LATITUD:validacion.lat,LONGITUD:validacion.lng,PRECISION_METROS:validacion.precision,VELOCIDAD_KMH:c.speed==null?0:c.speed*3.6,RUMBO:c.heading||0,DIRECCION:cachedAddress,BATERIA_PORCENTAJE:batteryLevel,DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,PAGINA_VISIBLE:document.hidden?'NO':'SI',TIPO_RED:connectionType(),PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,FECHA_HORA:new Date(validacion.fecha).toISOString(),TIEMPO_CAPTURA_MS:validacion.fecha,EDAD_SEGUNDOS:validacion.edad,PROVEEDOR:'BROWSER_HIGH_ACCURACY',ES_SIMULADA:'NO',FUENTE:source,RUTA_ID:routeTrackingContext?.RUTA_ID||'',OPERACION_ID:routeTrackingContext?.OPERACION_ID||'',VEHICULO_ID:routeTrackingContext?.VEHICULO_ID||'',CONDUCTOR_ID:routeTrackingContext?.CONDUCTOR_ID||'',CONTEXTO_RUTA_EXPLICITO:'SI'}});
+    if(resultadoGps?.aceptada===false)throw new Error(resultadoGps?.motivo||'UBICACION_GPS_RECHAZADA');
+    ultimaPosicionConfiableNavegador={...validacion};
+    guardarUltimaUbicacionDispositivo({latitud:validacion.lat,longitud:validacion.lng,precision:validacion.precision,fecha:validacion.fecha,fuente:source||'GPS del dispositivo',confiable:true});
+    ultimaUbicacionEnviada={tiempo:ahora,latitud:validacion.lat,longitud:validacion.lng};setSave('Ubicación verificada y sincronizada');
     resolveAddress(validacion.lat,validacion.lng).then(address=>{if(!direccionLegible(address))return;ultimaPosicionConocida={...(ultimaPosicionConocida||{}),direccion:address};guardarUltimaUbicacionDispositivo({latitud:validacion.lat,longitud:validacion.lng,precision:validacion.precision,fecha:validacion.fecha,fuente:source||'GPS del dispositivo',direccion:address});api.request('updateLocationAddress',{data:{DISPOSITIVO_ID:deviceId,LATITUD:validacion.lat,LONGITUD:validacion.lng,DIRECCION:address}}).catch(()=>{});}).catch(()=>{});
     if(currentSection==='gps')refreshLocations(false,false);
     if(currentSection==='connections'){

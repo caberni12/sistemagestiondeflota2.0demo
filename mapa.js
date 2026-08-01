@@ -142,9 +142,15 @@
     }
 
     actualizarMarcadores(marcadores, ajustar = false) {
-      const nuevos = (marcadores || []).filter(item => coordenadasValidas(item.latitud, item.longitud));
+      const unicos = new Map();
+      (marcadores || []).forEach((item, indice) => {
+        if (!coordenadasValidas(item.latitud, item.longitud)) return;
+        const clave = String(item.id || `marcador-${indice}`);
+        unicos.set(clave, { ...item, id: clave });
+      });
+      const nuevos = [...unicos.values()];
       const firma = JSON.stringify(nuevos.map(item => [
-        item.id || '', Number(item.latitud), Number(item.longitud), item.nombre || '',
+        item.id || '', Number(item.latitud), Number(item.longitud), item.nombre || '', item.direccion || '',
         Boolean(item.activo), Boolean(item.seguido), item.detalle || ''
       ]));
       const sinCambios = firma === this.firmaMarcadores;
@@ -299,7 +305,7 @@
         circulo.style.top = `${centro.y - arriba - radioPixeles}px`;
         circulo.style.width = `${radioPixeles * 2}px`;
         circulo.style.height = `${radioPixeles * 2}px`;
-        circulo.title = item.etiqueta || `Radio autorizado: ${Math.round(item.radio)} m`;
+        circulo.title = item.titulo || item.etiqueta || `Radio: ${Math.round(item.radio)} m`;
         if (item.etiqueta) {
           const etiqueta = document.createElement('span');
           etiqueta.textContent = item.etiqueta;
@@ -354,6 +360,10 @@
           const icono = document.createElement('i');
           icono.textContent = '⌖';
           const etiqueta = document.createElement('span');
+          const tituloEtiqueta = document.createElement('strong');
+          const direccionEtiqueta = document.createElement('small');
+          direccionEtiqueta.className = 'mapa-etiqueta-direccion';
+          etiqueta.append(tituloEtiqueta, direccionEtiqueta);
           const detalle = document.createElement('div');
           detalle.className = 'mapa-detalle';
           boton.append(icono, etiqueta, detalle);
@@ -366,12 +376,18 @@
           this.capaMarcadores.appendChild(boton);
         }
         boton.style.transform = `translate3d(${punto.x - izquierda}px, ${punto.y - arriba}px, 0) translate(-50%, -50%)`;
-        const firmaContenido = `${item.activo ? '1' : '0'}|${item.seguido ? '1' : '0'}|${item.nombre || ''}|${item.detalle || ''}`;
+        const firmaContenido = `${item.activo ? '1' : '0'}|${item.seguido ? '1' : '0'}|${item.nombre || ''}|${item.direccion || ''}|${item.detalle || ''}`;
         if (boton.dataset.firmaContenido !== firmaContenido) {
           const abierto = boton.classList.contains('abierto');
           boton.className = `mapa-marcador ${item.activo ? 'activo' : 'antiguo'} ${item.seguido ? 'seguido' : ''} ${abierto ? 'abierto' : ''}`.trim();
-          boton.setAttribute('aria-label', `Ubicación de ${item.nombre || 'conductor'}`);
-          boton.querySelector(':scope > span').textContent = item.nombre || 'Conductor';
+          const direccion=String(item.direccion||'').trim();
+          boton.setAttribute('aria-label', `Ubicación de ${item.nombre || 'conductor'}${direccion?`, en ${direccion}`:''}`);
+          boton.title=direccion||item.nombre||'Ubicación';
+          const etiqueta=boton.querySelector(':scope > span');
+          let titulo=etiqueta?.querySelector(':scope > strong'),subtitulo=etiqueta?.querySelector(':scope > small');
+          if(etiqueta&&!titulo){titulo=document.createElement('strong');subtitulo=document.createElement('small');subtitulo.className='mapa-etiqueta-direccion';etiqueta.replaceChildren(titulo,subtitulo);}
+          if(titulo)titulo.textContent=item.nombre||'Conductor';
+          if(subtitulo){subtitulo.textContent=direccion;subtitulo.hidden=!direccion;}
           boton.querySelector(':scope > .mapa-detalle').innerHTML = item.detalle || '';
           boton.dataset.firmaContenido = firmaContenido;
         }
