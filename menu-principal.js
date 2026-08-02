@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.26';
+  const VERSION='4.2.34';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -72,7 +72,9 @@
   function permitido(modulo){
     if(!usuario)return false;
     const permisos=Array.isArray(usuario.PERMISOS)?usuario.PERMISOS:[];
-    const rol=String(usuario.ROL_ID||usuario.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);
+    const rol=String(usuario.ROL_ID||usuario.ROL_NOMBRE||'').trim().toUpperCase();
+    const gpsPropio=rol==='ROL-CONDUCTOR'&&modulo==='GPS';
+    return gpsPropio||rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);
   }
   function construirMenu(){
     let html='';
