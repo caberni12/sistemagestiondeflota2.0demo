@@ -181,14 +181,14 @@
         ['PATENTE','Patente','text',true],['MARCA','Marca','text',true],['MODELO','Modelo','text',true],['ANIO','Año','number',false],
         ['COLOR','Color','text',false],['COMBUSTIBLE','Combustible','select',['Diésel','Gasolina','Eléctrico','Híbrido','Gas']],
         ['VIN','VIN / chasis','text',false],['KILOMETRAJE','Kilometraje','number',false],
-        ['ESTADO','Estado','select',['Disponible','En ruta','Mantención','Inactivo']],['PROXIMA_MANTENCION','Próxima mantención','date',false]
+        ['ESTADO','Estado','select',['Disponible','En mantención','Fuera de servicio','Inactivo']],['PROXIMA_MANTENCION','Próxima mantención','date',false]
       ]
     },
     drivers: {
       title:'Conductor', eyebrow:'PERSONAL', fields:[
         ['NOMBRE','Nombre completo','text',true],['RUT','RUT','text',true],['TELEFONO','Teléfono','text',false],['CORREO','Correo','email',false],
         ['LICENCIA_CLASE','Clase de licencia','select',['A1','A2','A3','A4','A5','B','C','D','E','F']],
-        ['LICENCIA_VENCIMIENTO','Vencimiento licencia','date',false],['ESTADO','Estado','select',['Disponible','En viaje','Licencia vencida','Inactivo']],
+        ['LICENCIA_VENCIMIENTO','Vencimiento licencia','date',false],['ESTADO','Estado','select',['Disponible','Licencia vencida','Suspendido','Inactivo']],
         ['USUARIO_ID','Usuario asociado','userSelect',false]
       ]
     },
@@ -422,7 +422,7 @@
       UBICACION_OPERACION_REQUERIDA:'Debe permitir el acceso al GPS y obtener la ubicación antes de continuar.', PRECISION_GPS_REQUERIDA:'El dispositivo no informó la precisión de la ubicación.',
       UBICACION_GPS_IMPRECISA:'La señal GPS es demasiado imprecisa. Salga a un lugar abierto y vuelva a intentarlo.', UBICACION_GPS_COORDENADAS_INVALIDAS:'La lectura GPS contiene coordenadas no válidas.', UBICACION_GPS_PRECISION_REQUERIDA:'El dispositivo no informó la precisión necesaria.', UBICACION_SIMULADA_RECHAZADA:'La ubicación simulada fue rechazada por seguridad.', UBICACION_RED_IMPRECISA:'La ubicación aproximada de red no tiene precisión suficiente. Espere señal GPS.', FECHA_GPS_ANTIGUA:'La ubicación recibida es antigua y no reemplazará la última posición confiable.', FECHA_GPS_FUTURA:'La fecha del dispositivo no es válida para registrar el GPS.', FECHA_GPS_ANTERIOR:'Se descartó una ubicación anterior a la última señal aceptada.', SALTO_GPS_IMPOSIBLE:'Se descartó un salto de ubicación incompatible con el movimiento real del vehículo.', UBICACION_GPS_DEGRADADA:'La nueva lectura es mucho menos precisa y fue descartada.', FUERA_DEL_PUNTO_DE_INICIO:'No puede iniciar la operación fuera del punto autorizado por el Administrador.',
       FUERA_DEL_PUNTO_DE_FINALIZACION:'No puede finalizar la operación hasta regresar al punto autorizado.', RADIO_OPERACION_INVALIDO:'Los radios y la precisión permitida deben estar entre 10 y 5.000 metros.',
-      RUTA_NO_DISPONIBLE:'La ruta seleccionada ya no está disponible.', RUTA_NO_CONFIRMADA_EN_CURSO:'El servidor respondió, pero no confirmó la ruta en estado En curso. Publique nuevamente Codigo_Completo.gs.', RUTA_VEHICULO_REQUERIDO:'La ruta necesita un vehículo asignado o una operación activa con vehículo.', RUTA_VEHICULO_NO_COINCIDE_OPERACION:'La operación activa utiliza otro vehículo distinto al asignado en la ruta.', RUTA_NO_COINCIDE_CONDUCTOR:'La ruta no corresponde al conductor seleccionado.', RUTA_NO_COINCIDE_VEHICULO:'La ruta no corresponde al vehículo seleccionado.', RUTA_YA_VINCULADA:'La ruta ya está vinculada a otra operación activa.',
+      RUTA_NO_DISPONIBLE:'La ruta seleccionada ya no está disponible.', ESTADO_OPERATIVO_AUTOMATICO:'Los estados En ruta y En operación se administran automáticamente al iniciar o finalizar una ruta u operación.', CONDUCTOR_NO_DISPONIBLE:'El conductor ya está ocupado en una ruta u operación activa.', VEHICULO_NO_DISPONIBLE:'El vehículo ya está ocupado en una ruta u operación activa.', RUTA_NO_CONFIRMADA_EN_CURSO:'El servidor respondió, pero no confirmó la ruta en estado En curso. Publique nuevamente Codigo_Completo.gs.', RUTA_VEHICULO_REQUERIDO:'La ruta necesita un vehículo asignado o una operación activa con vehículo.', RUTA_VEHICULO_NO_COINCIDE_OPERACION:'La operación activa utiliza otro vehículo distinto al asignado en la ruta.', RUTA_NO_COINCIDE_CONDUCTOR:'La ruta no corresponde al conductor seleccionado.', RUTA_NO_COINCIDE_VEHICULO:'La ruta no corresponde al vehículo seleccionado.', RUTA_YA_VINCULADA:'La ruta ya está vinculada a otra operación activa.',
       PUNTO_OPERACION_ROL_NO_AUTORIZADO:'Solo un Administrador o Supervisor puede configurar o cambiar el punto base.', CIERRE_EXCEPCIONAL_NO_AUTORIZADO:'Solo un Administrador o Supervisor puede cerrar una operación fuera de la base.',
       CIERRE_EXCEPCIONAL_CONFIRMACION_REQUERIDA:'Active la opción de cierre excepcional para continuar fuera de la base.', CIERRE_EXCEPCIONAL_MOTIVO_REQUERIDO:'Explique el motivo del cierre excepcional con al menos 10 caracteres.',
       KILOMETRAJE_FINAL_INVALIDO:'El kilometraje será guardado para revisión, pero no impedirá finalizar.', SOLO_ADMINISTRADOR:'Solo un Administrador puede realizar esta acción.', ACCESO_CONEXIONES_NO_AUTORIZADO:'El Administrador no ha habilitado el acceso a Conexiones en línea para este usuario.', USUARIO_SEGUIMIENTO_NO_ENCONTRADO:'El usuario seleccionado para seguimiento ya no está disponible.', MOTIVO_EDICION_REQUERIDO:'Indique un motivo de al menos 5 caracteres para registrar la edición.', FECHA_OPERACION_INVALIDA:'La fecha indicada no es válida.', RECURSO_IMPORTACION_NO_PERMITIDO:'Este módulo no admite importación masiva.',
@@ -1238,7 +1238,7 @@
   function validateImportRows(resource,fileData){
     const definition=bulkImportDefinitions[resource],headers=fileData.headers||[],rawRows=fileData.rows||[],errors=[],validRows=[],seen=new Set();
     const missingHeaders=definition.required.filter(field=>!headers.includes(field));if(missingHeaders.length)throw new Error(`COLUMNAS_REQUERIDAS: ${missingHeaders.join(', ')}`);if(rawRows.length>definition.maxRows)throw new Error('IMPORTACION_DEMASIADAS_FILAS');
-    const vehicleStates=['Disponible','En ruta','En mantención','Fuera de servicio'],fuels=['Diésel','Gasolina','Eléctrico','Híbrido','GLP','Otro'],driverStates=['Disponible','En viaje','Inactivo','Suspendido'],licenses=['A1','A2','A3','A4','A5','B','C','D','E','F'];
+    const vehicleStates=['Disponible','En mantención','Fuera de servicio','Inactivo'],fuels=['Diésel','Gasolina','Eléctrico','Híbrido','GLP','Otro'],driverStates=['Disponible','Licencia vencida','Inactivo','Suspendido'],licenses=['A1','A2','A3','A4','A5','B','C','D','E','F'];
     rawRows.forEach((raw,index)=>{const row={...raw},line=Number(raw.__FILA_ORIGEN||index+2),rowErrors=[];definition.headers.forEach(field=>{if(field in row&&typeof row[field]==='string')row[field]=row[field].trim();});definition.required.forEach(field=>{if(cleanImportText(row[field],500)==='')rowErrors.push(`CAMPO_REQUERIDO_${field}`);});
       if(resource==='vehicles'){
         row.PATENTE=cleanImportText(row.PATENTE,30).toUpperCase().replace(/[^A-Z0-9]/g,'');row.MARCA=cleanImportText(row.MARCA,100);row.MODELO=cleanImportText(row.MODELO,100);row.COLOR=cleanImportText(row.COLOR,60);row.VIN=cleanImportText(row.VIN,50).toUpperCase();
@@ -3277,8 +3277,8 @@
     const selectedValue=String(selected||'');
     let values=[...(rows||[])],placeholder='Seleccione';
     if(kind==='users'){placeholder='Sin asociar';}
-    if(kind==='routeDrivers'){values=values.filter(row=>row.ESTADO!=='Inactivo');}
-    if(kind==='routeVehicles'){placeholder='Por definir';values=values.filter(row=>row.ESTADO!=='Inactivo');}
+    if(kind==='routeDrivers'){values=values.filter(row=>row.ESTADO==='Disponible'||String(row.ID)===selectedValue);}
+    if(kind==='routeVehicles'){placeholder='Por definir';values=values.filter(row=>row.ESTADO==='Disponible'||String(row.ID)===selectedValue);}
     if(kind==='notificationDrivers'){values=values.filter(row=>row.ESTADO!=='Inactivo');}
     if(['operationVehicles','checkinVehicles'].includes(kind)){
       values=values.filter(row=>row.ESTADO==='Disponible'||String(row.ID)===selectedValue);
