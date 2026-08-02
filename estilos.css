@@ -511,7 +511,7 @@ body.dark .operation-location-status.valid.imprecise{background:#3d3218;color:#f
 .document-review-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:850;white-space:nowrap}.document-review-badge i{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-weight:900}.document-review-badge.approved{color:#176534;background:rgba(22,163,74,.12)}.document-review-badge.approved i{background:#16a34a;color:#fff}.document-review-badge.pending{color:#7a5700;background:#fff3cf}.document-review-badge.pending i{background:#d89616;color:#fff}.document-review-badge.rejected{color:#9f2525;background:rgba(199,71,71,.12)}.document-review-badge.rejected i{background:#c74747;color:#fff}.document-validity{display:block;margin-top:6px;color:var(--muted)}.document-review-actions{align-items:flex-start}.document-review-panel{display:flex;align-items:flex-start;gap:13px;padding:15px;border:1px solid var(--line);border-radius:15px;background:var(--surface-soft)}.document-review-panel .document-review-icon{display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:13px;background:var(--amber);color:#fff;font-size:21px;font-weight:900}.document-review-panel.ok{border-color:rgba(22,163,74,.34);background:rgba(22,163,74,.07)}.document-review-panel.ok .document-review-icon{background:#16a34a}.document-review-panel.bad{border-color:rgba(199,71,71,.35);background:rgba(199,71,71,.07)}.document-review-panel.bad .document-review-icon{background:#c74747}.document-review-panel b,.document-review-panel span,.document-review-panel small{display:block}.document-review-panel span,.document-review-panel small{margin-top:4px;color:var(--muted);line-height:1.4}.document-review-readonly{font-weight:800}.document-review-readonly.ok{border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.08);color:#176534}.document-review-readonly.warn{border-color:rgba(216,150,22,.38);background:#fff8e7;color:#7a5700}.document-review-readonly.bad{border-color:rgba(199,71,71,.38);background:rgba(199,71,71,.07);color:#9f2525}.document-auto-approved{border-color:rgba(22,163,74,.38)!important;background:rgba(22,163,74,.07)!important}.document-auto-approved>i{background:#16a34a!important;color:#fff!important}
 
 
-/* Precisión visual del GPS 4.2.16 */
+/* Precisión visual del GPS 4.2.18 */
 .mapa-radio.precision-gps{border-width:1.5px;background:rgba(14,159,145,.055);box-shadow:none;opacity:.8}
 .mapa-radio.precision-gps.alta{border-color:rgba(22,163,74,.75);background:rgba(22,163,74,.07)}
 .mapa-radio.precision-gps.media{border-color:rgba(14,159,145,.7);background:rgba(14,159,145,.065)}
@@ -521,10 +521,10 @@ body.dark .operation-location-status.valid.imprecise{background:#3d3218;color:#f
 .gps-quality{display:block;margin-top:4px;font-size:10px;font-weight:800}.gps-quality.alta{color:#176534}.gps-quality.media{color:var(--primary)}.gps-quality.aceptable{color:#9a5b00}
 body.dark .gps-quality.alta{color:#79d69b}body.dark .gps-quality.aceptable{color:#f4c66a}
 
-/* Dirección visible en el marcador único 4.2.16 */
+/* Dirección visible en el marcador único 4.2.18 */
 body.dark .mapa-marcador>span>small{color:#b7c7d2}
 
-/* 4.2.16 · Estado único del usuario en el mapa */
+/* 4.2.18 · Estado único del usuario en el mapa */
 .mapa-estado-linea{display:inline-flex!important;align-items:center;gap:6px;margin-top:7px!important;padding:5px 8px;border-radius:999px;font-size:10px!important;font-weight:850}
 .mapa-estado-linea>i{display:block;width:8px;height:8px;border-radius:50%;flex:0 0 8px}
 .mapa-estado-linea.en-linea{background:rgba(22,163,74,.18);color:#b8f5ca!important}.mapa-estado-linea.en-linea>i{background:var(--active-green);box-shadow:0 0 0 4px rgba(22,163,74,.18)}
@@ -532,13 +532,13 @@ body.dark .mapa-marcador>span>small{color:#b7c7d2}
 .mapa-marcador.activo>i{background:var(--active-green)!important}.mapa-marcador.activo .mapa-estado-linea.desconectado{display:none!important}
 .mapa-marcador.antiguo>i{background:var(--inactive-red)!important}.mapa-marcador.antiguo .mapa-estado-linea.en-linea{display:none!important}
 
-/* 4.2.16 · KPI activos del Panel principal */
+/* 4.2.18 · KPI activos del Panel principal */
 .metric-card-button{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;appearance:none;-webkit-appearance:none;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
 .metric-card-button:hover{transform:translateY(-2px);border-color:var(--primary);box-shadow:0 12px 28px rgba(14,159,145,.14)}
 .metric-card-button:focus-visible{outline:3px solid var(--primary-soft);outline-offset:2px}
 .metric-card-button:active{transform:translateY(0)}
 
-/* 4.2.16 · Cronómetro de rutas y respaldo general */
+/* 4.2.18 · Cronómetro de rutas y respaldo general */
 .route-clock{display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft,#f6f8fb)}
 .route-clock i{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;font-style:normal;background:rgba(20,125,78,.12);color:var(--success,#147d4e);font-weight:800}
 .route-clock span{display:flex;flex-direction:column;gap:1px}.route-clock small{color:var(--muted);font-size:.75rem}.route-clock b{font-variant-numeric:tabular-nums;font-size:1.08rem;letter-spacing:.04em}
@@ -547,3 +547,28 @@ body.dark .mapa-marcador>span>small{color:#b7c7d2}
 .backup-database-shell{margin-top:18px}.backup-database-card{overflow:hidden}.backup-feature-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.backup-feature-list span{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-soft,#f6f8fb);font-size:.88rem}
 .backup-status{margin:12px 0;padding:11px 13px;border-radius:10px;background:var(--surface-soft,#f6f8fb);color:var(--muted)}.backup-status.working{color:var(--primary);border:1px solid rgba(41,98,255,.22)}.backup-status.ok{color:var(--success,#147d4e);border:1px solid rgba(20,125,78,.22)}.backup-status.error{color:var(--danger,#b42318);border:1px solid rgba(180,35,24,.22)}
 @media(max-width:760px){.backup-feature-list{grid-template-columns:1fr}.route-clock.compact{min-width:112px}}
+
+/* 4.2.18 · Estado de recuperación GPS dentro del marcador único */
+.mapa-aviso-gps,.mapa-gps-actual{display:block;margin:.3rem 0;padding:.35rem .5rem;border-radius:.55rem;font-size:.78rem;font-weight:700}
+.mapa-aviso-gps{background:#fff4d6;color:#7a4a00;border:1px solid #f2cf79}
+.mapa-gps-actual{background:#e8f7ee;color:#176b3a;border:1px solid #9bd0ae}
+
+/* 4.2.19 · Mapas limpios: al ampliar, los indicadores quedan ocultos y el mapa ocupa toda la pantalla. */
+.map-card.map-fullscreen{padding:0!important;background:var(--surface,#fff)!important}
+.map-card.map-fullscreen .fleet-map{height:100vh!important;min-height:100vh!important;flex:1}
+.map-card.map-fullscreen .map-toolbar{display:none!important}
+.map-card.map-fullscreen .map-fullscreen-bar{position:absolute!important;top:10px;right:10px;z-index:40;margin:0!important}
+.map-card.map-fullscreen>.card-header{position:absolute!important;top:10px;right:10px;left:auto!important;z-index:40;margin:0!important;padding:0!important;border:0!important;background:transparent!important}
+.map-card.map-fullscreen>.card-header>div{display:none!important}
+.map-card.map-fullscreen [data-map-fullscreen]{min-width:48px;min-height:44px;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.25);backdrop-filter:blur(8px)}
+@media(max-width:720px){.map-card.map-fullscreen .fleet-map{height:100dvh!important;min-height:100dvh!important}.map-card.map-fullscreen .map-fullscreen-bar,.map-card.map-fullscreen>.card-header{top:max(8px,env(safe-area-inset-top));right:8px}}
+
+/* Importación masiva validada — versión 4.2.26 */
+.file-drop.dragover{border-color:var(--color-principal,#0b5f59);background:color-mix(in srgb,var(--color-principal,#0b5f59) 12%,transparent);transform:translateY(-2px)}
+.import-status.warning{background:color-mix(in srgb,var(--color-advertencia,#e8a128) 12%,transparent);color:#7a4b00}
+.import-preview{display:grid;gap:12px}.import-preview-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.import-preview-summary span,.import-ignored-columns{color:var(--color-texto-secundario,#65798b);font-size:12px}
+.import-row-ok{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:color-mix(in srgb,var(--color-exito,#0e9f91) 12%,transparent);color:var(--color-exito,#0e9f91);font-size:10px;font-weight:850}
+.import-pre-errors{max-height:220px}.import-result>[data-download-import-errors]{margin-top:12px}
+@media(max-width:720px){.import-preview-summary{align-items:flex-start;flex-direction:column}.import-steps{grid-template-columns:1fr}.import-template-card{align-items:flex-start;flex-direction:column}.import-template-card .btn{width:100%}}
+
+.connection-cell-stack{display:flex;flex-direction:column;gap:4px;min-width:0;line-height:1.3}.connection-cell-stack>strong,.connection-cell-stack>span,.connection-cell-stack>small{display:block;max-width:100%;overflow-wrap:anywhere}.connection-cell-stack>small{color:var(--text-secondary);font-size:.78rem}.connection-cell-stack .connection-state{display:inline-flex;width:max-content}.connection-address{font-weight:650}.connection-follow-unavailable{display:block;padding:7px 9px;border-radius:10px;background:var(--surface-soft);color:var(--text-secondary);font-size:10px;font-weight:700}.connection-follow-control span{display:inline-block}

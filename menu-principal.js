@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.16';
+  const VERSION='4.2.26';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -104,6 +104,10 @@
   function abrirModulo(id,{forzar=false}={}){
     const modulo=modulos.get(id)||modulos.get('dashboard');
     if(!usuario||!permitido(modulo[4]))return;
+    if((modulo[0]==='gps'||modulo[0]==='connections')&&window.AndroidConfig&&typeof window.AndroidConfig.abrirModuloNativo==='function'){
+      try{window.AndroidConfig.abrirModuloNativo(modulo[0]);cerrarMenu();cambiarEstado('Módulo Android nativo abierto','listo');return;}
+      catch(error){console.error('No fue posible abrir el módulo nativo',error);}
+    }
     if(modulo[0]===seccionActual&&!forzar&&marcoListo){cerrarMenu();return;}
     seccionActual=modulo[0];
     localStorage.setItem('flotas_modulo_actual_v1',seccionActual);
