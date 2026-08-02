@@ -11,7 +11,7 @@
     changePassword:'cambiarContrasena', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
     assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', sendNotification:'enviarNotificacion',
     readNotification:'marcarNotificacionLeida', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
-    connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones',
+    connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
     officeQuickStatus:'estadoRapidoOficinaVirtual', officeTasks:'pendientesOficinaVirtual',
     officeStatus:'estadoOficinaVirtual', officeAsk:'consultarOficinaVirtual', officeAutoMode:'configurarModoOficinaVirtual',
@@ -295,6 +295,7 @@
       updateRouteStatus: { actions:['dashboard','realtimeSummary','officeQuickStatus','officeTasks','officeStatus'], resources:['routes','notifications','audit'] },
       sendNotification: { actions:['dashboard','realtimeSummary'], resources:['notifications','audit'] },
       sendConnectionsNotice: { actions:['dashboard','realtimeSummary'], resources:['notifications','alerts','audit'] },
+      disconnectConnectedUser: { actions:['dashboard','realtimeSummary','connectionsOnline'], resources:['connections','notifications','audit'] },
       readNotification: { actions:['dashboard','realtimeSummary'], resources:['notifications'] },
       readAlert: { actions:['dashboard','realtimeSummary'], resources:['alerts'] },
       saveCompany: { actions:['status','getOperationalPoint'], resources:['companies','audit'] },
@@ -498,6 +499,16 @@
       || codigo.includes('ACCION NO RECONOCIDA')
       || codigo.includes('ACCION DESCONOCIDA');
   }
+  function esErrorRecuperableConexiones(error) {
+    const codigo=String(error?.message||error||'').trim().toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return esErrorAccionConexionesNoReconocida(error)
+      || codigo.includes('CONEXIONES_NO_DISPONIBLES')
+      || codigo.includes('CONEXIONES_Y_GPS_NO_DISPONIBLES')
+      || codigo.includes('GPS_RESUMEN_NO_DISPONIBLE')
+      || codigo.includes('BASE_DATOS_PGRST204')
+      || codigo.includes('BASE_DATOS_42703');
+  }
 
   function coordenadaVisibleCompatibilidad(row) {
     const lat = Number(row?.LATITUD);
@@ -506,7 +517,7 @@
     return Number.isFinite(lat) && Number.isFinite(lng)
       && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
       && !(Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001)
-      && Number.isFinite(precision) && precision > 0 && precision <= 120;
+      && Number.isFinite(precision) && precision > 0 && precision <= 250;
   }
 
   function adaptarResumenTiempoRealAConexiones(resumen = {}, payload = {}) {
@@ -514,6 +525,7 @@
     const porDispositivo = new Map();
     const porVehiculo = new Map();
     const porConductor = new Map();
+    const porUsuario = new Map();
     ubicaciones.forEach(row => {
       const fecha = new Date(row.FECHA_HORA || row.FECHA_GPS || row.ACTUALIZADO_EN || 0).getTime() || 0;
       const guardar = (mapa, clave) => {
@@ -525,9 +537,11 @@
       guardar(porDispositivo, row.DISPOSITIVO_ID);
       guardar(porVehiculo, row.VEHICULO_ID);
       guardar(porConductor, row.CONDUCTOR_ID);
+      guardar(porUsuario, row.USUARIO_ID);
     });
     const equipos = (resumen.devices || resumen.equipos || []).map(row => {
       const gps = porDispositivo.get(String(row.DISPOSITIVO_ID || ''))
+        || porUsuario.get(String(row.USUARIO_ID || ''))
         || porVehiculo.get(String(row.VEHICULO_ID || ''))
         || porConductor.get(String(row.CONDUCTOR_ID || ''))
         || {};
@@ -541,6 +555,7 @@
         DIRECCION: gps.DIRECCION || '',
         FUENTE_GPS: gps.FUENTE || '',
         GPS_RECIENTE: Boolean(gps.FECHA_HORA || gps.FECHA_GPS),
+        GPS_ACTIVO: visible ? 'SI' : String(row.GPS_ACTIVO||'NO').toUpperCase(),
         USUARIO_CORREO: row.USUARIO_CORREO || '',
         ESTADO_CONEXION: row.EN_LINEA ? 'Activo' : 'Desconectado'
       };
@@ -575,17 +590,27 @@
     const users=new Map((listados.users?.rows||[]).map(row=>[String(row.ID||''),row]));
     const drivers=new Map((listados.drivers?.rows||[]).map(row=>[String(row.ID||''),row]));
     const vehicles=new Map((listados.vehicles?.rows||[]).map(row=>[String(row.ID||''),row]));
-    const latestConnection=new Map(), latestDeviceGps=new Map(), latestVehicleGps=new Map(), latestDriverGps=new Map();
+    const latestConnection=new Map(), latestDeviceGps=new Map(), latestUserGps=new Map(), latestVehicleGps=new Map(), latestDriverGps=new Map();
     const keep=(map,key,row,dateField)=>{if(!key)return;const current=map.get(String(key));const rowDate=new Date(row?.[dateField]||row?.ACTUALIZADO_EN||row?.CREADO_EN||0).getTime()||0;const currentDate=current?(new Date(current?.[dateField]||current?.ACTUALIZADO_EN||current?.CREADO_EN||0).getTime()||0):-1;if(!current||rowDate>currentDate)map.set(String(key),row);};
     conexiones.forEach(row=>keep(latestConnection,row.DISPOSITIVO_ID||row.SESION_CLIENTE_ID||row.SESION_ID||row.ID,row,'ULTIMA_CONEXION'));
-    gps.forEach(row=>{keep(latestDeviceGps,row.DISPOSITIVO_ID,row,'FECHA_HORA');keep(latestVehicleGps,row.VEHICULO_ID,row,'FECHA_HORA');keep(latestDriverGps,row.CONDUCTOR_ID,row,'FECHA_HORA');});
+    gps.forEach(row=>{keep(latestDeviceGps,row.DISPOSITIVO_ID,row,'FECHA_HORA');keep(latestUserGps,row.USUARIO_ID,row,'FECHA_HORA');keep(latestVehicleGps,row.VEHICULO_ID,row,'FECHA_HORA');keep(latestDriverGps,row.CONDUCTOR_ID,row,'FECHA_HORA');});
     const activeLimit=Date.now()-90000,gpsLimit=Date.now()-180000;
     let equipos=[...latestConnection.values()].map(row=>{
       const user=users.get(String(row.USUARIO_ID||''))||{},driver=drivers.get(String(row.CONDUCTOR_ID||''))||{},vehicle=vehicles.get(String(row.VEHICULO_ID||''))||{};
-      const location=coordenadaVisibleCompatibilidad(row)?row:(latestDeviceGps.get(String(row.DISPOSITIVO_ID||''))||latestVehicleGps.get(String(row.VEHICULO_ID||''))||latestDriverGps.get(String(row.CONDUCTOR_ID||''))||{});
+      const location=coordenadaVisibleCompatibilidad(row)?row:(latestDeviceGps.get(String(row.DISPOSITIVO_ID||''))||latestUserGps.get(String(row.USUARIO_ID||''))||latestVehicleGps.get(String(row.VEHICULO_ID||''))||latestDriverGps.get(String(row.CONDUCTOR_ID||''))||{});
       const visible=coordenadaVisibleCompatibilidad(location),last=fechaConexionCompatibilidad(row),gpsDate=new Date(location.FECHA_HORA||location.FECHA_GPS||0).getTime()||0;
       const online=last>=activeLimit&&String(row.ESTADO||'').toLowerCase()!=='desconectado';
-      return {...row,USUARIO_NOMBRE:user.NOMBRE||row.USUARIO_ID||'Usuario',USUARIO_CORREO:user.CORREO||'',ROL_ID:user.ROL_ID||'',CONDUCTOR_NOMBRE:driver.NOMBRE||'',VEHICULO_PATENTE:vehicle.PATENTE||'',VEHICULO_NOMBRE:[vehicle.MARCA,vehicle.MODELO].filter(Boolean).join(' '),EN_LINEA:online,COLOR_ESTADO:online?'VERDE':'ROJO',ESTADO_CONEXION:online?'Activo':'Desconectado',GPS_RECIENTE:gpsDate>=gpsLimit,LATITUD:visible?Number(location.LATITUD):'',LONGITUD:visible?Number(location.LONGITUD):'',PRECISION_METROS:visible?Number(location.PRECISION_METROS):'',FECHA_GPS:location.FECHA_HORA||location.FECHA_GPS||'',DIRECCION:location.DIRECCION||'',FUENTE_GPS:location.FUENTE||location.FUENTE_GPS||'',PROVEEDOR_GPS:location.PROVEEDOR||location.PROVEEDOR_GPS||'',CALIDAD_GPS:location.CALIDAD_GPS||'',BATERIA_GPS:location.BATERIA_PORCENTAJE||row.BATERIA_PORCENTAJE||''};
+      return {...row,USUARIO_NOMBRE:user.NOMBRE||row.USUARIO_ID||'Usuario',USUARIO_CORREO:user.CORREO||'',ROL_ID:user.ROL_ID||'',CONDUCTOR_NOMBRE:driver.NOMBRE||'',VEHICULO_PATENTE:vehicle.PATENTE||'',VEHICULO_NOMBRE:[vehicle.MARCA,vehicle.MODELO].filter(Boolean).join(' '),EN_LINEA:online,COLOR_ESTADO:online?'VERDE':'ROJO',ESTADO_CONEXION:online?'Activo':'Desconectado',GPS_RECIENTE:gpsDate>=gpsLimit,GPS_ACTIVO:visible?'SI':String(row.GPS_ACTIVO||'NO').toUpperCase(),LATITUD:visible?Number(location.LATITUD):'',LONGITUD:visible?Number(location.LONGITUD):'',PRECISION_METROS:visible?Number(location.PRECISION_METROS):'',FECHA_GPS:location.FECHA_HORA||location.FECHA_GPS||'',DIRECCION:location.DIRECCION||'',FUENTE_GPS:location.FUENTE||location.FUENTE_GPS||'',PROVEEDOR_GPS:location.PROVEEDOR||location.PROVEEDOR_GPS||'',CALIDAD_GPS:location.CALIDAD_GPS||'',BATERIA_GPS:location.BATERIA_PORCENTAJE||row.BATERIA_PORCENTAJE||''};
+    });
+    const clavesRepresentadas=new Set();
+    equipos.forEach(row=>[row.DISPOSITIVO_ID,row.VEHICULO_ID,row.CONDUCTOR_ID].filter(Boolean).forEach(value=>clavesRepresentadas.add(String(value))));
+    gps.forEach(location=>{
+      const claves=[location.DISPOSITIVO_ID,location.VEHICULO_ID,location.CONDUCTOR_ID].filter(Boolean).map(String);
+      if(claves.some(clave=>clavesRepresentadas.has(clave)))return;
+      const driver=drivers.get(String(location.CONDUCTOR_ID||''))||{},vehicle=vehicles.get(String(location.VEHICULO_ID||''))||{},user=users.get(String(driver.USUARIO_ID||location.USUARIO_ID||''))||{};
+      const gpsDate=new Date(location.FECHA_HORA||location.FECHA_GPS||location.ACTUALIZADO_EN||0).getTime()||0,online=gpsDate>=activeLimit;
+      equipos.push({...location,ID:`GPS-RESPALDO-${location.ID||location.DISPOSITIVO_ID||Date.now()}`,MARCADOR_ID:`CONEXION-RESPALDO-${user.ID||driver.ID||vehicle.ID||location.DISPOSITIVO_ID||location.ID}`,USUARIO_ID:user.ID||driver.USUARIO_ID||location.USUARIO_ID||'',USUARIO_NOMBRE:user.NOMBRE||driver.NOMBRE||'Usuario con GPS',USUARIO_CORREO:user.CORREO||'',ROL_ID:user.ROL_ID||'',CONDUCTOR_NOMBRE:driver.NOMBRE||'',VEHICULO_PATENTE:vehicle.PATENTE||'',VEHICULO_NOMBRE:[vehicle.MARCA,vehicle.MODELO].filter(Boolean).join(' '),DISPOSITIVO_ID:location.DISPOSITIVO_ID||location.CLAVE_SEGUIMIENTO||location.ID||'',SECCION_ACTUAL:'seguimiento_gps',ACTIVIDAD:'Ubicación recibida por GPS',GPS_ACTIVO:'SI',PAGINA_VISIBLE:'NO',ESTADO:online?'Activo':'Desconectado',ULTIMA_CONEXION:location.FECHA_HORA||location.FECHA_GPS||location.ACTUALIZADO_EN||'',EN_LINEA:online,COLOR_ESTADO:online?'VERDE':'ROJO',ESTADO_CONEXION:online?'Activo':'Desconectado',GPS_RECIENTE:gpsDate>=gpsLimit,UBICACION_RETENIDA:gpsDate<gpsLimit,LATITUD:Number(location.LATITUD),LONGITUD:Number(location.LONGITUD),PRECISION_METROS:Number(location.PRECISION_METROS),FECHA_GPS:location.FECHA_HORA||location.FECHA_GPS||'',DIRECCION:location.DIRECCION||'',FUENTE_GPS:location.FUENTE||location.FUENTE_GPS||'GPS_ACTUAL_RESPALDO',PROVEEDOR_GPS:location.PROVEEDOR||location.PROVEEDOR_GPS||'',CALIDAD_GPS:location.CALIDAD_GPS||'',BATERIA_GPS:location.BATERIA_PORCENTAJE||''});
+      claves.forEach(clave=>clavesRepresentadas.add(clave));
     });
     const data=payload.data||payload||{},norm=value=>String(value||'').trim().toUpperCase(),search=String(data.BUSCAR||data.buscar||'').trim().toLowerCase();
     const userId=String(data.USUARIO_ID||data.usuarioId||''),driverId=String(data.CONDUCTOR_ID||data.conductorId||''),vehicleId=String(data.VEHICULO_ID||data.vehiculoId||''),deviceId=String(data.DISPOSITIVO_ID||data.dispositivoId||''),state=norm(data.ESTADO||data.estado||'TODOS'),gpsState=norm(data.GPS||data.gps||'TODOS'),network=String(data.TIPO_RED||data.tipoRed||''),platform=String(data.PLATAFORMA||data.plataforma||''),precisionMax=Number(data.PRECISION_MAXIMA||data.precisionMaxima||0);
@@ -603,14 +628,16 @@
   async function remoteRequest(action, payload) {
     if (!config.DIRECCION_APLICACION) throw new Error('DIRECCION_APLICACION_NO_CONFIGURADA');
     const controller = new AbortController();
-    const timeoutOperaciones=new Set(['operationsSummary','startOperation','finishOperation','editOperationAdmin','deleteOperationAdmin','startRoute','completeRoute','updateRouteStatus','uploadDriveFile','routeEvidenceImage']);
+    const timeoutOperaciones=new Set(['operationsSummary','startOperation','finishOperation','editOperationAdmin','deleteOperationAdmin','startRoute','completeRoute','updateRouteStatus','uploadDriveFile','routeEvidenceImage','bulkImport']);
     const timeout=action==='connectionTrackingLive'
       ? Number(config.TIEMPO_ESPERA_SEGUIMIENTO_CONEXION_MILISEGUNDOS||8000)
       : action==='connectionsOnline'
       ? Number(config.TIEMPO_ESPERA_CONEXIONES_MILISEGUNDOS||15000)
-      : timeoutOperaciones.has(action)
-        ? Number(config.TIEMPO_ESPERA_OPERACIONES_MILISEGUNDOS||60000)
-        : Number(config.TIEMPO_ESPERA_MILISEGUNDOS||30000);
+      : action==='bulkImport'
+        ? Number(config.TIEMPO_ESPERA_IMPORTACION_MILISEGUNDOS||120000)
+        : timeoutOperaciones.has(action)
+          ? Number(config.TIEMPO_ESPERA_OPERACIONES_MILISEGUNDOS||60000)
+          : Number(config.TIEMPO_ESPERA_MILISEGUNDOS||30000);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
       const response = await fetch(config.DIRECCION_APLICACION, {
@@ -635,7 +662,7 @@
         const codigo = result.error || 'ERROR_SERVICIO';
         if (isAuthError(codigo)) notificarSesionInvalida(codigo);
         const errorServicio = new Error(codigo);
-        if (action === 'connectionsOnline' && esErrorAccionConexionesNoReconocida(errorServicio)) {
+        if (action === 'connectionsOnline' && esErrorRecuperableConexiones(errorServicio)) {
           try {
             const resumenAnterior = await remoteRequest('realtimeSummary', { ...payload, estadoConexion:'TODOS', soloGps:true, force:true, cache:false });
             return adaptarResumenTiempoRealAConexiones(resumenAnterior, payload);
@@ -731,7 +758,7 @@
   async function localRequest(action, payload) {
     await Promise.resolve();
     switch (action) {
-      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.16', now:iso() };
+      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.26', now:iso() };
       case 'status': return {
         connected:true, needsSetup:activeRows(localDb.users).length === 0, spreadsheetName:'Base local del navegador',
         rows:{ users:activeRows(localDb.users).length, vehicles:activeRows(localDb.vehicles).length,
@@ -811,6 +838,7 @@
       case 'saveConnectionTracking': return localSaveConnectionTracking(payload);
       case 'connectionTrackingLive': return localConnectionTrackingLive(payload);
       case 'sendConnectionsNotice': return localSendConnectionsNotice(payload);
+      case 'disconnectConnectedUser': return localDisconnectConnectedUser(payload);
       case 'diagnoseSystem': return localDiagnoseSystem();
       case 'repairSystem': return localRepairSystem();
       case 'officeQuickStatus': return localOfficeQuickStatus();
@@ -842,6 +870,18 @@
       case 'clearOperationalData': return localClear(payload);
       default: throw new Error('ACCION_NO_ENCONTRADA');
     }
+  }
+
+
+  function localDisconnectConnectedUser(payload={}){
+    const admin=requireLocalUser();if(!isAdmin(admin))throw new Error('SOLO_ADMINISTRADOR');requireLocalPermission(admin,'CONEXIONES','DESCONECTAR_USUARIO');
+    const data=payload.data||payload,userId=String(data.USUARIO_ID||'').trim(),reason=String(data.MOTIVO||'').trim();
+    if(!userId)throw new Error('USUARIO_REQUERIDO');if(userId===admin.ID)throw new Error('NO_PUEDE_DESCONECTAR_SU_PROPIA_SESION');if(reason.length<5)throw new Error('MOTIVO_DESCONEXION_REQUERIDO');
+    const target=activeRows(localDb.users).find(row=>row.ID===userId);if(!target)throw new Error('USUARIO_NO_ENCONTRADO');
+    let sessionsClosed=0,connectionsClosed=0;activeRows(localDb.sessions).filter(row=>row.USUARIO_ID===userId&&row.ACTIVA==='SI').forEach(row=>{row.ACTIVA='NO';row.ULTIMO_USO=iso();sessionsClosed++;});
+    activeRows(localDb.connections).filter(row=>row.USUARIO_ID===userId).forEach(row=>{row.ESTADO='Desconectado';row.GPS_ACTIVO='NO';row.PAGINA_VISIBLE='NO';row.ACTIVIDAD='Sesión cerrada por Administrador';row.ULTIMA_CONEXION=iso();row.ACTUALIZADO_EN=iso();connectionsClosed++;});
+    localDb.notifications.push({ID:id('NOT'),DESTINATARIO_USUARIO_ID:userId,TITULO:'Sesión cerrada por un Administrador',MENSAJE:`Motivo: ${reason}`,TIPO:'Seguridad',PRIORIDAD:'Alta',LEIDA:'NO',FECHA_ENVIO:iso(),CREADO_POR:admin.ID,CREADO_EN:iso(),ACTUALIZADO_EN:iso(),ELIMINADO:'NO'});
+    audit(admin,'DESCONECTAR_USUARIO','CONEXIONES',`${target.NOMBRE||target.CORREO} · ${reason}`,userId);saveLocal();return{usuarioId:userId,usuarioNombre:target.NOMBRE||target.CORREO||userId,sesionesCerradas:sessionsClosed,conexionesCerradas:connectionsClosed,desconectadoEn:iso(),persistenciaConfirmada:true};
   }
 
   function localReviewDocument(payload={},decision='APROBAR'){
@@ -1373,7 +1413,7 @@
   }
   function localConnectionTrackingKey(user){return `flotas_seguimiento_conexion_servidor_v1_${String(user?.ID||'sin_usuario')}`;}
   function localSaveConnectionTracking(payload={}){
-    const user=requireLocalUser();requireLocalPermission(user,'CONEXIONES','LEER');
+    const user=requireLocalUser();requireLocalPermission(user,'CONEXIONES','SEGUIR');
     const data=payload.data||payload||{},trackedUserId=String(data.USUARIO_ID||data.usuarioId||'').trim();
     if(trackedUserId&&!activeRows(localDb.users).some(row=>row.ID===trackedUserId))throw new Error('USUARIO_SEGUIMIENTO_NO_ENCONTRADO');
     if(trackedUserId)localStorage.setItem(localConnectionTrackingKey(user),trackedUserId);else localStorage.removeItem(localConnectionTrackingKey(user));
@@ -1383,7 +1423,7 @@
     return{seguimiento:{USUARIO_ID:trackedUserId,USUARIO_NOMBRE:target?.NOMBRE||'',USUARIO_CORREO:target?.CORREO||'',VISIBLE:false,RASTRO:[]},persistenciaConfirmada:true};
   }
   function localConnectionTrackingLive(payload={}){
-    const user=requireLocalUser();requireLocalPermission(user,'CONEXIONES','LEER');
+    const user=requireLocalUser();requireLocalPermission(user,'CONEXIONES','SEGUIR');
     const data=payload.data||payload||{},trackedUserId=String(data.USUARIO_ID||data.usuarioId||localStorage.getItem(localConnectionTrackingKey(user))||'').trim();
     if(!trackedUserId)return{row:null,sinConexion:true,seguimiento:{USUARIO_ID:'',VISIBLE:false,RASTRO:[]},serverTime:iso()};
     const result=localConnectionsOnline({USUARIO_ID:trackedUserId,LIMITE:20});
@@ -1432,7 +1472,7 @@
   }
   function localConnectionsOnline(payload={}){
     const user=requireLocalUser();
-    requireLocalPermission(user,'CONEXIONES','LEER');
+    if(user.ROL_ID!=='ROL-CONDUCTOR')requireLocalPermission(user,'CONEXIONES','LEER');
     const data=payload.data||payload||{};
     const parseDate=(value,end)=>{if(!value)return null;const text=String(value),date=new Date(/^\d{4}-\d{2}-\d{2}$/.test(text)?`${text}${end?'T23:59:59.999':'T00:00:00.000'}`:text);return Number.isNaN(date.getTime())?null:date;};
     const from=parseDate(data.FECHA_DESDE||data.fechaDesde,false),to=parseDate(data.FECHA_HASTA||data.fechaHasta,true);
@@ -1444,7 +1484,8 @@
     const latest={};activeRows(localDb.connections).slice().sort((a,b)=>new Date(b.ULTIMA_CONEXION||0)-new Date(a.ULTIMA_CONEXION||0)).forEach(row=>{const key=String(row.DISPOSITIVO_ID||row.SESION_CLIENTE_ID||row.SESION_ID||row.ID);if(!latest[key])latest[key]=row;});
     const gpsRows=activeRows(localDb.gpsCurrent||[]).slice().sort((a,b)=>new Date(b.FECHA_HORA||b.ACTUALIZADO_EN||0)-new Date(a.FECHA_HORA||a.ACTUALIZADO_EN||0));
     const findGps=row=>gpsRows.find(g=>g.DISPOSITIVO_ID&&g.DISPOSITIVO_ID===row.DISPOSITIVO_ID)||gpsRows.find(g=>g.VEHICULO_ID&&g.VEHICULO_ID===row.VEHICULO_ID)||gpsRows.find(g=>g.CONDUCTOR_ID&&g.CONDUCTOR_ID===row.CONDUCTOR_ID)||{};
-    let equipos=Object.values(latest).map(row=>{const account=find('users',row.USUARIO_ID)||{},driver=find('drivers',row.CONDUCTOR_ID)||{},vehicle=find('vehicles',row.VEHICULO_ID)||{},gps=findGps(row);const last=new Date(row.ULTIMA_CONEXION||row.ACTUALIZADO_EN||0).getTime(),gpsTime=new Date(gps.FECHA_HORA||gps.ACTUALIZADO_EN||0).getTime(),online=Number.isFinite(last)&&last>=limit&&row.ESTADO!=='Desconectado',gpsRecent=Number.isFinite(gpsTime)&&gpsTime>=gpsLimit;return{...cleanRow(row),USUARIO_NOMBRE:account.NOMBRE||row.USUARIO_ID||'Usuario',USUARIO_CORREO:account.CORREO||'',ROL_ID:account.ROL_ID||'',CONDUCTOR_NOMBRE:driver.NOMBRE||'',VEHICULO_PATENTE:vehicle.PATENTE||'',VEHICULO_NOMBRE:[vehicle.MARCA,vehicle.MODELO].filter(Boolean).join(' '),EN_LINEA:online,COLOR_ESTADO:online?'VERDE':'ROJO',ESTADO_CONEXION:online?'Activo':'Desconectado',GPS_RECIENTE:gpsRecent,LATITUD:Number.isFinite(Number(gps.LATITUD))?Number(gps.LATITUD):'',LONGITUD:Number.isFinite(Number(gps.LONGITUD))?Number(gps.LONGITUD):'',PRECISION_METROS:Number.isFinite(Number(gps.PRECISION_METROS))?Number(gps.PRECISION_METROS):'',VELOCIDAD_KMH:Number(gps.VELOCIDAD_KMH||0),DIRECCION:gps.DIRECCION||'',FECHA_GPS:gps.FECHA_HORA||gps.ACTUALIZADO_EN||'',BATERIA_GPS:gps.BATERIA_PORCENTAJE||row.BATERIA_PORCENTAJE||''};});
+    let equipos=Object.values(latest).map(row=>{const account=find('users',row.USUARIO_ID)||{},driver=find('drivers',row.CONDUCTOR_ID)||{},vehicle=find('vehicles',row.VEHICULO_ID)||{},gps=findGps(row);const last=new Date(row.ULTIMA_CONEXION||row.ACTUALIZADO_EN||0).getTime(),gpsTime=new Date(gps.FECHA_HORA||gps.ACTUALIZADO_EN||0).getTime(),online=Number.isFinite(last)&&last>=limit&&row.ESTADO!=='Desconectado',gpsRecent=Number.isFinite(gpsTime)&&gpsTime>=gpsLimit,retained=Boolean(online&&!gpsRecent&&(Number.isFinite(Number(gps.LATITUD))&&Number.isFinite(Number(gps.LONGITUD))))||String(gps.CALIDAD_GPS||gps.FUENTE||row.ACTIVIDAD||'').toUpperCase().includes('RETENIDA');return{...cleanRow(row),USUARIO_NOMBRE:account.NOMBRE||row.USUARIO_ID||'Usuario',USUARIO_CORREO:account.CORREO||'',ROL_ID:account.ROL_ID||'',CONDUCTOR_NOMBRE:driver.NOMBRE||'',VEHICULO_PATENTE:vehicle.PATENTE||'',VEHICULO_NOMBRE:[vehicle.MARCA,vehicle.MODELO].filter(Boolean).join(' '),EN_LINEA:online,COLOR_ESTADO:online?'VERDE':'ROJO',ESTADO_CONEXION:online?'Activo':'Desconectado',GPS_RECIENTE:gpsRecent,UBICACION_RETENIDA:retained,LATITUD:Number.isFinite(Number(gps.LATITUD))?Number(gps.LATITUD):'',LONGITUD:Number.isFinite(Number(gps.LONGITUD))?Number(gps.LONGITUD):'',PRECISION_METROS:Number.isFinite(Number(gps.PRECISION_METROS))?Number(gps.PRECISION_METROS):'',VELOCIDAD_KMH:Number(gps.VELOCIDAD_KMH||0),DIRECCION:gps.DIRECCION||'',FECHA_GPS:gps.FECHA_HORA||gps.ACTUALIZADO_EN||'',BATERIA_GPS:gps.BATERIA_PORCENTAJE||row.BATERIA_PORCENTAJE||''};});
+    if(user.ROL_ID==='ROL-CONDUCTOR')equipos=equipos.filter(row=>String(row.USUARIO_ID||'')===String(user.ID||''));
     const allTeams=equipos.slice();
     equipos=equipos.filter(row=>{const date=new Date(row.ULTIMA_CONEXION||row.ACTUALIZADO_EN||0);if(from&&date<from)return false;if(to&&date>to)return false;if(userId&&row.USUARIO_ID!==userId)return false;if(driverId&&row.CONDUCTOR_ID!==driverId)return false;if(vehicleId&&row.VEHICULO_ID!==vehicleId)return false;if(deviceIdFilter&&row.DISPOSITIVO_ID!==deviceIdFilter)return false;if(state==='ACTIVOS'&&!row.EN_LINEA)return false;if(state==='DESCONECTADOS'&&row.EN_LINEA)return false;if(state==='SEGUNDO_PLANO'&&row.PAGINA_VISIBLE!=='NO')return false;if(gpsFilter==='ACTIVO'&&!(row.GPS_ACTIVO==='SI'&&row.GPS_RECIENTE))return false;if(gpsFilter==='INACTIVO'&&row.GPS_ACTIVO==='SI'&&row.GPS_RECIENTE)return false;if(gpsFilter==='SIN_UBICACION'&&row.LATITUD!=='')return false;if(net&&String(row.TIPO_RED||'').toLowerCase()!==net)return false;if(platform&&!String(row.PLATAFORMA||'').toLowerCase().includes(platform))return false;if(precisionMax>0&&Number(row.PRECISION_METROS||Number.MAX_SAFE_INTEGER)>precisionMax)return false;if(search&&!`${row.USUARIO_NOMBRE} ${row.USUARIO_CORREO} ${row.CONDUCTOR_NOMBRE} ${row.VEHICULO_PATENTE} ${row.DISPOSITIVO_ID} ${row.PLATAFORMA} ${row.NAVEGADOR} ${row.IP_PUBLICA} ${row.SECCION_ACTUAL} ${row.ACTIVIDAD} ${row.DIRECCION}`.toLowerCase().includes(search))return false;return true;});
     equipos.sort((a,b)=>{const aTracked=trackedUserId&&a.USUARIO_ID===trackedUserId,bTracked=trackedUserId&&b.USUARIO_ID===trackedUserId;if(aTracked!==bTracked)return aTracked?-1:1;return a.EN_LINEA!==b.EN_LINEA?(a.EN_LINEA?-1:1):new Date(b.ULTIMA_CONEXION||0)-new Date(a.ULTIMA_CONEXION||0);});
@@ -1455,8 +1496,8 @@
     trace=trace.slice(-40);
     const trackedAccount=trackedUserId?find('users',trackedUserId):null;
     const unique=field=>[...new Set(equipos.map(row=>String(row[field]||'').trim()).filter(Boolean))].sort();
-    const ubicaciones=equipos.filter(row=>row.LATITUD!==''&&row.LONGITUD!=='').map(row=>({ID:row.ID,DISPOSITIVO_ID:row.DISPOSITIVO_ID,USUARIO_ID:row.USUARIO_ID,USUARIO_NOMBRE:row.USUARIO_NOMBRE,CONDUCTOR_NOMBRE:row.CONDUCTOR_NOMBRE,VEHICULO_ID:row.VEHICULO_ID,VEHICULO_PATENTE:row.VEHICULO_PATENTE,LATITUD:row.LATITUD,LONGITUD:row.LONGITUD,PRECISION_METROS:row.PRECISION_METROS,VELOCIDAD_KMH:row.VELOCIDAD_KMH,DIRECCION:row.DIRECCION,FECHA_GPS:row.FECHA_GPS,EN_LINEA:row.EN_LINEA,GPS_RECIENTE:row.GPS_RECIENTE,GPS_ACTIVO:row.GPS_ACTIVO,ESTADO_CONEXION:row.ESTADO_CONEXION}));
-    return{equipos:equipos.slice(0,500),ubicaciones:ubicaciones.slice(0,500),totales:{equipos:equipos.length,activos:equipos.filter(r=>r.EN_LINEA).length,desconectados:equipos.filter(r=>!r.EN_LINEA).length,gpsActivos:equipos.filter(r=>r.GPS_ACTIVO==='SI'&&r.GPS_RECIENTE).length,sinGps:equipos.filter(r=>!(r.GPS_ACTIVO==='SI'&&r.GPS_RECIENTE)).length,segundoPlano:equipos.filter(r=>r.PAGINA_VISIBLE==='NO').length},opciones:{usuarios:activeRows(localDb.users).filter(r=>r.ESTADO==='Activo').map(r=>({ID:r.ID,NOMBRE:r.NOMBRE,CORREO:r.CORREO})),conductores:activeRows(localDb.drivers).filter(r=>r.ESTADO!=='Inactivo').map(r=>({ID:r.ID,NOMBRE:r.NOMBRE||r.ID})),vehiculos:activeRows(localDb.vehicles).filter(r=>r.ESTADO!=='Inactivo').map(r=>({ID:r.ID,PATENTE:r.PATENTE,NOMBRE:[r.MARCA,r.MODELO].filter(Boolean).join(' ')})),dispositivos:unique('DISPOSITIVO_ID'),redes:unique('TIPO_RED'),plataformas:unique('PLATAFORMA')},seguimiento:{USUARIO_ID:trackedUserId,USUARIO_NOMBRE:trackedAccount?.NOMBRE||trackedUserId,USUARIO_CORREO:trackedAccount?.CORREO||'',VISIBLE:Boolean(followed),DIRECCION:followed?.DIRECCION||'',DISPOSITIVO_ID:followed?.DISPOSITIVO_ID||'',FECHA_GPS:followed?.FECHA_GPS||'',RASTRO:trace},serverTime:iso(),intervaloActivoSegundos:Math.round((config.ANTIGUEDAD_CONEXION_ACTIVA_MILISEGUNDOS||90000)/1000)};
+    const ubicaciones=equipos.filter(row=>row.LATITUD!==''&&row.LONGITUD!=='').map(row=>({ID:row.ID,MARCADOR_ID:`USUARIO-${row.USUARIO_ID||row.ID}`,DISPOSITIVO_ID:row.DISPOSITIVO_ID,USUARIO_ID:row.USUARIO_ID,USUARIO_NOMBRE:row.USUARIO_NOMBRE,CONDUCTOR_NOMBRE:row.CONDUCTOR_NOMBRE,VEHICULO_ID:row.VEHICULO_ID,VEHICULO_PATENTE:row.VEHICULO_PATENTE,LATITUD:row.LATITUD,LONGITUD:row.LONGITUD,PRECISION_METROS:row.PRECISION_METROS,VELOCIDAD_KMH:row.VELOCIDAD_KMH,DIRECCION:row.DIRECCION,FECHA_GPS:row.FECHA_GPS,EN_LINEA:row.EN_LINEA,GPS_RECIENTE:row.GPS_RECIENTE,UBICACION_RETENIDA:row.UBICACION_RETENIDA,GPS_ACTIVO:row.GPS_ACTIVO,ESTADO_CONEXION:row.ESTADO_CONEXION}));
+    return{equipos:equipos.slice(0,500),ubicaciones:ubicaciones.slice(0,500),totales:{equipos:equipos.length,activos:equipos.filter(r=>r.EN_LINEA).length,desconectados:equipos.filter(r=>!r.EN_LINEA).length,gpsActivos:equipos.filter(r=>r.GPS_ACTIVO==='SI'&&r.GPS_RECIENTE).length,sinGps:equipos.filter(r=>!(r.GPS_ACTIVO==='SI'&&r.GPS_RECIENTE)).length,segundoPlano:equipos.filter(r=>r.PAGINA_VISIBLE==='NO').length},opciones:{usuarios:(user.ROL_ID==='ROL-CONDUCTOR'?activeRows(localDb.users).filter(r=>r.ID===user.ID):activeRows(localDb.users).filter(r=>r.ESTADO==='Activo')).map(r=>({ID:r.ID,NOMBRE:r.NOMBRE,CORREO:r.CORREO})),conductores:(user.ROL_ID==='ROL-CONDUCTOR'?activeRows(localDb.drivers).filter(r=>r.USUARIO_ID===user.ID):activeRows(localDb.drivers).filter(r=>r.ESTADO!=='Inactivo')).map(r=>({ID:r.ID,NOMBRE:r.NOMBRE||r.ID})),vehiculos:(user.ROL_ID==='ROL-CONDUCTOR'?activeRows(localDb.vehicles).filter(r=>equipos.some(e=>e.VEHICULO_ID===r.ID)):activeRows(localDb.vehicles).filter(r=>r.ESTADO!=='Inactivo')).map(r=>({ID:r.ID,PATENTE:r.PATENTE,NOMBRE:[r.MARCA,r.MODELO].filter(Boolean).join(' ')})),dispositivos:unique('DISPOSITIVO_ID'),redes:unique('TIPO_RED'),plataformas:unique('PLATAFORMA')},seguimiento:{USUARIO_ID:trackedUserId,USUARIO_NOMBRE:trackedAccount?.NOMBRE||trackedUserId,USUARIO_CORREO:trackedAccount?.CORREO||'',VISIBLE:Boolean(followed),DIRECCION:followed?.DIRECCION||'',DISPOSITIVO_ID:followed?.DISPOSITIVO_ID||'',FECHA_GPS:followed?.FECHA_GPS||'',RASTRO:trace},serverTime:iso(),intervaloActivoSegundos:Math.round((config.ANTIGUEDAD_CONEXION_ACTIVA_MILISEGUNDOS||90000)/1000)};
   }
 
   function localSaveCompany(payload){
@@ -1516,8 +1557,53 @@
     const point=localOperationalBase();return{row:cleanRow(row),point,confirmado:true};
   }
 
-  function localImportKey(resource,row){if(resource==='vehicles')return `PATENTE:${String(row.PATENTE||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()}`;if(resource==='drivers')return `RUT:${String(row.RUT||'').replace(/[^0-9Kk]/g,'').toUpperCase()}`;return ['DOC',row.TIPO,row.ASOCIADO_TIPO,row.IDENTIFICACION,row.FECHA_VENCIMIENTO].map(value=>String(value||'').trim().toUpperCase()).join(':');}
-  function localBulkImport(payload){const user=requireLocalUser(),resource=String(payload.resource||payload.recurso||''),key=resourceMap[resource],data=payload.data||payload,rows=Array.isArray(data.rows)?data.rows:Array.isArray(data.filas)?data.filas:[];if(!['vehicles','drivers','documents'].includes(resource)||!key)throw new Error('RECURSO_IMPORTACION_NO_PERMITIDO');requireLocalPermission(user,moduleByResource[key],'CREAR');const update=String(data.actualizarExistentes??'SI')!=='NO';if(update)requireLocalPermission(user,moduleByResource[key],'ACTUALIZAR');if(!rows.length)throw new Error('IMPORTACION_SIN_FILAS');if(rows.length>1500)throw new Error('IMPORTACION_DEMASIADAS_FILAS');const required={vehicles:['PATENTE','MARCA','MODELO'],drivers:['NOMBRE','RUT'],documents:['TIPO','ASOCIADO_TIPO','IDENTIFICACION','FECHA_VENCIMIENTO']}[resource],errors=[],seen=new Set(),indexMap=new Map(activeRows(localDb[key]).map(row=>[localImportKey(resource,row),row]));let created=0,updated=0,skipped=0;rows.forEach((raw,i)=>{try{const row={};Object.entries(raw||{}).forEach(([field,value])=>{const normalized=String(field).trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'');if(normalized)row[normalized]=value;});required.forEach(field=>{if(String(row[field]??'').trim()==='')throw new Error(`CAMPO_REQUERIDO_${field}`);});if(resource==='vehicles'){row.PATENTE=String(row.PATENTE).trim().toUpperCase();row.ESTADO=row.ESTADO||'Disponible';row.KILOMETRAJE=Number(row.KILOMETRAJE||0);row.QR_CODIGO=row.QR_CODIGO||`VEH-${row.PATENTE.replace(/[^A-Z0-9]/g,'')}`;}if(resource==='drivers'){row.RUT=String(row.RUT).trim().toUpperCase();row.CORREO=String(row.CORREO||'').trim().toLowerCase();row.ESTADO=row.ESTADO||'Disponible';}if(resource==='documents'){row.ASOCIADO_TIPO=String(row.ASOCIADO_TIPO).trim();row.IDENTIFICACION=String(row.IDENTIFICACION).trim().toUpperCase();row.ESTADO=row.ESTADO||'Vigente';if(!row.ASOCIADO_ID){if(row.ASOCIADO_TIPO==='Vehículo')row.ASOCIADO_ID=activeRows(localDb.vehicles).find(item=>String(item.PATENTE||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()===row.IDENTIFICACION.replace(/[^A-Z0-9]/gi,''))?.ID||'';else if(row.ASOCIADO_TIPO==='Conductor')row.ASOCIADO_ID=activeRows(localDb.drivers).find(item=>String(item.RUT||'').replace(/[^0-9Kk]/g,'').toUpperCase()===row.IDENTIFICACION.replace(/[^0-9Kk]/g,''))?.ID||'';else row.ASOCIADO_ID=localPrimaryCompany()?.ID||'';}if(!row.ASOCIADO_ID)throw new Error('ASOCIADO_NO_ENCONTRADO');}const importKey=localImportKey(resource,row);if(seen.has(importKey))throw new Error('DUPLICADA_EN_ARCHIVO');seen.add(importKey);const existing=indexMap.get(importKey),now=iso();if(existing){if(!update){skipped++;return;}Object.assign(existing,row,{ACTUALIZADO_EN:now,ELIMINADO:'NO'});updated++;}else{const prefixes={vehicles:'VEH',drivers:'CON',documents:'DOC'},createdRow={ID:id(prefixes[resource]),...row,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb[key].push(createdRow);indexMap.set(importKey,createdRow);created++;}}catch(error){errors.push({fila:i+2,error:String(error.message||error)});}});audit(user,'IMPORTAR_MASIVO',moduleByResource[key],`Importación masiva: ${created} creados, ${updated} actualizados, ${skipped} omitidos, ${errors.length} errores`);saveLocal();return{resource,totalRecibidas:rows.length,creadas:created,actualizadas:updated,omitidas:skipped,errores:errors,correcto:errors.length===0};}
+  function localImportHeader(value){return String(value||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
+  function localImportText(value,max=300){return String(value??'').trim().replace(/\s+/g,' ').slice(0,max);}
+  function localImportNumber(value){if(value===''||value==null)return null;const normalized=String(value).trim().replace(/\s/g,'').replace(/\.(?=\d{3}(?:\D|$))/g,'').replace(',','.');const result=Number(normalized);return Number.isFinite(result)?result:null;}
+  function localImportDate(value){const raw=localImportText(value,40),match=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!match)return'';const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),date=new Date(Date.UTC(year,month-1,day));return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day?`${match[1]}-${match[2]}-${match[3]}`:'';}
+  function localImportCanonical(value,allowed){const key=localImportText(value,80).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();return allowed.find(item=>item.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()===key)||'';}
+  function localImportRutKey(value){return String(value||'').toUpperCase().replace(/[^0-9K]/g,'');}
+  function localImportRutValid(value){const key=localImportRutKey(value);if(!/^\d{6,8}[0-9K]$/.test(key))return false;let sum=0,multiplier=2;for(let i=key.length-2;i>=0;i--){sum+=Number(key[i])*multiplier;multiplier=multiplier===7?2:multiplier+1;}const result=11-(sum%11),expected=result===11?'0':result===10?'K':String(result);return expected===key.slice(-1);}
+  function localImportRutFormat(value){const key=localImportRutKey(value);if(key.length<2)return'';const body=key.slice(0,-1),dv=key.slice(-1),groups=[];for(let end=body.length;end>0;end-=3)groups.unshift(body.slice(Math.max(0,end-3),end));return`${groups.join('.')}-${dv}`;}
+  function localImportKey(resource,row){if(resource==='vehicles')return `PATENTE:${String(row.PATENTE||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()}`;if(resource==='drivers')return `RUT:${localImportRutKey(row.RUT)}`;return ['DOC',row.TIPO,row.ASOCIADO_TIPO,row.IDENTIFICACION,row.FECHA_VENCIMIENTO].map(value=>String(value||'').trim().toUpperCase()).join(':');}
+  function localBulkImport(payload){
+    const user=requireLocalUser(),resource=String(payload.resource||payload.recurso||''),key=resourceMap[resource],data=payload.data||payload,rows=Array.isArray(data.rows)?data.rows:Array.isArray(data.filas)?data.filas:[];
+    if(!['vehicles','drivers','documents'].includes(resource)||!key)throw new Error('RECURSO_IMPORTACION_NO_PERMITIDO');
+    if(!['ROL-ADMIN','ROL-SUPERVISOR'].includes(String(user.ROL_ID||'').toUpperCase()))throw new Error('PERMISO_DENEGADO');
+    requireLocalPermission(user,moduleByResource[key],'IMPORTAR');
+    const update=String(data.actualizarExistentes??'SI').toUpperCase()!=='NO';
+    if(!rows.length)throw new Error('IMPORTACION_SIN_FILAS');if(rows.length>1500)throw new Error('IMPORTACION_DEMASIADAS_FILAS');
+    const errors=[],seen=new Set(),indexMap=new Map(activeRows(localDb[key]).map(row=>[localImportKey(resource,row),row]));let created=0,updated=0,skipped=0;
+    const vehicleStates=['Disponible','En ruta','En mantención','Fuera de servicio'],fuels=['Diésel','Gasolina','Eléctrico','Híbrido','GLP','Otro'],driverStates=['Disponible','En viaje','Inactivo','Suspendido'],licenses=['A1','A2','A3','A4','A5','B','C','D','E','F'];
+    rows.forEach((raw,i)=>{const line=Number(raw?.__FILA_ORIGEN||raw?._FILA_ORIGEN||i+2);try{
+      const source={};Object.entries(raw||{}).forEach(([field,value])=>{const normalized=localImportHeader(field);if(normalized)source[normalized]=value;});
+      const now=iso();let row={};
+      if(resource==='vehicles'){
+        const patent=String(source.PATENTE||'').replace(/[^A-Z0-9]/gi,'').toUpperCase(),brand=localImportText(source.MARCA,100),model=localImportText(source.MODELO,100);
+        if(!patent)throw new Error('CAMPO_REQUERIDO_PATENTE');if(!brand)throw new Error('CAMPO_REQUERIDO_MARCA');if(!model)throw new Error('CAMPO_REQUERIDO_MODELO');if(!/^[A-Z0-9]{4,15}$/.test(patent))throw new Error('PATENTE_INVALIDA');
+        row={PATENTE:patent,MARCA:brand,MODELO:model};
+        if(source.ANIO!==''&&source.ANIO!=null){const year=localImportNumber(source.ANIO);if(year===null||!Number.isInteger(year)||year<1950||year>new Date().getFullYear()+2)throw new Error('ANIO_VEHICULO_INVALIDO');row.ANIO=year;}
+        if(source.KILOMETRAJE!==''&&source.KILOMETRAJE!=null){const km=localImportNumber(source.KILOMETRAJE);if(km===null||km<0)throw new Error('KILOMETRAJE_VEHICULO_INVALIDO');row.KILOMETRAJE=km;}
+        if(source.COMBUSTIBLE!==''&&source.COMBUSTIBLE!=null){const value=localImportCanonical(source.COMBUSTIBLE,fuels);if(!value)throw new Error('COMBUSTIBLE_INVALIDO');row.COMBUSTIBLE=value;}
+        if(source.ESTADO!==''&&source.ESTADO!=null){const value=localImportCanonical(source.ESTADO,vehicleStates);if(!value)throw new Error('ESTADO_VEHICULO_INVALIDO');row.ESTADO=value;}
+        if(source.PROXIMA_MANTENCION!==''&&source.PROXIMA_MANTENCION!=null){const value=localImportDate(source.PROXIMA_MANTENCION);if(!value)throw new Error('FECHA_MANTENCION_INVALIDA');row.PROXIMA_MANTENCION=value;}
+        const color=localImportText(source.COLOR,60),vin=localImportText(source.VIN,50).toUpperCase(),qr=localImportText(source.QR_CODIGO,100);if(color)row.COLOR=color;if(vin)row.VIN=vin;if(qr)row.QR_CODIGO=qr;
+      }else if(resource==='drivers'){
+        const name=localImportText(source.NOMBRE,160),rutRaw=source.RUT;if(!name)throw new Error('CAMPO_REQUERIDO_NOMBRE');if(!localImportRutKey(rutRaw))throw new Error('CAMPO_REQUERIDO_RUT');if(!localImportRutValid(rutRaw))throw new Error('RUT_INVALIDO');
+        row={NOMBRE:name,RUT:localImportRutFormat(rutRaw)};const email=localImportText(source.CORREO,200).toLowerCase(),phone=localImportText(source.TELEFONO,50),userId=localImportText(source.USUARIO_ID,100);if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('CORREO_INVALIDO');if(email)row.CORREO=email;if(phone)row.TELEFONO=phone;
+        if(source.LICENCIA_CLASE!==''&&source.LICENCIA_CLASE!=null){const value=localImportCanonical(source.LICENCIA_CLASE,licenses);if(!value)throw new Error('LICENCIA_CLASE_INVALIDA');row.LICENCIA_CLASE=value;}
+        if(source.LICENCIA_VENCIMIENTO!==''&&source.LICENCIA_VENCIMIENTO!=null){const value=localImportDate(source.LICENCIA_VENCIMIENTO);if(!value)throw new Error('LICENCIA_VENCIMIENTO_INVALIDA');row.LICENCIA_VENCIMIENTO=value;}
+        if(source.ESTADO!==''&&source.ESTADO!=null){const value=localImportCanonical(source.ESTADO,driverStates);if(!value)throw new Error('ESTADO_CONDUCTOR_INVALIDO');row.ESTADO=value;}
+        if(userId){if(!activeRows(localDb.users).some(item=>item.ID===userId&&item.ESTADO==='Activo'))throw new Error('USUARIO_ID_NO_EXISTE');const assigned=activeRows(localDb.drivers).find(driver=>driver.USUARIO_ID===userId&&localImportKey('drivers',driver)!==localImportKey('drivers',row));if(assigned)throw new Error('USUARIO_YA_ASOCIADO_A_OTRO_CONDUCTOR');row.USUARIO_ID=userId;}
+      }else{
+        row={...source};['TIPO','ASOCIADO_TIPO','IDENTIFICACION','FECHA_VENCIMIENTO'].forEach(field=>{if(!localImportText(row[field],500))throw new Error(`CAMPO_REQUERIDO_${field}`);});row.ASOCIADO_TIPO=localImportText(row.ASOCIADO_TIPO,80);row.IDENTIFICACION=localImportText(row.IDENTIFICACION,160).toUpperCase();row.ESTADO=localImportText(row.ESTADO,80)||'Vigente';if(!row.ASOCIADO_ID){if(row.ASOCIADO_TIPO==='Vehículo')row.ASOCIADO_ID=activeRows(localDb.vehicles).find(item=>String(item.PATENTE||'').replace(/[^A-Z0-9]/gi,'').toUpperCase()===row.IDENTIFICACION.replace(/[^A-Z0-9]/gi,''))?.ID||'';else if(row.ASOCIADO_TIPO==='Conductor')row.ASOCIADO_ID=activeRows(localDb.drivers).find(item=>localImportRutKey(item.RUT)===localImportRutKey(row.IDENTIFICACION))?.ID||'';else row.ASOCIADO_ID=localPrimaryCompany()?.ID||'';}if(!row.ASOCIADO_ID)throw new Error('ASOCIADO_NO_ENCONTRADO');
+      }
+      const importKey=localImportKey(resource,row);if(!importKey||seen.has(importKey))throw new Error('DUPLICADA_EN_ARCHIVO');seen.add(importKey);const existing=indexMap.get(importKey);
+      if(existing){if(!update){skipped++;return;}Object.assign(existing,row,{ACTUALIZADO_EN:now,ELIMINADO:'NO'});if(resource==='vehicles'&&!existing.QR_CODIGO)existing.QR_CODIGO=`VEH-${existing.PATENTE}`;updated++;}
+      else{const prefixes={vehicles:'VEH',drivers:'CON',documents:'DOC'},createdRow={ID:id(prefixes[resource]),...row,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};if(resource==='vehicles'){createdRow.ESTADO=createdRow.ESTADO||'Disponible';createdRow.COMBUSTIBLE=createdRow.COMBUSTIBLE||'Otro';createdRow.KILOMETRAJE=createdRow.KILOMETRAJE??0;createdRow.QR_CODIGO=createdRow.QR_CODIGO||`VEH-${createdRow.PATENTE}`;}if(resource==='drivers')createdRow.ESTADO=createdRow.ESTADO||'Disponible';localDb[key].push(createdRow);indexMap.set(importKey,createdRow);created++;}
+    }catch(error){errors.push({fila:Number.isFinite(line)?line:i+2,error:String(error.message||error)});}});
+    audit(user,'IMPORTAR_MASIVO',moduleByResource[key],`Importación masiva: ${created} creados, ${updated} actualizados, ${skipped} omitidos, ${errors.length} errores`);saveLocal();return{resource,totalRecibidas:rows.length,procesadas:created+updated,creadas:created,creados:created,actualizadas:updated,actualizados:updated,omitidas:skipped,omitidos:skipped,errores:errors,correcto:errors.length===0};
+  }
   function localRegisterConnectionIp(payload){const user=requireLocalUser(),data=payload.data||payload,ip=String(data.IP_PUBLICA||'').trim();if(!ip)return{registrada:false};const session=find('sessions',auth.sessionId),now=iso();if(session)Object.assign(session,{IP_PUBLICA:ip,IP_VERSION:ip.includes(':')?'IPv6':'IPv4',IP_CAPTURADA_EN:now,ULTIMO_USO:now});activeRows(localDb.connections).filter(row=>row.SESION_ID===auth.sessionId).forEach(row=>Object.assign(row,{IP_PUBLICA:ip,IP_VERSION:ip.includes(':')?'IPv6':'IPv4',IP_CAPTURADA_EN:now,ACTUALIZADO_EN:now}));audit(user,'REGISTRAR_IP','SEGURIDAD','Dirección IP pública registrada al conectar',auth.sessionId);saveLocal();return{registrada:true,ipVersion:ip.includes(':')?'IPv6':'IPv4',fecha:now};}
   function localDiagnoseSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','LEER');
@@ -1533,7 +1619,7 @@
       alerts:{nombre:'Alertas',estado:'OK',detalle:`${activeRows(localDb.alerts).length} registros`},
       history:{nombre:'Historiales',estado:'OK',detalle:`${activeRows(localDb.history).length} eventos operativos · ${activeRows(localDb.checkins).length} check-ins`}
     };
-    return{version:'4.2.16',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
+    return{version:'4.2.26',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
   }
   function localRepairSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','ACTUALIZAR');
@@ -1596,7 +1682,7 @@
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.16',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'Oficina Virtual',version:'4.2.26',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
