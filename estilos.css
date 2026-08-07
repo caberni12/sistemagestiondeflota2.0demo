@@ -136,7 +136,6 @@ button.is-loading-compact:before{width:15px;height:15px}
 .modal-error{display:grid;justify-items:start;gap:10px;padding:22px;border:1px solid #f2cbd2;border-radius:14px;background:var(--red-soft)}.modal-error b{color:var(--red)}.modal-error p{margin:0;color:var(--muted)}
 .modal-backdrop{backdrop-filter:blur(2px)}.modal{animation-duration:.14s;animation-timing-function:ease-out}
 .topbar-sync{height:38px;padding:8px 12px;font-size:11px;white-space:nowrap}.topbar-sync i{font-style:normal;font-size:16px}
-.sidebar-footer #sidebarSyncButton{color:#b5c8d5}
 @media(max-width:760px){.modal-backdrop{backdrop-filter:none}.topbar-sync{width:40px;min-width:40px!important;padding:0}.topbar-sync span{display:none}.topbar-sync i{font-size:18px}}
 @media(prefers-reduced-motion:reduce){button.is-loading:before,.modal-loading>i{animation-duration:1.4s}}
 

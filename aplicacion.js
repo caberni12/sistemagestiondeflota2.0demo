@@ -82,7 +82,7 @@
   const cacheRegistros = new Map();
   const listasFormularioPendientes = new Map();
   const claveEstadoSincronizacion = 'flotas_estado_sincronizacion_modulos_v1';
-  const cargaManualModulos = config.CARGA_MANUAL_MODULOS !== false;
+  const cargaManualModulos = false; // La carga es automática e independiente para el módulo abierto.
   const estadoSincronizacionModulos = {};
   const modulosSincronizadosSesion = new Set();
   const actualizacionesModuloPendientes = new Map();
@@ -232,7 +232,7 @@
 
   const labels = {
     dashboard:'Panel principal',office:'Oficina Virtual',routes:'Rutas asignadas',vehicles:'Vehículos',drivers:'Conductores',checkin:'Check-in vehicular',checkinApprovals:'Aprobación de check-ins',checkinHistory:'Historial de check-in',operations:'Operaciones',gps:'GPS en tiempo real',maintenance:'Mantenciones',fuel:'Combustible',
-    notifications:'Notificaciones',documents:'Documentos',history:'Historial',alerts:'Alertas',connections:'Conexiones en línea',users:'Usuarios',reports:'Reportes',audit:'Auditoría',company:'Empresa',settings:'Configuración'
+    notifications:'Notificaciones',documents:'Documentos del conductor',history:'Historial',alerts:'Alertas',connections:'Conexiones en línea',users:'Usuarios',reports:'Reportes',audit:'Auditoría',company:'Empresa',settings:'Configuración'
   };
 
   const navPermission = {
@@ -244,7 +244,7 @@
   const permissionCatalog = Object.freeze([
     ['PANEL_PRINCIPAL','Panel principal'],['OFICINA_VIRTUAL','Oficina Virtual'],['USUARIOS','Usuarios'],['VEHICULOS','Vehículos'],['CONDUCTORES','Conductores'],
     ['OPERACIONES','Operaciones'],['CHECKIN','Check-in'],['CHECKIN_APROBACIONES','Aprobar check-ins'],['GPS','Ubicación en tiempo real'],
-    ['HISTORIAL','Historial'],['MANTENCIONES','Mantenciones'],['COMBUSTIBLE','Combustible'],['DOCUMENTOS','Documentos'],['ALERTAS','Alertas'],
+    ['HISTORIAL','Historial'],['MANTENCIONES','Mantenciones'],['COMBUSTIBLE','Combustible'],['DOCUMENTOS','Documentos del conductor'],['ALERTAS','Alertas'],
     ['REPORTES','Reportes'],['BITACORA','Auditoría'],['CONFIGURACION','Configuración'],['QR','QR'],['RUTAS','Rutas'],
     ['NOTIFICACIONES','Notificaciones'],['CONEXIONES','Conexiones en línea · acceso delegado']
   ]);
@@ -409,7 +409,7 @@
       QR_NO_RECONOCIDO:'El código QR no corresponde a un vehículo registrado.', CODIGO_QR_REQUERIDO:'Ingrese o escanee un código QR.', ETIQUETA_QR_ROL_NO_AUTORIZADO:'Solo los Administradores y Supervisores pueden generar o imprimir etiquetas QR de vehículos.', GENERADOR_QR_NO_DISPONIBLE:'No se pudo cargar el generador QR local. Recargue la aplicación e inténtelo nuevamente.', VEHICULO_PATENTE_REQUERIDA:'El vehículo debe tener una patente válida para generar su QR.', VEHICULO_REQUERIDO:'Seleccione un vehículo para generar la etiqueta QR.', RUTA_NO_ENCONTRADA:'La ruta no existe.',
       ALERTA_OPERACIONAL_REQUIERE_ADMINISTRADOR:'Esta alerta operacional debe ser validada y cerrada por un Administrador real después de comprobar la situación en terreno.',
       ESTADO_RUTA_INVALIDO:'El estado solicitado para la ruta no es válido.', DESTINATARIO_REQUERIDO:'Seleccione un destinatario.', USUARIO_DESTINATARIO_NO_ENCONTRADO:'El usuario destinatario no existe o no está activo.', SIN_DESTINATARIOS_PARA_EL_ALCANCE:'No existen cuentas activas que coincidan con el grupo seleccionado.', TITULO_Y_MENSAJE_REQUERIDOS:'Complete el título y el mensaje.', TIPO_AVISO_INVALIDO:'Seleccione una clase de aviso válida.', ALCANCE_AVISO_INVALIDO:'Seleccione un grupo de destinatarios válido.', NOTIFICACION_NO_ENCONTRADA:'La notificación no existe.', ALERTA_NO_ENCONTRADA:'La alerta no existe.', LECTURA_NOTIFICACION_NO_CONFIRMADA:'La notificación no confirmó su estado leído en la base central.', LECTURA_ALERTA_NO_CONFIRMADA:'La alerta no confirmó su estado leído en la base central.',
-      COORDENADAS_INVALIDAS:'Las coordenadas recibidas no son válidas.', OFICINA_INCIDENTES_NO_DISPONIBLES:'No fue posible consultar los incidentes de Oficina Virtual.', DETALLE_FALLA_REQUERIDO:'Describa la falla con al menos diez caracteres.', PREGUNTA_REQUERIDA:'Escriba una consulta para Oficina Virtual.', CARGA_DOCUMENTAL_REQUIERE_CONEXION_CENTRAL:'La carga documental requiere conexión con la Base de Datos central.', AUTORIZACION_QR_INVALIDA:'Valide nuevamente el QR del vehículo. La autorización dura cinco minutos.',
+      COORDENADAS_INVALIDAS:'Las coordenadas recibidas no son válidas.', REFERENCIA_RELACIONADA_NO_EXISTE_GPS_ACTUAL:'La ubicación tenía una asociación anterior de ruta u operación que ya no existe. El sistema la corregirá automáticamente y continuará el seguimiento.', REFERENCIA_RELACIONADA_NO_EXISTE_GPS:'La ubicación tenía una asociación anterior no disponible. El sistema continuará sin esa referencia.', OFICINA_INCIDENTES_NO_DISPONIBLES:'No fue posible consultar los incidentes de Oficina Virtual.', DETALLE_FALLA_REQUERIDO:'Describa la falla con al menos diez caracteres.', PREGUNTA_REQUERIDA:'Escriba una consulta para Oficina Virtual.', CARGA_DOCUMENTAL_REQUIERE_CONEXION_CENTRAL:'La carga documental requiere conexión con la Base de Datos central.', AUTORIZACION_QR_INVALIDA:'Valide nuevamente el QR del vehículo. La autorización dura cinco minutos.',
       ACCION_ESPECIAL_REQUERIDA:'Utilice el botón específico del módulo para realizar esta acción.',
       SINCRONIZACION_NO_COMPLETADA:'La base de datos no respondió correctamente durante la sincronización.',
       CHECKIN_REQUERIDO:'Debe seleccionar un check-in aprobado antes de iniciar la operación.', CHECKIN_DIARIO_REQUERIDO:'Debe realizar un check-in hoy para este mismo vehículo y conductor antes de iniciar la ruta.', CHECKIN_NO_ENCONTRADO:'El check-in seleccionado no existe.',
@@ -719,9 +719,9 @@
     prepararEstadoGpsUsuarioActual();
     $('#authScreen').classList.add('hidden'); $('#appShell').classList.remove('hidden');
     $('#userName').textContent=currentUser.NOMBRE; $('#userRole').textContent=currentUser.ROL_NOMBRE || currentUser.ROL_ID; $('#userAvatar').textContent=initials(currentUser.NOMBRE);
-    $('#backendName').textContent=api.backendLabel(); $('#backendDetail').textContent=api.isRemote()?'Carga manual de módulos · conexión bajo demanda':'Información guardada en este dispositivo';
+    $('#backendName').textContent=api.backendLabel(); $('#backendDetail').textContent=api.isRemote()?'Sincronización automática del módulo abierto':'Información guardada en este dispositivo';
     if(currentCompany)applyBranding(currentCompany);
-    setConnection(true, api.isRemote()?'Listo para sincronizar':'Base de datos local activa'); buildNav();
+    setConnection(true, api.isRemote()?'Módulo listo · actualización silenciosa':'Base de datos local activa'); buildNav();
     if(appInicializada){
       if(embeddedMode)postParent({tipo:'flotas:modulo-listo',usuario:currentUser,seccion:currentSection,actualizadoEn:estadoSincronizacionModulos[currentSection]?.time||0});
       return;
@@ -760,19 +760,9 @@
   }
 
   function precargarModulos() {
-    if (cargaManualModulos) return;
-    if (embeddedMode || precargaIniciada || !currentUser) return;
-    precargaIniciada = true;
-    const queries = consultasPrecarga();
-    const ejecutar = () => api.prefetch(queries).then(result => {
-      queries.forEach(query => {
-        const rows = result?.[query.key]?.rows;
-        if (Array.isArray(rows)) guardarListaFormulario(query.payload.resource,rows);
-      });
-      if (currentUser) setSave('Módulos preparados');
-    });
-    if ('requestIdleCallback' in window) window.requestIdleCallback(ejecutar, { timeout:1500 });
-    else setTimeout(ejecutar, 350);
+    // Regla 4.2.39: no consultar todos los módulos a la vez. Cada módulo
+    // sincroniza únicamente sus propios datos cuando el usuario lo abre.
+    return;
   }
 
   function dependenciaSeccion(section) {
@@ -793,15 +783,15 @@
 
   function textoActualizacionSeccion(section) {
     const saved = estadoSincronizacionModulos[section];
-    if (!saved?.time) return 'Módulo vacío · pulse Sincronizar para consultar la base central';
+    if (!saved?.time) return 'Actualización automática del módulo en curso';
     const date = new Date(saved.time);
-    if (Number.isNaN(date.getTime())) return 'Módulo listo para sincronizar';
+    if (Number.isNaN(date.getTime())) return 'Actualización automática por módulo activa';
     return `Última sincronización: ${new Intl.DateTimeFormat('es-CL',{dateStyle:'short',timeStyle:'short'}).format(date)} · datos vigentes en esta sesión`;
   }
 
   function decorarModuloConSincronizacion(html, section) {
     const hasSync = /data-sync|data-refresh-locations/.test(html);
-    const button = hasSync ? '' : '<button class="btn soft small" type="button" data-sync>↻ Sincronizar</button>';
+    const button = hasSync ? '' : '<button class="btn soft small" type="button" data-sync>↻ Actualizar este módulo</button>';
     return `<div class="module-cache-status" data-module-cache-status><div><i></i><span>${esc(textoActualizacionSeccion(section))}</span></div>${button}</div>${html}`;
   }
 
@@ -811,13 +801,6 @@
     node.classList.toggle('syncing',mode==='syncing');
     node.classList.toggle('error',mode==='error');
     const span=$('span',node);if(span)span.textContent=text;
-  }
-
-  function moduloVacioSinSincronizar(section) {
-    const title=labels[section]||'Módulo';
-    return decorarModuloConSincronizacion(
-      heading('CARGA MANUAL',title,'Este módulo inicia sin datos para que el sistema abra de inmediato.',`<button class="btn primary" type="button" data-sync>↻ Sincronizar ahora</button>`)+
-      `<article class="card manual-load-empty">${empty('↻','Módulo listo para sincronizar','No se ha consultado la Base de Datos. Pulse Sincronizar para cargar únicamente la información de este módulo.','<button class="btn primary" type="button" data-sync>Sincronizar datos</button>')}</article>`,section);
   }
 
   function esqueletoModulo() {
@@ -837,14 +820,6 @@
     $('#pageTitle').textContent=labels[section]; $('#breadcrumb').textContent=`Sistema / ${labels[section]}`;
     closeSidebar();
 
-    const cargaAutomaticaPermitida = section === 'gps' || section === 'connections' || section === 'office';
-    if (cargaManualModulos && !cargaAutomaticaPermitida && !options.force && !modulosSincronizadosSesion.has(section)) {
-      $('#content').innerHTML=moduloVacioSinSincronizar(section);
-      bindSection();
-      if(embeddedMode)postParent({tipo:'flotas:modulo-listo',usuario:currentUser,seccion:section,actualizadoEn:0,cargaManual:true});
-      window.scrollTo({top:0,behavior:'auto'});
-      return true;
-    }
 
     const cachedView = (section === 'gps' || section === 'connections') ? null : cacheVistasModulo.get(section);
     if (cachedView && !options.force) {
@@ -952,7 +927,7 @@
       const notifications=(data.notifications||[]).map(notificationCard).join('');
       const normalizeState=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
       const routes=routeRows.filter(r=>['asignada','en curso','iniciada','activa'].includes(normalizeState(r.ESTADO)));
-      const headingActions=`<button class="btn soft" data-sync>↻ Sincronizar</button>${hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>＋ Asignar ruta</button>':''}`;
+      const headingActions=`<button class="btn soft" data-sync>↻ Actualizar</button>${hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>＋ Asignar ruta</button>':''}`;
       const driverHero=currentUser.ROL_ID==='ROL-CONDUCTOR'&&routes.length?`<div class="driver-home"><article class="card driver-route-hero"><div class="card-header"><div><h3>Próxima ruta asignada</h3><p>Lista para iniciar navegación</p></div>${status(routes[0].ESTADO)}</div>${routeCard(routes[0],true)}</article><article class="card"><div class="card-header"><div><h3>Mi conexión</h3><p>Estado del dispositivo</p></div></div><div class="tracking-notice ${gpsWatchId===null?'inactive':'active'}" data-tracking-notice><i data-tracking-icon>${gpsWatchId===null?'○':'●'}</i><div><b data-tracking-title>${gpsWatchId===null?'Ubicación continua detenida':'Ubicación continua activada'}</b><span data-tracking-detail>${trackingDetail()}</span></div></div><button class="btn ${gpsWatchId===null?'primary':'danger'} full" data-toggle-tracking>${gpsWatchId===null?'Activar ubicación continua':'Detener ubicación continua'}</button></article></div>`:'';
       const kpis=[
         hasPermission('VEHICULOS','LEER')?metric('▣','Vehículos',m.vehicles,`${m.availableVehicles} disponibles`,'vehicles'):'',
@@ -1339,7 +1314,7 @@
     const importButtons=importDefinition&&importPermission&&hasPermission(...importPermission.split(':'))?`<a class="btn soft" href="${esc(importDefinition.template)}" download>⇩ Plantilla</a><button class="btn soft" data-bulk-import="${resource}">⇧ Importación masiva</button>`:'';
     const folderButtons='';
     const rowHtml=rows.map(row=>rowRenderer(row)).join('');
-    return heading(tag,title,description,`<button class="btn soft" data-sync>↻ Sincronizar</button>${folderButtons}${importButtons}${createButton}`)+accesoBloqueado+`<article class="card resource-card resource-${esc(resource)}"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar en ${title.toLowerCase()}"></label>${puedeExportarFormato('csv')?`<button class="btn soft push" data-export="${resource}">Exportar CSV</button>`:''}</div><div data-filter-table class="resource-table resource-${esc(resource)}">${table(headers,rowHtml,`No hay ${title.toLowerCase()} registrados.`)}</div></article>`;
+    return heading(tag,title,description,`<button class="btn soft" data-sync>↻ Actualizar</button>${folderButtons}${importButtons}${createButton}`)+accesoBloqueado+`<article class="card resource-card resource-${esc(resource)}"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar en ${title.toLowerCase()}"></label>${puedeExportarFormato('csv')?`<button class="btn soft push" data-export="${resource}">Exportar CSV</button>`:''}</div><div data-filter-table class="resource-table resource-${esc(resource)}">${table(headers,rowHtml,`No hay ${title.toLowerCase()} registrados.`)}</div></article>`;
   }
 
   function vehicleRows(v){return `<tr data-filter-date="${esc(v.PROXIMA_MANTENCION||v.ACTUALIZADO_EN||v.CREADO_EN||'')}" data-search-row="${esc(`${v.PATENTE} ${v.MARCA} ${v.MODELO} ${v.ESTADO}`.toLowerCase())}"><td><div class="entity"><i class="entity-icon">🚐</i><div><strong>${esc(v.MARCA||'Sin marca')} ${esc(v.MODELO||'')}</strong><span class="muted">${esc(v.ID)}</span></div></div></td><td><strong>${esc(v.PATENTE)}</strong></td><td>${esc(v.ANIO||'—')}</td><td>${number(v.KILOMETRAJE)} km</td><td>${status(v.ESTADO)}</td><td><code class="vehicle-qr-code">${esc(codigoQrVehiculo(v))}</code></td><td>${accionesVehiculo(v)}</td></tr>`;}
@@ -1569,7 +1544,7 @@
     const approved=data.rows.filter(row=>checkinVisualState(row)==='Aprobado').length,pending=data.rows.filter(row=>row.ESTADO_REVISION==='Pendiente').length,blocked=data.rows.filter(row=>row.ESTADO_REVISION==='Bloqueado').length;
     const rows=data.rows.map(row=>checkinRow(row,vehicleMap,driverMap)).join('');
     const create=hasPermission('CHECKIN','CREAR')?`${hasPermission('CHECKIN','VALIDAR_QR')?'<button class="btn soft" data-open-checkin-qr>▦ Escanear QR para revisión</button>':''}<button class="btn primary" data-focus-checkin>↓ Ir a la lista de chequeo</button>`:'';
-    return heading('INSPECCIÓN PREOPERACIONAL','Check-in vehicular','Revise el vehículo antes de iniciar cualquier operación. Los 16 controles aparecen directamente en esta pantalla.',`<button class="btn soft" data-sync>↻ Sincronizar</button>${create}`)+
+    return heading('INSPECCIÓN PREOPERACIONAL','Check-in vehicular','Revise el vehículo antes de iniciar cualquier operación. Los 16 controles aparecen directamente en esta pantalla.',`<button class="btn soft" data-sync>↻ Actualizar</button>${create}`)+
       reciboCheckinMarkup()+
       `<div class="checkin-process"><article><i>1</i><div><b>Seleccionar vehículo</b><span>Confirme patente, conductor y kilometraje.</span></div></article><article><i>2</i><div><b>Completar 16 controles</b><span>Marque conforme, falla o no aplica cuando corresponda.</span></div></article><article><i>3</i><div><b>Guardar evaluación</b><span>La operación solo inicia con check-in aprobado y vigente.</span></div></article></div>`+
       checkinInlineFormMarkup()+
@@ -1580,7 +1555,7 @@
     const data=await checkinContext(),vehicleMap=Object.fromEntries(data.vehicles.map(v=>[v.ID,v])),driverMap=Object.fromEntries(data.drivers.map(d=>[d.ID,d]));
     const pending=data.rows.filter(row=>['Pendiente','Bloqueado'].includes(row.ESTADO_REVISION)&&row.UTILIZADO!=='SI');
     const rows=pending.map(row=>checkinRow(row,vehicleMap,driverMap,true)).join('');
-    return heading('CONTROL DE SEGURIDAD','Aprobación de check-ins','Revise observaciones leves. Las fallas críticas exigen corrección y una nueva inspección.',`<button class="btn soft" data-sync>↻ Sincronizar</button>`)+
+    return heading('CONTROL DE SEGURIDAD','Aprobación de check-ins','Revise observaciones leves. Las fallas críticas exigen corrección y una nueva inspección.',`<button class="btn soft" data-sync>↻ Actualizar</button>`)+
       `<div class="operation-banner checkin-warning"><i>!</i><div><h3>Regla de bloqueo</h3><p>Un supervisor puede aprobar observaciones leves, pero nunca una inspección con fallas críticas.</p></div></div>`+
       `<div class="live-strip">${liveStat('⌛','Pendientes de revisión',pending.filter(r=>r.ESTADO_REVISION==='Pendiente').length,'warning')}${liveStat('!','Bloqueados críticos',pending.filter(r=>r.ESTADO_REVISION==='Bloqueado').length,'warning')}${liveStat('✓','Aprobados hoy',data.rows.filter(r=>r.ESTADO_REVISION==='Aprobado'&&String(r.FECHA_REVISION||r.FECHA_HORA).slice(0,10)===new Date().toISOString().slice(0,10)).length,'online')}</div>`+
       `<article class="card"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar check-in pendiente"></label><button class="btn soft push" data-nav="checkinHistory">Abrir historial</button></div><div data-filter-table>${table(['Check-in','Vehículo','Conductor','Resultado','Estado','Fallas','Vigente hasta','Acciones'],rows,'No hay check-ins pendientes de revisión.')}</div></article>`;
@@ -1588,7 +1563,7 @@
   async function renderCheckinHistory() {
     const data=await checkinContext(),vehicleMap=Object.fromEntries(data.vehicles.map(v=>[v.ID,v])),driverMap=Object.fromEntries(data.drivers.map(d=>[d.ID,d]));
     const rows=data.rows.map(row=>checkinRow(row,vehicleMap,driverMap)).join('');
-    return heading('TRAZABILIDAD','Historial de check-in','Consulte inspecciones, resultados, aprobaciones, bloqueos y operaciones relacionadas.',`<button class="btn soft" data-sync>↻ Sincronizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="checkins">Exportar CSV</button>':''}`)+
+    return heading('TRAZABILIDAD','Historial de check-in','Consulte inspecciones, resultados, aprobaciones, bloqueos y operaciones relacionadas.',`<button class="btn soft" data-sync>↻ Actualizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="checkins">Exportar CSV</button>':''}`)+
       `<article class="card"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar en el historial"></label><button class="btn primary push" data-nav="checkin">Nuevo check-in</button></div><div data-filter-table>${table(['Check-in','Vehículo','Conductor','Resultado','Estado','Fallas','Vigente hasta','Acciones'],rows,'No existen inspecciones registradas.')}</div></article>`;
   }
 
@@ -1774,7 +1749,7 @@
 
     const opRows=operationRows.map(op=>`<tr data-filter-date="${esc(op.FECHA_INICIO||op.CREADO_EN||'')}" data-search-row="${esc(`${op.ID} ${vehicleMap[op.VEHICULO_ID]?.PATENTE||op.VEHICULO_ID} ${driverMap[op.CONDUCTOR_ID]?.NOMBRE||op.CONDUCTOR_ID} ${op.TIPO_OPERACION||''} ${routeMap[op.RUTA_ID]?.NOMBRE||op.RUTA_ID||''} ${op.ESTADO||''}`.toLowerCase())}"><td><strong>${esc(op.ID)}</strong></td><td>${esc(vehicleMap[op.VEHICULO_ID]?.PATENTE||op.VEHICULO_ID)}</td><td>${esc(driverMap[op.CONDUCTOR_ID]?.NOMBRE||op.CONDUCTOR_ID)}</td><td>${esc(op.TIPO_OPERACION||'—')}</td><td>${esc(routeMap[op.RUTA_ID]?.NOMBRE||op.RUTA_ID||'Sin ruta')}</td><td>${fmtDate(op.FECHA_INICIO,true)}</td><td>${op.KM_INICIO!==''&&op.KM_INICIO!=null?number(op.KM_INICIO):'—'} / ${op.KM_FIN!==''&&op.KM_FIN!=null?number(op.KM_FIN):'—'}</td><td><span class="operation-verified-badge ${['Finalizada','Completada'].includes(String(op.ESTADO||''))&&['VALIDADA','VALIDADA_PRECISION_BAJA'].includes(String(op.VALIDACION_FIN||''))?'complete':'progress'}"><i>${String(op.VALIDACION_INICIO||'').startsWith('CAPTURADA')||op.VALIDACION_INICIO==='VALIDADA'?'✓':'○'}</i>${['Finalizada','Completada'].includes(String(op.ESTADO||''))?'Cierre '+(['VALIDADA','VALIDADA_PRECISION_BAJA'].includes(String(op.VALIDACION_FIN||''))?'verificado':'pendiente'):'Inicio verificado'}</span></td><td>${status(op.ESTADO)}</td><td>${hasPermission('OPERACIONES','EDITAR_ADMIN')||hasPermission('OPERACIONES','ELIMINAR_ADMIN')?`<div class="row-button-stack">${hasPermission('OPERACIONES','EDITAR_ADMIN')?`<button class="btn soft small" data-edit-operation-admin="${op.ID}">Editar</button>`:''}${hasPermission('OPERACIONES','ELIMINAR_ADMIN')?`<button class="btn danger small" data-delete-operation-admin="${op.ID}">Eliminar</button>`:''}</div>`:'—'}</td></tr>`).join('');
 
-    const enabled=base.configurada,createActions=`<button class="btn soft" data-sync>↻ Sincronizar</button>`+(hasPermission('OPERACIONES','INICIAR')&&enabled?(currentUser.ROL_ID==='ROL-CONDUCTOR'?'<button class="btn primary" data-open-qr>▦ Validar QR e iniciar</button>':'<button class="btn soft" data-open-qr>▦ Escanear QR</button><button class="btn primary" data-new-operation>＋ Nueva operación</button>'):'');
+    const enabled=base.configurada,createActions=`<button class="btn soft" data-sync>↻ Actualizar</button>`+(hasPermission('OPERACIONES','INICIAR')&&enabled?(currentUser.ROL_ID==='ROL-CONDUCTOR'?'<button class="btn primary" data-open-qr>▦ Validar QR e iniciar</button>':'<button class="btn soft" data-open-qr>▦ Escanear QR</button><button class="btn primary" data-new-operation>＋ Nueva operación</button>'):'');
     const availability=`<div class="operation-availability"><span><b>${number(summary.availableVehicles??vehicles.filter(row=>row.ESTADO==='Disponible').length)}</b> vehículos disponibles</span><span><b>${number(summary.availableDrivers??drivers.filter(row=>row.ESTADO==='Disponible').length)}</b> conductores disponibles</span><span><b>${number(summary.availableRoutes??routes.filter(row=>['Asignada','En curso'].includes(row.ESTADO)).length)}</b> rutas vigentes</span><small>Respuesta preparada en ${number(summary.processingMilliseconds||0)} ms</small></div>`;
     const baseBanner=enabled?`<div class="operation-geofence-banner"><i>⌖</i><div><h3>${esc(base.nombre)}</h3><p>${esc(base.direccion)} · Inicio dentro de ${number(base.radioInicio)} m · Finalización dentro de ${number(base.radioFin)} m · Precisión máxima de inicio ±${number(base.precisionMaxima)} m. En el cierre, una señal imprecisa puede aceptarse con tolerancia controlada y registro de auditoría.</p></div>${puedeAdministrarPuntoOperacion()?'<button class="btn soft" data-nav="settings">Configurar punto</button>':''}</div>`:`<div class="operation-geofence-banner blocked"><i>!</i><div><h3>Punto operacional no configurado</h3><p>Nadie podrá iniciar o finalizar operaciones hasta que el Administrador defina la ubicación base en Configuración.</p></div>${puedeAdministrarPuntoOperacion()?'<div class="operation-banner-actions"><button class="btn soft" data-nav="settings">Configuración avanzada</button><button class="btn primary" data-quick-base-setup>⌖ Configurar con mi ubicación</button></div>':''}</div>`;
     const total=Number(summary.total??operationRows.length),shown=operationRows.length,historyNote=total>shown?`Mostrando ${shown} registros prioritarios de ${number(total)}. Las operaciones activas siempre se incluyen.`:`${shown} registros cargados.`;
@@ -1811,7 +1786,7 @@
     const completed=routes.filter(row=>row.ESTADO==='Completada');
     const cancelled=routes.filter(row=>row.ESTADO==='Cancelada');
     const active=[...running,...assigned];
-    const actions=`<button class="btn soft" data-sync>↻ Sincronizar</button>${hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>＋ Asignar ruta</button>':''}`;
+    const actions=`<button class="btn soft" data-sync>↻ Actualizar</button>${hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>＋ Asignar ruta</button>':''}`;
     const prerequisites=[];
     if(!base.configurada)prerequisites.push(`<div class="module-diagnostic warning"><i>⌖</i><div><b>La ruta puede asignarse sin geocerca</b><span>Defina manualmente el origen y el destino. El punto operacional solo será obligatorio cuando se intente iniciar o finalizar una operación.</span></div>${puedeAdministrarPuntoOperacion()?'<button class="btn soft" data-nav="settings">Configurar punto para operaciones</button>':''}</div>`);
     if(hasPermission('RUTAS','CREAR')&&!driversResult.rows.length)prerequisites.push(`<div class="module-diagnostic warning"><i>♙</i><div><b>No existen conductores disponibles</b><span>Registre un conductor antes de crear la primera asignación.</span></div><button class="btn soft" data-nav="drivers">Abrir conductores</button></div>`);
@@ -1835,7 +1810,7 @@
     guardarListaFormulario('notifications',notifications);
     const unread=notifications.filter(row=>row.LEIDA!=='SI');
     const urgent=unread.filter(row=>['Urgente','Alta'].includes(row.PRIORIDAD));
-    const actions=`<button class="btn soft" data-sync>↻ Sincronizar</button><button class="btn soft" data-speak-notifications>🔊 Leer pendientes</button><button class="btn soft" data-voice-command>🎙 Comando de voz</button>${hasPermission('NOTIFICACIONES','CREAR')?'<button class="btn primary" data-new-notification>＋ Nueva notificación</button>':''}`;
+    const actions=`<button class="btn soft" data-sync>↻ Actualizar</button><button class="btn soft" data-speak-notifications>🔊 Leer pendientes</button><button class="btn soft" data-voice-command>🎙 Comando de voz</button>${hasPermission('NOTIFICACIONES','CREAR')?'<button class="btn primary" data-new-notification>＋ Nueva notificación</button>':''}`;
     const rows=notifications.map(item=>{const recipient=driverMap[item.DESTINATARIO_CONDUCTOR_ID]?.NOMBRE||userMap[item.DESTINATARIO_USUARIO_ID]?.NOMBRE||item.DESTINATARIO_CONDUCTOR_ID||item.DESTINATARIO_USUARIO_ID||'Sin destinatario';return `<tr data-filter-date="${esc(item.FECHA_ENVIO||item.CREADO_EN||'')}" data-search-row="${esc(`${item.TITULO} ${item.MENSAJE} ${recipient} ${item.PRIORIDAD} ${item.TIPO}`.toLowerCase())}"><td>${item.LEIDA==='SI'?'<span class="status">Leída</span>':'<span class="status warning">Pendiente</span>'}</td><td><strong>${esc(item.TITULO)}</strong><span class="muted">${esc(item.MENSAJE)}</span></td><td>${esc(recipient)}</td><td>${status(item.PRIORIDAD||'Normal')}</td><td>${esc(item.TIPO||'Información')}</td><td>${fmtDate(item.FECHA_ENVIO||item.CREADO_EN,true)}</td><td>${item.LEIDA!=='SI'?`<button class="btn soft small" data-read-notification="${item.ID}">Marcar leída</button>`:'—'}</td></tr>`;}).join('');
     return heading('CENTRO DE COMUNICACIONES','Notificaciones','Mensajes dirigidos, lectura, dictado y comandos de voz desde una sola bandeja.',actions)+
       `<div class="voice-command-panel"><div><span class="eyebrow">CONTROL POR VOZ</span><h3>Comandos disponibles</h3><p id="voiceCommandStatus">Diga “leer notificaciones”, “marcar todas como leídas”, “crear notificación” o “detener lectura”.</p></div><div class="voice-command-actions"><button class="btn primary" data-voice-command>🎙 Escuchar comando</button><button class="btn soft" data-speak-notifications>🔊 Leer</button><button class="btn soft" data-stop-voice>■ Detener</button></div></div>`+
@@ -1852,7 +1827,7 @@
     const unread=alerts.filter(row=>row.LEIDA!=='SI');
     const critical=unread.filter(row=>String(row.NIVEL||'').toLowerCase().includes('cr'));
     const rows=alerts.map(row=>`<tr data-filter-date="${esc(row.FECHA_HORA||row.CREADO_EN||'')}" data-search-row="${esc(`${row.NIVEL} ${row.TITULO} ${row.MENSAJE} ${row.MODULO}`.toLowerCase())}"><td>${status(row.NIVEL||'Info')}</td><td><strong>${esc(row.TITULO||'Alerta')}</strong><span class="muted">${esc(row.MENSAJE||'')}</span></td><td>${esc(row.MODULO||'Sistema')}</td><td>${esc(row.REGISTRO_ID||'—')}</td><td>${fmtDate(row.FECHA_HORA||row.CREADO_EN,true)}</td><td>${row.LEIDA==='SI'?status('Cerrada'):(hasPermission('ALERTAS','CERRAR')?`<button class="btn soft small" data-read-alert="${row.ID}">Validar y cerrar</button>`:'<span class="status warning">Sin permiso de cierre</span>')}</td></tr>`).join('');
-    return heading('CENTRO DE ATENCIÓN','Alertas','Eventos operacionales, fallas críticas y avisos generados por el sistema.',`<button class="btn soft" data-sync>↻ Sincronizar</button><button class="btn soft" data-run-alert-engine>⚡ Revisar anomalías</button>${unread.length&&hasPermission('ALERTAS','CERRAR')?'<button class="btn soft" data-read-all-alerts>✓ Validar y cerrar todas</button>':''}${hasPermission('ALERTAS','ENVIAR')?'<button class="btn primary" data-add="alerts">＋ Crear alerta</button>':''}`)+
+    return heading('CENTRO DE ATENCIÓN','Alertas','Eventos operacionales, fallas críticas y avisos generados por el sistema.',`<button class="btn soft" data-sync>↻ Actualizar</button><button class="btn soft" data-run-alert-engine>⚡ Revisar anomalías</button>${unread.length&&hasPermission('ALERTAS','CERRAR')?'<button class="btn soft" data-read-all-alerts>✓ Validar y cerrar todas</button>':''}${hasPermission('ALERTAS','ENVIAR')?'<button class="btn primary" data-add="alerts">＋ Crear alerta</button>':''}`)+
       `<div class="live-strip">${liveStat('!','Pendientes',unread.length,unread.length?'warning':'online')}${liveStat('⚠','Críticas',critical.length,critical.length?'warning':'')}${liveStat('✓','Atendidas',alerts.length-unread.length,'online')}${liveStat('▤','Total',alerts.length)}</div>`+
       `<div class="automatic-alert-banner"><i>⚡</i><div><b>Motor automático activo</b><span>Revisa cada 5 minutos y mantiene informados a los Administradores. Las alertas operacionales permanecen abiertas hasta su validación en terreno.</span></div></div>`+
       `<article class="card"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar alerta, módulo o registro"></label>${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="alerts">Exportar CSV</button>':''}</div><div data-filter-table>${table(['Nivel','Alerta','Módulo','Registro','Fecha','Acción'],rows,'No existen alertas registradas.')}</div></article>`;
@@ -1996,7 +1971,7 @@
         `<article class="card map-card gps-driver-private-map" id="mapCard"><div id="fleetMap" class="fleet-map"></div><div class="map-toolbar"><span class="gps-live"><i></i> Solo su ubicación autenticada</span><span class="muted" id="gpsLastSync">Actualización automática</span><span class="muted push">Mapa © OpenStreetMap, CARTO o Esri</span></div></article>`;
     }
     const locations={rows:realtime.locations,total:realtime.totals.locations||realtime.locations.length};
-    const controls=`<button class="btn soft" data-refresh-locations>↻ Sincronizar</button>`;
+    const controls=`<button class="btn soft" data-refresh-locations>↻ Actualizar</button>`;
     return heading('MONITOREO','GPS en tiempo real','Posición confiable, dirección, velocidad y conexión de la flota autorizada.',controls)+
       gpsRoleNotice()+gpsFilterControls(realtime)+
       `<div class="live-strip"><article class="live-stat"><i>⌖</i><div><span>Ubicaciones visibles</span><b id="gpsVisibleCount">${locations.total}</b></div></article><article class="live-stat online"><i>●</i><div><span>Sesiones abiertas</span><b id="gpsOnlineCount">${realtime.totals.onlineDevices||0}</b></div></article><article class="live-stat online"><i>🚐</i><div><span>Conduciendo</span><b id="gpsDrivingCount">${realtime.totals.drivingSessions||0}</b></div></article><article class="live-stat ${(realtime.totals.sessionsWithoutGps||0)?'warning':''}"><i>!</i><div><span>Operación sin GPS</span><b id="gpsWithoutCount">${realtime.totals.sessionsWithoutGps||0}</b></div></article></div>`+
@@ -2454,7 +2429,7 @@
         return;
       }
       const script=document.createElement('script');
-      script.src='mapa.js?v=4.2.26';
+      script.src='mapa.js?v=4.2.39-ui1';
       script.async=true;
       script.dataset.mapaFlotas='dinamico';
       script.onload=comprobar;
@@ -2612,7 +2587,7 @@
     data.checkins.rows.forEach(row=>events.push({fecha:row.FECHA_REVISION||row.FECHA_HORA||row.CREADO_EN,tipo:'Check-in',referencia:row.ID,evento:row.ESTADO_REVISION||row.RESULTADO||'Registrado',detalle:`Vehículo ${row.VEHICULO_ID||'—'} · Conductor ${row.CONDUCTOR_ID||'—'}`,usuario:row.REVISADO_POR||row.CREADO_POR||'—'}));
     events.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
     const rows=events.map(item=>`<tr data-filter-date="${esc(item.fecha||'')}" data-search-row="${esc(`${item.tipo} ${item.referencia} ${item.evento} ${item.detalle} ${item.usuario}`.toLowerCase())}"><td>${fmtDate(item.fecha,true)}</td><td>${status(item.tipo)}</td><td><strong>${esc(item.evento)}</strong><span class="muted">${esc(item.detalle)}</span></td><td>${esc(item.referencia||'—')}</td><td>${esc(item.usuario||'—')}</td></tr>`).join('');
-    return heading('TRAZABILIDAD CENTRAL','Historial','Línea de tiempo unificada de operaciones, rutas, check-ins, alertas y notificaciones.',`<button class="btn soft" data-sync>↻ Sincronizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="history">Exportar historial operativo</button>':''}`)+
+    return heading('TRAZABILIDAD CENTRAL','Historial','Línea de tiempo unificada de operaciones, rutas, check-ins, alertas y notificaciones.',`<button class="btn soft" data-sync>↻ Actualizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="history">Exportar historial operativo</button>':''}`)+
       `<div class="live-strip">${liveStat('⇄','Operaciones',data.history.rows.length)}${liveStat('➜','Rutas',data.routes.rows.length)}${liveStat('✓','Check-ins',data.checkins.rows.length)}${liveStat('!','Alertas',data.alerts.rows.length,data.alerts.rows.some(row=>row.LEIDA!=='SI')?'warning':'')}</div>`+
       `<article class="card"><div class="toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar evento, referencia o usuario"></label><span class="muted push">${events.length} eventos visibles</span></div><div data-filter-table>${table(['Fecha','Origen','Evento y detalle','Referencia','Usuario'],rows,'Aún no existen eventos en el historial.')}</div></article>`;
   }
@@ -2647,9 +2622,9 @@
     const [operations,drivers,vehicles,checkins,routes]=await Promise.all(['operations','drivers','vehicles','checkins','routes'].map(solicitarListaSegura));if(operations.error)throw operations.error;
     guardarListaFormulario('operations',operations.rows);guardarListaFormulario('drivers',drivers.rows);guardarListaFormulario('vehicles',vehicles.rows);guardarListaFormulario('checkins',checkins.rows);guardarListaFormulario('routes',routes.rows);
     const today=new Date(),start=new Date();start.setDate(today.getDate()-30);
-    return heading('INTELIGENCIA OPERACIONAL','KPIs y reportes','Analice el desempeño por período, conductor y vehículo.',`<button class="btn soft" data-sync>↻ Sincronizar</button>`)+`<article class="card kpi-filter-card"><div class="card-header"><div><h3>Filtros del análisis</h3><p>Los indicadores, rankings y exportación se actualizan al instante.</p></div></div><form id="kpiFilterForm" class="kpi-filter-form"><label class="field"><span>Desde</span><input type="date" name="FECHA_DESDE" value="${fechaInputIso(start)}"></label><label class="field"><span>Hasta</span><input type="date" name="FECHA_HASTA" value="${fechaInputIso(today)}"></label><label class="field"><span>Conductor</span><select name="CONDUCTOR_ID"><option value="">Todos los conductores</option>${drivers.rows.map(row=>`<option value="${esc(row.ID)}">${esc(row.NOMBRE||row.ID)}</option>`).join('')}</select></label><label class="field"><span>Vehículo</span><select name="VEHICULO_ID"><option value="">Todos los vehículos</option>${vehicles.rows.map(row=>`<option value="${esc(row.ID)}">${esc(row.PATENTE||row.ID)} · ${esc(`${row.MARCA||''} ${row.MODELO||''}`.trim())}</option>`).join('')}</select></label><div class="form-actions"><button class="btn soft" type="button" data-kpi-reset>Últimos 30 días</button><button class="btn primary" type="button" data-kpi-apply>Aplicar filtros</button></div></form></article><section id="kpiReportResults" aria-live="polite"></section><article class="card"><div class="card-header"><div><h3>Exportaciones generales</h3><p>Descargue las bases completas en CSV, Excel o PDF.</p></div></div><div class="kpi-export-grid">${['vehicles','drivers','operations','gps',...(hasPermission('COMBUSTIBLE','LEER')?['fuel']:[])].map(resource=>`<article class="metric-card report-export-card"><i class="metric-icon">⇩</i><div><span>Exportar</span><b style="font-size:17px">${labels[resource]||resource}</b><small>Base completa</small>${botonesExportacion('data-export-resource',resource,true)}</div></article>`).join('')}</div></article>`;
+    return heading('INTELIGENCIA OPERACIONAL','KPIs y reportes','Analice el desempeño por período, conductor y vehículo.',`<button class="btn soft" data-sync>↻ Actualizar</button>`)+`<article class="card kpi-filter-card"><div class="card-header"><div><h3>Filtros del análisis</h3><p>Los indicadores, rankings y exportación se actualizan al instante.</p></div></div><form id="kpiFilterForm" class="kpi-filter-form"><label class="field"><span>Desde</span><input type="date" name="FECHA_DESDE" value="${fechaInputIso(start)}"></label><label class="field"><span>Hasta</span><input type="date" name="FECHA_HASTA" value="${fechaInputIso(today)}"></label><label class="field"><span>Conductor</span><select name="CONDUCTOR_ID"><option value="">Todos los conductores</option>${drivers.rows.map(row=>`<option value="${esc(row.ID)}">${esc(row.NOMBRE||row.ID)}</option>`).join('')}</select></label><label class="field"><span>Vehículo</span><select name="VEHICULO_ID"><option value="">Todos los vehículos</option>${vehicles.rows.map(row=>`<option value="${esc(row.ID)}">${esc(row.PATENTE||row.ID)} · ${esc(`${row.MARCA||''} ${row.MODELO||''}`.trim())}</option>`).join('')}</select></label><div class="form-actions"><button class="btn soft" type="button" data-kpi-reset>Últimos 30 días</button><button class="btn primary" type="button" data-kpi-apply>Aplicar filtros</button></div></form></article><section id="kpiReportResults" aria-live="polite"></section><article class="card"><div class="card-header"><div><h3>Exportaciones generales</h3><p>Descargue las bases completas en CSV, Excel o PDF.</p></div></div><div class="kpi-export-grid">${['vehicles','drivers','operations','gps',...(hasPermission('COMBUSTIBLE','LEER')?['fuel']:[])].map(resource=>`<article class="metric-card report-export-card"><i class="metric-icon">⇩</i><div><span>Exportar</span><b style="font-size:17px">${labels[resource]||resource}</b><small>Base completa</small>${botonesExportacion('data-export-resource',resource,true)}</div></article>`).join('')}</div></article>`;
   }
-  async function renderAudit(){const result=await api.request('list',{resource:'audit'});guardarListaFormulario('audit',result.rows||[]);const rows=(result.rows||[]).map(a=>`<tr><td>${fmtDate(a.FECHA_HORA||a.CREADO_EN,true)}</td><td>${esc(a.USUARIO_NOMBRE)}</td><td><strong>${esc(a.ACCION)}</strong></td><td>${esc(a.MODULO)}</td><td>${esc(a.IP_CLIENTE||a.IP_PUBLICA||'')}</td><td>${esc(a.DETALLE)}</td></tr>`).join('');return heading('BITÁCORA','Auditoría','Registro de las acciones realizadas en el sistema.',`<button class="btn soft" data-sync>↻ Sincronizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="audit">Exportar CSV</button>':''}`)+`<article class="card">${table(['Fecha','Usuario','Acción','Módulo','IP','Detalle'],rows)}</article>`;}
+  async function renderAudit(){const result=await api.request('list',{resource:'audit'});guardarListaFormulario('audit',result.rows||[]);const rows=(result.rows||[]).map(a=>`<tr><td>${fmtDate(a.FECHA_HORA||a.CREADO_EN,true)}</td><td>${esc(a.USUARIO_NOMBRE)}</td><td><strong>${esc(a.ACCION)}</strong></td><td>${esc(a.MODULO)}</td><td>${esc(a.IP_CLIENTE||a.IP_PUBLICA||'')}</td><td>${esc(a.DETALLE)}</td></tr>`).join('');return heading('BITÁCORA','Auditoría','Registro de las acciones realizadas en el sistema.',`<button class="btn soft" data-sync>↻ Actualizar</button>${puedeExportarFormato('csv')?'<button class="btn soft" data-export="audit">Exportar CSV</button>':''}`)+`<article class="card">${table(['Fecha','Usuario','Acción','Módulo','IP','Detalle'],rows)}</article>`;}
   async function refreshCompanyBranding(){
     try{const result=await api.request('list',{resource:'companies'});currentCompany=empresaConPuntoDispositivo(seleccionarEmpresaPrincipal(result.rows||[])||currentCompany||{});applyBranding(currentCompany);}catch(_){applyBranding(currentCompany);}
   }
@@ -2674,7 +2649,7 @@
     const result=await api.request('list',{resource:'companies'});const company=seleccionarEmpresaPrincipal(result.rows||[])||{};currentCompany=company;applyBranding(company);
     guardarListaFormulario('companies',result.rows||[]);
     const logo=company.DIRECCION_LOGOTIPO||defaultLogo;
-    return heading('IDENTIDAD INSTITUCIONAL','Empresa','Administre el logotipo, los datos legales, la ubicación y las preferencias generales de la organización.',`<button class="btn soft" data-sync>↻ Sincronizar</button><span class="status ok">Configuración permanente</span>`)+
+    return heading('IDENTIDAD INSTITUCIONAL','Empresa','Administre el logotipo, los datos legales, la ubicación y las preferencias generales de la organización.',`<button class="btn soft" data-sync>↻ Actualizar</button><span class="status ok">Configuración permanente</span>`)+
     `<form id="companyForm" class="company-layout">
       <article class="card company-logo-card">
         <div class="card-header"><div><h3>Logotipo de la empresa</h3><p>Se mostrará en el acceso y en el menú principal</p></div></div>
@@ -2807,7 +2782,8 @@
     const remote=api.isRemote();let company=empresaConPuntoDispositivo(currentCompany||{});
     try{const result=await api.request('list',{resource:'companies'});company=seleccionarEmpresaPrincipal(result.rows||[])||company;currentCompany=company;applyBranding(company);}catch(_){ }
     const tema=window.TemaFlotas?.normalizar?.(company)||company;
-    return heading('PARÁMETROS','Configuración','Defina la conexión, el modo de visualización y la identidad cromática de todo el sistema.')+
+    return heading('PARÁMETROS','Configuración administrativa','Administre los parámetros internos, el modo de visualización y la identidad del sistema.')+
+    `${currentUser?.ROL_ID==='ROL-ADMIN'?'<section class="connection-admin-shell"><article class="card"><div class="card-header"><div><span class="eyebrow">SOLO ADMINISTRADOR</span><h3>Configuración de conexión Android</h3><p>La dirección del servicio se administra aquí y nunca se muestra en el login. Las claves privadas no se exponen en Web ni Android.</p></div><span class="status ok">Protegida</span></div><div class="info-grid"><div class="info-item full"><span>Servicio central</span><b>${esc(config.DIRECCION_APLICACION||"Configurado internamente")}</b></div></div><div class="form-actions"><button class="btn primary" type="button" data-open-android-connection>Administrar conexión del dispositivo</button></div><p class="helper">En navegador se muestra la configuración central en modo de solo lectura. En la aplicación Android, el botón abre el panel nativo protegido por rol.</p></article></section>':''}`+
     `<div class="settings-grid"><article class="card"><div class="card-header"><div><h3>Base de datos</h3><p>Estado de la información del sistema</p></div>${status(remote?'Central conectada':'Local activa')}</div><div class="info-grid"><div class="info-item"><span>Tipo</span><b>${remote?'Base de datos central':'Base de datos local'}</b></div><div class="info-item"><span>Sincronización</span><b>${remote?'Activa entre dispositivos':'Solo en este dispositivo'}</b></div></div></article><article class="card"><div class="card-header"><div><h3>Modo de pantalla</h3><p>Preferencia individual de este dispositivo</p></div></div><div class="setting-row"><div><b>Modo oscuro</b><span>Puede cambiarlo sin modificar la paleta guardada</span></div><label class="switch"><input id="darkSwitch" type="checkbox" ${document.body.classList.contains('dark')?'checked':''}><i></i></label></div><button class="btn soft" data-nav="company">Abrir datos de empresa</button></article></div>`+
     `<section class="system-health-shell"><article class="card system-health-card"><div class="card-header"><div><h3>Diagnóstico y reparación</h3><p>Comprueba tablas, campos, permisos y requisitos de los módulos críticos.</p></div><span class="status" id="systemHealthStatus">Sin ejecutar</span></div><div id="systemHealthResult" class="system-health-result"><div class="module-diagnostic"><i>✓</i><div><b>Herramienta de mantenimiento disponible</b><span>Ejecute el diagnóstico después de actualizar el servicio central. La reparación no elimina registros.</span></div></div></div><div class="form-actions">${hasPermission('OFICINA_VIRTUAL','DIAGNOSTICAR')?'<button class="btn soft" type="button" data-diagnose-system>Revisar sistema</button>':''}${hasPermission('OFICINA_VIRTUAL','REPARAR')?'<button class="btn primary" type="button" data-repair-system>Reparar estructura</button>':''}</div></article></section>`+
     `${currentUser?.ROL_ID==='ROL-ADMIN'&&hasPermission('CONFIGURACION','RESPALDO_GENERAL')?'<section class="backup-database-shell"><article class="card backup-database-card"><div class="card-header"><div><span class="eyebrow">RESPALDO GENERAL</span><h3>Descargar Base de Datos en XLSX</h3><p>Genera un libro Excel con una hoja por cada tabla y todos los registros disponibles hasta la fecha.</p></div><span class="status ok">Solo Administrador</span></div><div class="backup-feature-list"><span>✓ Incluye registros activos e históricos</span><span>✓ Protege contraseñas, tokens y credenciales</span><span>✓ Agrega resumen de tablas y totales</span></div><div class="backup-status" data-backup-status>Listo para generar el respaldo.</div><div class="form-actions"><button class="btn primary" type="button" data-backup-database>⬇ Descargar respaldo XLSX</button></div></article></section>':''}`+
@@ -2872,7 +2848,7 @@
   }
 
   function opcionesModulosOficinaVirtual(){
-    const items=[['GENERAL','General'],['PANEL_PRINCIPAL','Panel principal'],['USUARIOS','Usuarios y permisos'],['VEHICULOS','Vehículos'],['CONDUCTORES','Conductores'],['OPERACIONES','Operaciones'],['CHECKIN','Check-in'],['GPS','GPS en tiempo real'],['CONEXIONES','Conexiones en línea'],['RUTAS','Rutas'],['COMBUSTIBLE','Combustible'],['DOCUMENTOS','Documentos'],['NOTIFICACIONES','Notificaciones'],['ALERTAS','Alertas'],['REPORTES','Reportes'],['CONFIGURACION','Configuración']];
+    const items=[['GENERAL','General'],['PANEL_PRINCIPAL','Panel principal'],['USUARIOS','Usuarios y permisos'],['VEHICULOS','Vehículos'],['CONDUCTORES','Conductores'],['OPERACIONES','Operaciones'],['CHECKIN','Check-in'],['GPS','GPS en tiempo real'],['CONEXIONES','Conexiones en línea'],['RUTAS','Rutas'],['COMBUSTIBLE','Combustible'],['DOCUMENTOS','Documentos del conductor'],['NOTIFICACIONES','Notificaciones'],['ALERTAS','Alertas'],['REPORTES','Reportes'],['CONFIGURACION','Configuración']];
     return items.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
   }
 
@@ -2974,33 +2950,32 @@
     if (sincronizacionPendiente) return sincronizacionPendiente;
     const section = currentSection;
     const ejecutar = async () => {
-      setSave(`Sincronizando ${labels[section]||'módulo'}…`,'saving');
-      actualizarEstadoSincronizacionVisible('Consultando la base central…','syncing');
-      // El primer clic debe consultar realmente el servidor. Se marca el módulo
-      // como habilitado para carga y se elimina toda respuesta pendiente o cacheada
-      // antes de renderizarlo, evitando que el primer clic solo prepare el estado.
+      setSave(`Actualizando ${labels[section]||'módulo'}…`,'saving');
+      actualizarEstadoSincronizacionVisible('Consultando únicamente los datos de este módulo…','syncing');
+      // La actualización manual afecta solo al módulo abierto. No dispara cargas
+      // globales ni invalida datos de las demás pantallas.
       modulosSincronizadosSesion.add(section);
-      api.invalidate();
-      cacheVistasModulo.delete(section);
       const dependencia = dependenciaSeccion(section);
+      api.invalidate({ actions:dependencia.actions, resources:dependencia.resources });
+      cacheVistasModulo.delete(section);
       dependencia.resources.forEach(resource => invalidarListasFormulario(resource));
       try {
         const completed = await go(section,{force:true,manualSync:true});
         if (completed === false) throw new Error('SINCRONIZACION_NO_COMPLETADA');
         if (section==='notifications'||section==='dashboard') await refreshNotificationBadge();
-        setSave('Módulo sincronizado');
+        setSave('Módulo actualizado');
         actualizarEstadoSincronizacionVisible(textoActualizacionSeccion(section));
-        toast('Módulo sincronizado',`${labels[section]||'La información'} fue actualizada desde la base central.`);
+        toast('Módulo actualizado',`${labels[section]||'La información'} fue actualizada sin cargar los demás módulos.`);
         return true;
       } catch (error) {
         modulosSincronizadosSesion.delete(section);
-        setSave('Error al sincronizar','error');
-        actualizarEstadoSincronizacionVisible('No se pudo sincronizar · pulse nuevamente para reintentar','error');
-        toast('No se pudo sincronizar',translateError(error),'error');
+        setSave('Error al actualizar','error');
+        actualizarEstadoSincronizacionVisible('No se pudo actualizar · pulse nuevamente para reintentar','error');
+        toast('No se pudo actualizar',translateError(error),'error');
         return false;
       }
     };
-    sincronizacionPendiente = conCargaBoton(button,'Sincronizando…',ejecutar);
+    sincronizacionPendiente = conCargaBoton(button,'Actualizando…',ejecutar);
     try { return await sincronizacionPendiente; }
     finally { sincronizacionPendiente = null; }
   }
@@ -3095,7 +3070,7 @@
     const approvals=hasPermission('COMBUSTIBLE','AUTORIZAR_ELIMINACION')&&pending.length?`<article class="card"><div class="card-header"><div><span class="eyebrow">AUTORIZACIONES</span><h3>Eliminaciones pendientes</h3><p>El Supervisor no puede eliminar hasta que un Administrador resuelva la solicitud.</p></div>${status(`${pending.length} pendiente${pending.length===1?'':'s'}`)}</div>${table(['Solicitud','Carga','Supervisor','Motivo','Fecha','Decisión'],pending.map(row=>`<tr><td><strong>${esc(row.ID)}</strong></td><td>${esc(row.CARGA_ID)}</td><td>${esc(row.SOLICITANTE_NOMBRE||row.SOLICITADO_POR)}</td><td>${esc(row.MOTIVO)}</td><td>${fmtDate(row.FECHA_SOLICITUD,true)}</td><td><div class="fuel-actions"><button class="btn primary small" type="button" data-approve-fuel-delete="${esc(row.ID)}">Aprobar</button><button class="btn soft small" type="button" data-reject-fuel-delete="${esc(row.ID)}">Rechazar</button></div></td></tr>`).join(''))}</article>`:'';
     const supervisorRequests=currentUser.ROL_ID==='ROL-SUPERVISOR'&&authorizations.length?`<article class="card"><div class="card-header"><div><h3>Mis solicitudes de eliminación</h3><p>Seguimiento de autorizaciones administrativas.</p></div></div>${table(['Solicitud','Carga','Motivo','Estado','Respuesta','Fecha'],[...authorizations].sort((a,b)=>new Date(b.FECHA_SOLICITUD||0)-new Date(a.FECHA_SOLICITUD||0)).map(row=>`<tr><td><strong>${esc(row.ID)}</strong></td><td>${esc(row.CARGA_ID)}</td><td>${esc(row.MOTIVO)}</td><td>${status(row.ESTADO)}</td><td>${esc(row.COMENTARIO_AUTORIZACION||'—')}<small>${esc(row.AUTORIZADOR_NOMBRE||'')}</small></td><td>${fmtDate(row.FECHA_SOLICITUD,true)}</td></tr>`).join(''))}</article>`:'';
     const create=hasPermission('COMBUSTIBLE','REGISTRAR')?`${hasPermission('CHECKIN','VALIDAR_QR')?'<button class="btn soft" type="button" data-open-fuel-qr>▦ Escanear QR para carga</button>':''}<button class="btn primary" type="button" data-new-fuel>＋ Informar carga</button>`:'';
-    return heading('CONTROL DE GASTOS','Carga de combustible',currentUser.ROL_ID==='ROL-CONDUCTOR'?'Consulte su historial e informe las cargas realizadas para su vehículo y asignación activa.':'Registre cargas, mida el rendimiento y mantenga trazabilidad completa por vehículo y conductor.',`${puedeExportarFormato('csv')?'<button class="btn soft" data-export="fuel">⇩ Exportar historial</button>':''}<button class="btn soft" data-sync>↻ Sincronizar</button>${create}`)+
+    return heading('CONTROL DE GASTOS','Carga de combustible',currentUser.ROL_ID==='ROL-CONDUCTOR'?'Consulte su historial e informe las cargas realizadas para su vehículo y asignación activa.':'Registre cargas, mida el rendimiento y mantenga trazabilidad completa por vehículo y conductor.',`${puedeExportarFormato('csv')?'<button class="btn soft" data-export="fuel">⇩ Exportar historial</button>':''}<button class="btn soft" data-sync>↻ Actualizar</button>${create}`)+
       `<div class="kpi-grid">${metric('⛽','Litros acumulados',`${decimal(summary.totalLitros||0,2)} L`,`${number(summary.totalCargas||0)} cargas`)}${metric('$','Gasto acumulado',clp(summary.gastoTotal||0),`Promedio ${clp(summary.precioPromedioLitro||0)}/L`)}${metric('↗','Rendimiento promedio',`${decimal(summary.consumoPromedioKmL||0)} km/L`,`${decimal(summary.consumoPromedioL100Km||0)} L/100 km`)}${metric('▦','Mes actual',clp(summary.mesActual?.gasto||0),`${decimal(summary.mesActual?.litros||0,2)} L · ${number(summary.mesActual?.cargas||0)} cargas`)}</div>`+
       approvals+supervisorRequests+
       `<article class="card"><div class="card-header"><div><h3>Historial de cargas</h3><p>${currentUser.ROL_ID==='ROL-CONDUCTOR'?'Solo se muestran registros vinculados a su conductor.':'Creaciones, cambios y eliminaciones quedan registradas en auditoría.'}</p></div><label class="table-search"><span>⌕</span><input data-table-search placeholder="Buscar vehículo, conductor, estación o documento"></label></div>${table(['Fecha','Vehículo','Conductor','Litros','Precio/L','Costo','Kilometraje','Consumo','Estación','Acciones'],rows,'No existen cargas de combustible visibles.')}</article>`;
@@ -3154,6 +3129,11 @@
   }
 
   function bindSection() {
+    $('[data-open-android-connection]')?.addEventListener('click',()=>{
+      if(currentUser?.ROL_ID!=='ROL-ADMIN'){toast('Acceso restringido','Solo el Administrador puede modificar la conexión.','error');return;}
+      if(window.AndroidConfig&&typeof window.AndroidConfig.abrirConfiguracion==='function'){window.AndroidConfig.abrirConfiguracion();return;}
+      toast('Configuración central protegida','En la versión Web la dirección se administra en configuracion.js o variables del despliegue; las claves privadas no se muestran.');
+    });
     $$('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>navigateSection(btn.dataset.nav)));
     $('[data-office-review]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Revisando…',()=>ejecutarRevisionOficinaVirtual(event.currentTarget)));
     $('[data-office-repair]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Reparando…',()=>repararConOficinaVirtual(event.currentTarget)));
@@ -3218,7 +3198,7 @@
     $$('[data-edit-operation-admin]').forEach(btn=>btn.addEventListener('click',()=>openAdminEditOperationModal(btn.dataset.editOperationAdmin)));
     $$('[data-delete-operation-admin]').forEach(btn=>btn.addEventListener('click',()=>openAdminDeleteOperationModal(btn.dataset.deleteOperationAdmin)));
     $$('[data-open-qr]').forEach(btn=>btn.addEventListener('click',()=>openQr('vehiculo-operacion')));
-    $$('[data-refresh-locations]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,'Sincronizando…',()=>refreshLocations(true,false))));
+    $$('[data-refresh-locations]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,'Actualizando…',()=>refreshLocations(true,false))));
     $$('[data-capture-gps]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,'Obteniendo GPS…',captureGps)));
     $$('[data-toggle-tracking]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,gpsWatchId===null?'Activando…':'Deteniendo…',toggleTracking).then(updateTrackingUi)));
     $$('[data-gps-scope]').forEach(btn=>btn.addEventListener('click',()=>changeGpsTrackingScope(btn.dataset.gpsScope)));
@@ -3716,7 +3696,8 @@
     $('#routeForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());await conCargaBoton(button,'Asignando…',async()=>{try{await api.request('assignRoute',{data});invalidarListasFormulario('routes','notifications');cacheVistasModulo.delete('routes');cacheVistasModulo.delete('dashboard');closeModal();toast('Ruta asignada','La ruta fue creada sin exigir validación GPS. La geocerca se comprobará al iniciar la operación.');actualizarSeccionEnSegundoPlano('routes');}catch(error){toast('No se pudo asignar',translateError(error),'error');}});};
     prepararListasModal(token,['drivers','vehicles']);
   }
-  function guardarContextoSeguimientoRuta(contexto){routeTrackingContext=contexto&&contexto.activo!==false?contexto:null;try{if(routeTrackingContext)localStorage.setItem(routeTrackingKey,JSON.stringify(routeTrackingContext));else localStorage.removeItem(routeTrackingKey);}catch(_){}}
+  function guardarContextoSeguimientoRuta(contexto){routeTrackingContext=contexto&&contexto.activo!==false?{...contexto,USUARIO_ID:currentUser?.ID||contexto.USUARIO_ID||''}:null;try{if(routeTrackingContext)localStorage.setItem(routeTrackingKey,JSON.stringify(routeTrackingContext));else localStorage.removeItem(routeTrackingKey);}catch(_){}}
+  function contextoSeguimientoRutaValido(){if(!routeTrackingContext||routeTrackingContext.activo===false)return false;const owner=String(routeTrackingContext.USUARIO_ID||'');if(owner&&currentUser?.ID&&owner!==String(currentUser.ID)){guardarContextoSeguimientoRuta(null);return false;}return Boolean(routeTrackingContext.RUTA_ID||routeTrackingContext.OPERACION_ID);}
   async function activarSeguimientoRutaCliente(contexto){guardarContextoSeguimientoRuta(contexto);try{if(window.AndroidConfig&&typeof AndroidConfig.iniciarSeguimientoRuta==='function'){AndroidConfig.iniciarSeguimientoRuta(JSON.stringify(contexto||{}));gpsWatchId='ANDROID';updateTrackingUi();return true;}}catch(_){}return startTracking({silent:true});}
   function detenerSeguimientoRutaCliente(routeId){guardarContextoSeguimientoRuta(null);try{if(window.AndroidConfig&&typeof AndroidConfig.finalizarSeguimientoRuta==='function')AndroidConfig.finalizarSeguimientoRuta(String(routeId||''));}catch(_){}if(!config.GPS_AUTOMATICO_OBLIGATORIO&&gpsWatchId!==null)stopTracking({remember:false,silent:true});}
   function esErrorAccionRutaNoDisponible(error){
@@ -4085,7 +4066,7 @@
       data.CIERRE_EXCEPCIONAL=outside&&privileged?'SI':'NO';
       data.IP_PUBLICA=clientPublicIp||await api.getClientIp?.().catch(()=> '')||'';
       const result=await api.request('finishOperation',{id,data});
-      if(result.seguimiento&&result.seguimiento.RUTA_ID)detenerSeguimientoRutaCliente(result.seguimiento.RUTA_ID);
+      if(result.seguimiento?.activo===false)detenerSeguimientoRutaCliente(result.seguimiento.RUTA_ID||'');
       invalidarListasFormulario('operations','vehicles','drivers','history','routes','alerts','audit');
       ['operations','dashboard','routes','history','alerts','audit'].forEach(section=>cacheVistasModulo.delete(section));
       closeModal();
@@ -4432,7 +4413,9 @@
     if(!forzar&&ultimaUbicacionEnviada){const tiempo=ahora-ultimaUbicacionEnviada.tiempo,movimiento=distanciaMetros(ultimaUbicacionEnviada.latitud,ultimaUbicacionEnviada.longitud,validacion.lat,validacion.lng);if(tiempo<config.INTERVALO_GPS_MILISEGUNDOS&&movimiento<Number(config.DISTANCIA_MINIMA_ENVIO_GPS_METROS||6))return;}
     const fallback=`${validacion.lat.toFixed(6)}, ${validacion.lng.toFixed(6)}`;
     const cachedAddress=lastAddressLookup.address&&distanciaMetros(validacion.lat,validacion.lng,lastAddressLookup.latitude,lastAddressLookup.longitude)<50?lastAddressLookup.address:fallback;
-    const resultadoGps=await api.request('saveLocation',{data:{LATITUD:validacion.lat,LONGITUD:validacion.lng,PRECISION_METROS:validacion.precision,VELOCIDAD_KMH:c.speed==null?0:c.speed*3.6,RUMBO:c.heading||0,DIRECCION:cachedAddress,BATERIA_PORCENTAJE:batteryLevel,DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,PAGINA_VISIBLE:document.hidden?'NO':'SI',TIPO_RED:connectionType(),PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,FECHA_HORA:new Date(validacion.fecha).toISOString(),TIEMPO_CAPTURA_MS:validacion.fecha,EDAD_SEGUNDOS:validacion.edad,PROVEEDOR:'BROWSER_HIGH_ACCURACY',ES_SIMULADA:'NO',FUENTE:source,RUTA_ID:routeTrackingContext?.RUTA_ID||'',OPERACION_ID:routeTrackingContext?.OPERACION_ID||'',VEHICULO_ID:routeTrackingContext?.VEHICULO_ID||'',CONDUCTOR_ID:routeTrackingContext?.CONDUCTOR_ID||'',CONTEXTO_RUTA_EXPLICITO:'SI'}});
+    const contextoRuta=contextoSeguimientoRutaValido()?routeTrackingContext:null;
+    const resultadoGps=await api.request('saveLocation',{data:{LATITUD:validacion.lat,LONGITUD:validacion.lng,PRECISION_METROS:validacion.precision,VELOCIDAD_KMH:c.speed==null?0:c.speed*3.6,RUMBO:c.heading||0,DIRECCION:cachedAddress,BATERIA_PORCENTAJE:batteryLevel,DISPOSITIVO_ID:deviceId,SESION_CLIENTE_ID:clientSessionId,SECCION_ACTUAL:currentSection,PAGINA_VISIBLE:document.hidden?'NO':'SI',TIPO_RED:connectionType(),PLATAFORMA:navigator.platform||'',NAVEGADOR:navigator.userAgent,FECHA_HORA:new Date(validacion.fecha).toISOString(),TIEMPO_CAPTURA_MS:validacion.fecha,EDAD_SEGUNDOS:validacion.edad,PROVEEDOR:'BROWSER_HIGH_ACCURACY',ES_SIMULADA:'NO',FUENTE:source,RUTA_ID:contextoRuta?.RUTA_ID||'',OPERACION_ID:contextoRuta?.OPERACION_ID||'',VEHICULO_ID:contextoRuta?.VEHICULO_ID||'',CONDUCTOR_ID:contextoRuta?.CONDUCTOR_ID||'',CONTEXTO_RUTA_EXPLICITO:contextoRuta?'SI':'NO'}});
+    if(resultadoGps?.contextoRutaDepurado)guardarContextoSeguimientoRuta(null);
     if(resultadoGps?.aceptada===false)throw new Error(resultadoGps?.motivo||'UBICACION_GPS_RECHAZADA');
     ultimaPosicionConfiableNavegador={...validacion};
     guardarUltimaUbicacionDispositivo({latitud:validacion.lat,longitud:validacion.lng,precision:validacion.precision,fecha:validacion.fecha,fuente:source||'GPS del dispositivo',confiable:true});
@@ -4553,7 +4536,7 @@
   window.addEventListener('flotas:qr-nativo-error',event=>{liberarSolicitudQrNativo();const mensaje=String(event?.detail?.mensaje||'No se pudo leer el código QR.');toast('Lector QR nativo',mensaje,'error');});
 
   function logout(){const cierre=api.request('logout',{data:{SESION_CLIENTE_ID:clientSessionId}}).catch(()=>{});forceLogout();return cierre;}
-  function forceLogout(){cleanupSection();stopRealtimeServices();stopCamera();stopTracking({remember:false,silent:true});ultimaPosicionConocida=null;ultimaPosicionConfiableNavegador=null;ultimaUbicacionEnviada=null;gpsPendingPosition=null;currentUser=null;appInicializada=false;connectionTrackedUserId='';connectionTrackedPositionKey='';connectionTrackingServerLoaded=false;connectionTrackingSavePending=false;connectionTrackedVisibility=null;notificationSnapshotReady=false;knownNotificationIds=new Set();knownAlertIds=new Set();notificationCenterState={notifications:[],alerts:[]};precargaIniciada=false;modulosSincronizadosSesion.clear();actualizacionesModuloPendientes.clear();cacheVistasModulo.clear();invalidarListasFormulario();api.setAuth({});postParent({tipo:'flotas:sesion-cerrada'});$('#appShell').classList.add('hidden');if(embeddedMode)return;$('#authScreen').classList.remove('hidden');checkSystem();}
+  function forceLogout(){cleanupSection();stopRealtimeServices();stopCamera();guardarContextoSeguimientoRuta(null);stopTracking({remember:false,silent:true});ultimaPosicionConocida=null;ultimaPosicionConfiableNavegador=null;ultimaUbicacionEnviada=null;gpsPendingPosition=null;currentUser=null;appInicializada=false;connectionTrackedUserId='';connectionTrackedPositionKey='';connectionTrackingServerLoaded=false;connectionTrackingSavePending=false;connectionTrackedVisibility=null;notificationSnapshotReady=false;knownNotificationIds=new Set();knownAlertIds=new Set();notificationCenterState={notifications:[],alerts:[]};precargaIniciada=false;modulosSincronizadosSesion.clear();actualizacionesModuloPendientes.clear();cacheVistasModulo.clear();invalidarListasFormulario();api.setAuth({});postParent({tipo:'flotas:sesion-cerrada'});$('#appShell').classList.add('hidden');if(embeddedMode)return;$('#authScreen').classList.remove('hidden');checkSystem();}
   function showProfile(){openInfoModal('Mi perfil',[['Nombre',currentUser.NOMBRE],['Correo',currentUser.CORREO],['Rol',currentUser.ROL_NOMBRE],['Estado',currentUser.ESTADO],['Último acceso',fmtDate(currentUser.ULTIMO_ACCESO,true)]]);}
   function openInfoModal(title,items){$('#modalEyebrow').textContent='INFORMACIÓN';$('#modalTitle').textContent=title;$('#modalBody').innerHTML=`<div class="info-grid">${items.map(([a,b])=>`<div class="info-item"><span>${a}</span><b>${esc(b||'—')}</b></div>`).join('')}</div>`;openModal();}
   function openPasswordModal(){$('#modalEyebrow').textContent='SEGURIDAD';$('#modalTitle').textContent='Cambiar contraseña';$('#modalBody').innerHTML=`<form class="form-grid" id="passwordForm"><label class="field full"><span>Contraseña actual</span><input name="contrasenaActual" type="password" required></label><label class="field full"><span>Nueva contraseña</span><input name="nuevaContrasena" type="password" required placeholder="Letras, números o símbolos"></label><p class="helper full">Puede elegir cualquier combinación. La contraseña distingue mayúsculas y minúsculas.</p><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Cambiar contraseña</button></div></form>`;openModal();$('[data-cancel-modal]').onclick=closeModal;$('#passwordForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form);await conCargaBoton(button,'Actualizando…',async()=>{try{await api.request('changePassword',Object.fromEntries(new FormData(form).entries()));invalidarListasFormulario('users');closeModal();toast('Contraseña actualizada');}catch(error){toast('No se pudo cambiar',translateError(error),'error');}});};}
@@ -4562,7 +4545,6 @@
     $('#setupForm').addEventListener('submit',handleSetup);$('#loginForm').addEventListener('submit',handleLogin);$('#showPassword').addEventListener('click',()=>{const input=$('#loginPassword');input.type=input.type==='password'?'text':'password';});
     $('#retryConnection').addEventListener('click',event=>conCargaBoton(event.currentTarget,'Conectando…',checkSystem));$('#recheckConnection').addEventListener('click',event=>conCargaBoton(event.currentTarget,'Conectando…',checkSystem));$('#useLocalMode').addEventListener('click',()=>{sessionStorage.setItem('flotas_forzar_local','1');location.reload();});
     $('#openSidebar').addEventListener('click',openSidebar);$('#closeSidebar').addEventListener('click',closeSidebar);$('#overlay').addEventListener('click',closeSidebar);$('#logoutButton').addEventListener('click',event=>conCargaBoton(event.currentTarget,'Cerrando…',logout));
-    $('#syncButton').addEventListener('click',event=>sincronizarSistema(event.currentTarget));$('#sidebarSyncButton').addEventListener('click',event=>sincronizarSistema(event.currentTarget));
     $('#notificationButton').addEventListener('click',()=>{if(currentUser&&(hasPermission('NOTIFICACIONES','LEER')||hasPermission('ALERTAS','LEER')))openNotificationCenter();});
     $('#themeButton').addEventListener('click',()=>setTheme(!document.body.classList.contains('dark')));$('#profileButton').addEventListener('click',()=>$('#profileMenu').classList.toggle('open'));
     $('#profileMenu').addEventListener('click',event=>{const action=event.target.dataset.profileAction;if(action==='profile')showProfile();if(action==='password')openPasswordModal();if(action==='logout')conCargaBoton(event.target,'Cerrando…',logout);$('#profileMenu').classList.remove('open');});

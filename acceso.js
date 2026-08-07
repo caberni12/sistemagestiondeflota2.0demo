@@ -66,11 +66,39 @@
   });
 
   loginForm.addEventListener('submit',async event=>{
-    event.preventDefault();ocultarMensaje();if(!loginForm.reportValidity())return;bloquear(loginButton,true,'Ingresando…','Ingresar al sistema');
+    event.preventDefault();ocultarMensaje();if(!loginForm.reportValidity())return;bloquear(loginButton,true,'Ingresando…','Ingresar');
     try{const datos=Object.fromEntries(new FormData(loginForm).entries());const ipPromise=api.getClientIp?.().catch(()=> '')||Promise.resolve('');const resultado=await api.request('login',datos);api.setAuth({token:resultado.token,sessionId:resultado.sessionId||'',user:resultado.user,expiresAt:resultado.expiresAt||''});ipPromise.then(IP_PUBLICA=>api.registerConnectionIp?.({IP_PUBLICA})).catch(()=>{});cambiarEstado('Acceso correcto','conectado');mostrarMensaje('Sesión iniciada. Abriendo el panel principal…','exito');entrar();}
     catch(error){mostrarMensaje(textoError(error));cambiarEstado('Acceso no autorizado','error');$('#contrasenaAcceso').select();}
-    finally{bloquear(loginButton,false,'Ingresando…','Ingresar al sistema');}
+    finally{bloquear(loginButton,false,'Ingresando…','Ingresar');}
   });
+  function ocultarTecladoMovil(){
+    const activo=document.activeElement;
+    if(activo&&/^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName))activo.blur();
+  }
+  function mantenerControlVisible(control){
+    if(!control)return;
+    setTimeout(()=>control.scrollIntoView({block:'center',behavior:'smooth'}),120);
+  }
+  document.addEventListener('pointerdown',event=>{
+    if(!event.target.closest('input,textarea,select,button'))ocultarTecladoMovil();
+  },{passive:true});
+  loginForm.querySelectorAll('input').forEach(input=>input.addEventListener('focus',()=>{
+    document.body.classList.add('teclado-movil-activo');
+    mantenerControlVisible(input.id==='contrasenaAcceso'?loginButton:input);
+  }));
+  loginForm.addEventListener('focusout',()=>setTimeout(()=>{
+    if(!loginForm.contains(document.activeElement))document.body.classList.remove('teclado-movil-activo');
+  },100));
+  if(window.visualViewport){
+    const ajustarVista=()=>{
+      const reducido=window.visualViewport.height<window.innerHeight*0.78;
+      document.body.classList.toggle('teclado-movil-activo',reducido);
+      document.documentElement.style.setProperty('--alto-visible-login',`${Math.round(window.visualViewport.height)}px`);
+    };
+    window.visualViewport.addEventListener('resize',ajustarVista);
+    window.visualViewport.addEventListener('scroll',ajustarVista);
+    ajustarVista();
+  }
   $('#mostrarContrasena').addEventListener('click',()=>{const input=$('#contrasenaAcceso');input.type=input.type==='password'?'text':'password';$('#mostrarContrasena').setAttribute('aria-label',input.type==='password'?'Mostrar contraseña':'Ocultar contraseña');});
   $('#reintentarConexion').addEventListener('click',()=>comprobar({redirigir:false}));
   const parametros=new URLSearchParams(location.search),avisoSesion=parametros.get('sesion');

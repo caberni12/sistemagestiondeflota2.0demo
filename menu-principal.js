@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.34';
+  const VERSION='4.2.39';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -20,7 +20,7 @@
       ['checkinHistory','▤','Historial de check-in','checkin-historial.html','CHECKIN'],
       ['maintenance','⚙','Mantenciones','mantenciones.html','MANTENCIONES'],
       ['fuel','⛽','Combustible','combustible.html','COMBUSTIBLE'],
-      ['documents','▤','Documentos','documentos.html','DOCUMENTOS'],
+      ['documents','▤','Documentos del conductor','documentos.html','DOCUMENTOS'],
       ['history','↻','Historial','historial.html','HISTORIAL'],
       ['alerts','!','Alertas','alertas.html','ALERTAS']
     ]],
@@ -73,8 +73,10 @@
     if(!usuario)return false;
     const permisos=Array.isArray(usuario.PERMISOS)?usuario.PERMISOS:[];
     const rol=String(usuario.ROL_ID||usuario.ROL_NOMBRE||'').trim().toUpperCase();
-    const gpsPropio=rol==='ROL-CONDUCTOR'&&modulo==='GPS';
-    return gpsPropio||rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);
+    const administrador=rol==='ROL-ADMIN'||rol==='ADMINISTRADOR';
+    if(administrador)return true;
+    if((modulo==='GPS'||modulo==='CONEXIONES')&&rol!=='ROL-SUPERVISOR')return false;
+    return permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);
   }
   function construirMenu(){
     let html='';
@@ -471,7 +473,6 @@
   $('#abrirMenu').addEventListener('click',abrirMenu);
   $('#cerrarMenu').addEventListener('click',cerrarMenu);
   $('#capaMenu').addEventListener('click',cerrarMenu);
-  $('#sincronizarModulo').addEventListener('click',()=>{cambiarEstado('Sincronizando');enviar({tipo:'flotas:sincronizar'});});
   $('#interruptorModoAutoOficina').addEventListener('change',cambiarModoOficinaVirtual);
   $('#interruptorAvisosEmergentes').addEventListener('change',cambiarAvisosEmergentes);
   $('#cerrarSesionMenu').addEventListener('click',cerrarSesion);
