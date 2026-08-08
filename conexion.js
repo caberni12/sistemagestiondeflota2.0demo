@@ -4,7 +4,7 @@
   const config = window.CONFIGURACION_FLOTAS;
   const accionesAplicacion = Object.freeze({
     health:'salud', status:'estadoSistema', bootstrap:'instalacionInicial', login:'iniciarSesion',
-    logout:'cerrarSesion', me:'miSesion', dashboard:'panelPrincipal', operationsSummary:'resumenOperaciones', list:'listar', get:'obtener',
+    logout:'cerrarSesion', me:'miSesion', dashboard:'panelPrincipal', operationsSummary:'resumenOperaciones', reportsKpiSummary:'resumenReportesKpi', reportsKpiDetail:'detalleReportesKpi', list:'listar', get:'obtener',
     quickLoad:'cargaRapida',
     create:'crear', update:'actualizar', delete:'eliminar', startOperation:'iniciarOperacion',
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
@@ -59,7 +59,7 @@
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
-  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','backupCatalog','backupTable']);
+  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','backupCatalog','backupTable']);
   const clientIpCacheKey = 'flotas_ip_publica_v1';
   const claveCachePersistente = config.CLAVE_CACHE_MODULOS_LOCAL || 'sistema_gestion_flotas_cache_modulos_v1';
   const accionesCachePersistente = new Set(['dashboard','operationsSummary','list','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint']);
@@ -759,7 +759,7 @@
   async function localRequest(action, payload) {
     await Promise.resolve();
     switch (action) {
-      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.42', now:iso() };
+      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.43', now:iso() };
       case 'status': return {
         connected:true, needsSetup:activeRows(localDb.users).length === 0, spreadsheetName:'Base local del navegador',
         rows:{ users:activeRows(localDb.users).length, vehicles:activeRows(localDb.vehicles).length,
@@ -803,6 +803,8 @@
       case 'me': seedCatalogs(); return { user:publicUser(requireLocalUser()) };
       case 'dashboard': return panelPrincipalLocal();
       case 'operationsSummary': return localOperationsSummary(payload);
+      case 'reportsKpiSummary': return localReportsKpiSummary(payload);
+      case 'reportsKpiDetail': return localReportsKpiDetail(payload);
       case 'fuelSummary': return localFuelSummary();
       case 'list': return localList(payload);
       case 'get': {
@@ -1169,6 +1171,37 @@
       PRECISION_GPS_MAXIMA_METROS:Number(company.PRECISION_GPS_MAXIMA_METROS||120)
     }:null;
     return{operations:selected,activeOperations:active,vehicles,drivers,routes,total:all.length,totalActive:active.length,historyShown:recent.length,historyLimit,pointConfigured,point,company,generatedAt:iso()};
+  }
+
+  function localReportsKpiContext(payload={}){
+    const user=requireLocalUser();requireLocalPermission(user,'REPORTES','LEER');
+    const data=payload.data||payload,desdeRaw=String(data.DESDE||data.FECHA_DESDE||'').trim(),hastaRaw=String(data.HASTA||data.FECHA_HASTA||'').trim();
+    const desde=desdeRaw?new Date(desdeRaw):null,hasta=hastaRaw?new Date(hastaRaw):null;
+    if((desde&&Number.isNaN(desde.getTime()))||(hasta&&Number.isNaN(hasta.getTime()))||(desde&&hasta&&desde>hasta))throw new Error('RANGO_FECHAS_INVALIDO');
+    const permisos=new Set(effectiveLocalPermissions(user)),puede=modulo=>user.ROL_ID==='ROL-ADMIN'||permisos.has(`${modulo}:LEER`);
+    const conductorId=String(data.CONDUCTOR_ID||'').trim(),vehiculoId=String(data.VEHICULO_ID||'').trim();
+    const fechaFila=(fila,campo)=>new Date(fila[campo]||fila.FECHA_HORA||fila.FECHA_INICIO||fila.FECHA_ASIGNACION||fila.FECHA_PROGRAMADA||fila.FECHA_VENCIMIENTO||fila.CREADO_EN||0);
+    const asociado=(fila,tipo)=>String(tipo==='conductor'?(fila.CONDUCTOR_ID||fila.CONDUCTOR_ASOCIADO_ID||(String(fila.ASOCIADO_TIPO||'').toUpperCase().includes('CONDUCTOR')?fila.ASOCIADO_ID:'')):(fila.VEHICULO_ID||fila.VEHICULO_ASOCIADO_ID||(String(fila.ASOCIADO_TIPO||'').toUpperCase().includes('VEHICULO')?fila.ASOCIADO_ID:''))||'');
+    const filtrar=(recurso,modulo,campo)=>puede(modulo)?localFilterRows(recurso,activeRows(localDb[recurso]||[]),user).filter(fila=>{const fecha=fechaFila(fila,campo);if(desde&&(!Number.isFinite(fecha.getTime())||fecha<desde))return false;if(hasta&&(!Number.isFinite(fecha.getTime())||fecha>hasta))return false;if(conductorId&&asociado(fila,'conductor')!==conductorId)return false;if(vehiculoId&&asociado(fila,'vehiculo')!==vehiculoId)return false;return true;}).map(cleanRow):[];
+    return{user,puede,desde,hasta,conductorId,vehiculoId,operations:filtrar('operations','OPERACIONES','FECHA_INICIO'),drivers:puede('CONDUCTORES')?localFilterRows('drivers',activeRows(localDb.drivers),user).map(cleanRow):[],vehicles:puede('VEHICULOS')?localFilterRows('vehicles',activeRows(localDb.vehicles),user).map(cleanRow):[],checkins:filtrar('checkins','CHECKIN','FECHA_HORA'),routes:filtrar('routes','RUTAS','FECHA_ASIGNACION'),fuel:filtrar('fuel','COMBUSTIBLE','FECHA_HORA'),maintenance:filtrar('maintenance','MANTENCIONES','FECHA_PROGRAMADA'),documents:filtrar('documents','DOCUMENTOS','FECHA_VENCIMIENTO'),alerts:filtrar('alerts','ALERTAS','FECHA_HORA')};
+  }
+  function localReportsDistance(row){const directa=Math.max(0,Number(row.DISTANCIA_KM||0));return directa>0?directa:Math.max(0,Number(row.KM_FIN||0)-Number(row.KM_INICIO||0));}
+  function localReportsNormalized(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
+  function localReportsKpiSummary(payload={}){
+    const c=localReportsKpiContext(payload),operations=c.operations.slice().sort((a,b)=>new Date(b.FECHA_INICIO||b.CREADO_EN||0)-new Date(a.FECHA_INICIO||a.CREADO_EN||0));
+    const completed=operations.filter(row=>/finaliz|complet|cerrad/.test(localReportsNormalized(row.ESTADO))),active=operations.filter(row=>/activ|curso|iniciad|en ruta/.test(localReportsNormalized(row.ESTADO)));
+    const km=operations.reduce((sum,row)=>sum+localReportsDistance(row),0),durations=completed.map(row=>{const start=new Date(row.FECHA_INICIO||0),end=new Date(row.FECHA_FIN||0);return Number.isFinite(start.getTime())&&Number.isFinite(end.getTime())&&end>=start?(end-start)/3600000:0;}).filter(Boolean);
+    const liters=c.fuel.reduce((sum,row)=>sum+Math.max(0,Number(row.LITROS||0)),0),fuelCost=c.fuel.reduce((sum,row)=>sum+Math.max(0,Number(row.COSTO_TOTAL||0)||Number(row.LITROS||0)*Number(row.PRECIO_LITRO||0)),0),stateMap=new Map(),monthMap=new Map();
+    operations.forEach(row=>{const state=String(row.ESTADO||'Sin estado').trim()||'Sin estado';stateMap.set(state,(stateMap.get(state)||0)+1);const date=new Date(row.FECHA_INICIO||row.CREADO_EN||0);if(Number.isFinite(date.getTime())){const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;monthMap.set(key,(monthMap.get(key)||0)+1);}});
+    const ranking=key=>{const map=new Map();operations.forEach(row=>{const id=String(row[key]||'SIN-ASIGNAR'),item=map.get(id)||{ID:id,TOTAL:0,KM:0};item.TOTAL++;item.KM+=localReportsDistance(row);map.set(id,item);});return[...map.values()].sort((a,b)=>b.TOTAL-a.TOTAL||b.KM-a.KM).slice(0,6);};
+    const driverMap=Object.fromEntries(c.drivers.map(row=>[String(row.ID),row.NOMBRE||row.ID])),vehicleMap=Object.fromEntries(c.vehicles.map(row=>[String(row.ID),row.PATENTE||row.ID]));
+    const resumen={METRICAS:{OPERACIONES_TOTAL:operations.length,OPERACIONES_ACTIVAS:active.length,OPERACIONES_FINALIZADAS:completed.length,KILOMETROS:km,DURACION_PROMEDIO_HORAS:durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:0,CIERRES_EXCEPCIONALES:completed.filter(row=>String(row.CIERRE_FUERA_BASE||'').toUpperCase()==='SI').length,RIESGOS_GPS:completed.filter(row=>localReportsNormalized(row.VALIDACION_FIN).includes('precision_baja')||localReportsNormalized(row.VALIDACION_FIN).includes('precision baja')).length,RUTAS_TOTAL:c.routes.length,RUTAS_COMPLETADAS:c.routes.filter(row=>/complet|finaliz|cerrad/.test(localReportsNormalized(row.ESTADO))).length,CHECKINS_TOTAL:c.checkins.length,CHECKINS_APROBADOS:c.checkins.filter(row=>localReportsNormalized(row.ESTADO_REVISION)==='aprobado').length,CHECKINS_BLOQUEADOS:c.checkins.filter(row=>/bloquead|rechazad/.test(localReportsNormalized(row.ESTADO_REVISION))).length,COMBUSTIBLE_TOTAL:c.fuel.length,COMBUSTIBLE_LITROS:liters,COMBUSTIBLE_COSTO:fuelCost,MANTENCIONES_TOTAL:c.maintenance.length,MANTENCIONES_ABIERTAS:c.maintenance.filter(row=>!/realiz|complet|cerrad|cancelad/.test(localReportsNormalized(row.ESTADO))).length,DOCUMENTOS_TOTAL:c.documents.length,DOCUMENTOS_VENCIDOS:c.documents.filter(row=>localReportsNormalized(row.ESTADO)==='vencido'||new Date(row.FECHA_VENCIMIENTO||0).getTime()<Date.now()).length,ALERTAS_TOTAL:c.alerts.length,ALERTAS_PENDIENTES:c.alerts.filter(row=>localReportsNormalized(row.LEIDA)!=='si'&&localReportsNormalized(row.CERRADA)!=='si').length},ESTADOS_OPERACIONES:[...stateMap].map(([ESTADO,TOTAL])=>({ESTADO,TOTAL})).sort((a,b)=>b.TOTAL-a.TOTAL),TENDENCIA_OPERACIONES:[...monthMap].sort(([a],[b])=>a.localeCompare(b)).slice(-12).map(([FECHA,TOTAL])=>({FECHA,ETIQUETA:`${FECHA.slice(5)}/${FECHA.slice(2,4)}`,TOTAL})),RANKING_CONDUCTORES:ranking('CONDUCTOR_ID').map(row=>({...row,NOMBRE:driverMap[row.ID]||row.ID})),RANKING_VEHICULOS:ranking('VEHICULO_ID').map(row=>({...row,NOMBRE:vehicleMap[row.ID]||row.ID})),DETALLE_OPERACIONES:operations.slice(0,150),CATALOGO_CONDUCTORES:c.drivers,CATALOGO_VEHICULOS:c.vehicles,GENERADO_EN:iso()};
+    return{resumen,origen:'AGREGACION_LOCAL',serverTime:iso(),filasTransferidas:resumen.DETALLE_OPERACIONES.length+c.drivers.length+c.vehicles.length};
+  }
+  function localReportsKpiDetail(payload={}){
+    const c=localReportsKpiContext(payload),data=payload.data||payload,format=String(data.FORMATO||'CSV').toUpperCase(),action=format==='XLSX'?'EXPORTAR_XLSX':format==='PDF'?'EXPORTAR_PDF':'EXPORTAR_CSV';requireLocalPermission(c.user,'REPORTES',action);
+    const offset=Math.max(0,Number(data.DESDE_REGISTRO||0)||0),limit=Math.min(2000,Math.max(1,Number(data.LIMITE||1000)||1000)),all=c.operations.slice().sort((a,b)=>new Date(b.FECHA_INICIO||b.CREADO_EN||0)-new Date(a.FECHA_INICIO||a.CREADO_EN||0)),rows=all.slice(offset,offset+limit);
+    return{rows,total:all.length,desde:offset,limite:limit,hasMore:offset+rows.length<all.length,orden:'MAS_RECIENTES_PRIMERO'};
   }
 
   function localFuelSummary(){const user=requireLocalUser();requireLocalPermission(user,'COMBUSTIBLE','LEER');const rows=localFilterRows('fuel',activeRows(localDb.fuel),user),monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1),month=rows.filter(row=>new Date(row.FECHA_HORA||row.CREADO_EN)>=monthStart),sum=(list,field)=>list.reduce((total,row)=>total+Number(row[field]||0),0),distanceRows=rows.filter(row=>Number(row.DISTANCIA_DESDE_ULTIMA_CARGA_KM||0)>0&&Number(row.LITROS||0)>0),distance=sum(distanceRows,'DISTANCIA_DESDE_ULTIMA_CARGA_KM'),litersForConsumption=sum(distanceRows,'LITROS'),byVehicle={};rows.forEach(row=>{const key=row.VEHICULO_ID||'SIN-VEHICULO',item=byVehicle[key]||(byVehicle[key]={VEHICULO_ID:key,CARGAS:0,LITROS:0,COSTO_TOTAL:0,DISTANCIA_KM:0});item.CARGAS++;item.LITROS+=Number(row.LITROS||0);item.COSTO_TOTAL+=Number(row.COSTO_TOTAL||0);item.DISTANCIA_KM+=Number(row.DISTANCIA_DESDE_ULTIMA_CARGA_KM||0);});return{totalCargas:rows.length,totalLitros:localFuelRound(sum(rows,'LITROS'),2),gastoTotal:localFuelRound(sum(rows,'COSTO_TOTAL'),2),precioPromedioLitro:rows.length?localFuelRound(sum(rows,'COSTO_TOTAL')/Math.max(sum(rows,'LITROS'),.001),2):0,consumoPromedioKmL:distance&&litersForConsumption?localFuelRound(distance/litersForConsumption,2):0,consumoPromedioL100Km:distance&&litersForConsumption?localFuelRound(litersForConsumption/distance*100,2):0,mesActual:{cargas:month.length,litros:localFuelRound(sum(month,'LITROS'),2),gasto:localFuelRound(sum(month,'COSTO_TOTAL'),2)},porVehiculo:Object.values(byVehicle).sort((a,b)=>b.COSTO_TOTAL-a.COSTO_TOTAL)};}
@@ -1701,7 +1734,7 @@
       alerts:{nombre:'Alertas',estado:'OK',detalle:`${activeRows(localDb.alerts).length} registros`},
       history:{nombre:'Historiales',estado:'OK',detalle:`${activeRows(localDb.history).length} eventos operativos · ${activeRows(localDb.checkins).length} check-ins`}
     };
-    return{version:'4.2.42',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
+    return{version:'4.2.43',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
   }
   function localRepairSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','ACTUALIZAR');
@@ -1764,7 +1797,7 @@
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.42',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'Oficina Virtual',version:'4.2.43',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
