@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.39';
+  const VERSION='4.2.40';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -49,6 +49,8 @@
   let avisosInicializados=false;
   let idsNotificacionesConocidas=new Set();
   let idsAlertasConocidas=new Set();
+  let idsAsignacionesMostradas=new Set();
+  let alertaAsignacionVisible=null;
   let estadoAvisos={notifications:[],alerts:[]};
   let cargandoModoOficina=false;
   let consultaAvisosPendiente=null;
@@ -169,21 +171,23 @@
     programarRevisionAutomaticaOficina(1800);
   }
   function esAdministradorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR';}
+  function esSupervisorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-SUPERVISOR'||rol==='SUPERVISOR';}
+  function puedeConfigurarAvisosMenu(){return esAdministradorMenu()||esSupervisorMenu();}
   function claveAvisosEmergentesMenu(){return `flotas_avisos_emergentes_admin_v1_${String(usuario?.ID||usuario?.USUARIO_ID||'sin_usuario')}`;}
   function avisosEmergentesActivosMenu(){
-    if(!esAdministradorMenu())return true;
+    if(!puedeConfigurarAvisosMenu())return true;
     try{return localStorage.getItem(claveAvisosEmergentesMenu())!=='NO';}
     catch(_){return true;}
   }
   function actualizarInterruptorAvisosEmergentes(){
     const contenedor=$('#avisosEmergentesMenu'),input=$('#interruptorAvisosEmergentes');
     if(!contenedor||!input||!usuario)return;
-    contenedor.hidden=!esAdministradorMenu();
+    contenedor.hidden=!puedeConfigurarAvisosMenu();
     if(!contenedor.hidden)input.checked=avisosEmergentesActivosMenu();
   }
   function cambiarAvisosEmergentes(){
     const input=$('#interruptorAvisosEmergentes');
-    if(!input||!esAdministradorMenu())return;
+    if(!input||!puedeConfigurarAvisosMenu())return;
     const activo=input.checked;
     try{localStorage.setItem(claveAvisosEmergentesMenu(),activo?'SI':'NO');}
     catch(_){input.checked=!activo;cambiarEstado('No se pudo guardar la preferencia','advertencia');return;}
@@ -231,6 +235,37 @@
   function puedeAvisos(modulo){if(!usuario)return false;const permisos=Array.isArray(usuario.PERMISOS)?usuario.PERMISOS:[];const rol=String(usuario.ROL_ID||usuario.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);}
   function fechaOrdenAviso(item){return new Date(item.FECHA_ENVIO||item.FECHA_HORA||item.CREADO_EN||0).getTime();}
   function mostrarToastAviso(item,tipo){if(!avisosEmergentesActivosMenu())return;const contenedor=$('#toastAvisosMenu'),nodo=document.createElement('article');nodo.className=`toast-aviso-menu ${tipo}`;nodo.innerHTML=`<i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(tipo==='alerta'?'Nueva alerta':'Nueva notificación')}</b><small>${escapar(item.TITULO||item.MENSAJE||'Existe un nuevo aviso pendiente.')}</small></div><button type="button" aria-label="Cerrar">×</button>`;contenedor.append(nodo);nodo.querySelector('button').addEventListener('click',()=>nodo.remove());setTimeout(()=>nodo.remove(),5200);}
+  function esAlertaAsignacion(item){return ['RUTA_ASIGNADA','OPERACION_ASIGNADA'].includes(String(item?.CATEGORIA_EMERGENTE||'').toUpperCase())&&String(item?.ESTADO_RESPUESTA||'PENDIENTE').toUpperCase()==='PENDIENTE';}
+  function anunciarAsignacionVoz(item){
+    if(!('speechSynthesis'in window)||!avisosEmergentesActivosMenu())return;
+    const clase=String(item.CATEGORIA_EMERGENTE||'').startsWith('OPERACION')?'operación':'ruta';
+    const texto=`Nueva ${clase} asignada para ${item.DESTINATARIO_NOMBRE||'el conductor'}. ${item.NOMBRE_ASIGNACION||''}. Desde ${item.ORIGEN||'origen no informado'} hasta ${item.DESTINO||'destino no informado'}.`;
+    try{window.speechSynthesis.cancel();const voz=new SpeechSynthesisUtterance(texto);voz.lang='es-CL';voz.rate=1;window.speechSynthesis.speak(voz);}catch(_){ }
+  }
+  async function responderAlertaAsignacionMenu(item,respuesta,boton){
+    if(!item?.ID)return;
+    if(boton)boton.disabled=true;
+    try{
+      await api.request('respondAssignmentAlert',{id:item.ID,data:{NOTIFICACION_ID:item.ID,RESPUESTA:respuesta}});
+      alertaAsignacionVisible?.remove();alertaAsignacionVisible=null;
+      estadoAvisos.notifications=(estadoAvisos.notifications||[]).filter(row=>String(row.ID)!==String(item.ID));
+      await actualizarAvisos();
+      cambiarEstado(respuesta==='ACEPTADA'?'Asignación aceptada':'Aviso cerrado','listo');
+    }catch(_){if(boton)boton.disabled=false;cambiarEstado('No se pudo confirmar la asignación','advertencia');}
+  }
+  function mostrarAlertaAsignacionMenu(item){
+    if(!avisosEmergentesActivosMenu()||!item?.ID)return;
+    alertaAsignacionVisible?.remove();
+    const clase=String(item.CATEGORIA_EMERGENTE||'').startsWith('OPERACION')?'operación':'ruta';
+    const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',`Nueva ${clase} asignada`);
+    const distancia=item.DISTANCIA_KM==null||item.DISTANCIA_KM===''?'Distancia por calcular':`${escapar(item.DISTANCIA_KM)} km estimados`;
+    const minutos=item.DURACION_MINUTOS==null||item.DURACION_MINUTOS===''?'Tiempo por calcular':`${escapar(item.DURACION_MINUTOS)} min estimados`;
+    nodo.innerHTML=`<header><i>${clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>Nueva ${clase} asignada</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ Aceptar</button></footer>`;
+    document.body.append(nodo);alertaAsignacionVisible=nodo;
+    nodo.querySelectorAll('[data-respuesta]').forEach(boton=>boton.addEventListener('click',()=>responderAlertaAsignacionMenu(item,boton.dataset.respuesta,boton)));
+    anunciarAsignacionVoz(item);
+    setTimeout(()=>{if(alertaAsignacionVisible===nodo){nodo.remove();alertaAsignacionVisible=null;}},3800);
+  }
   function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small></div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',()=>{cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
   async function actualizarAvisos(){
@@ -245,13 +280,17 @@
       const alerts=(lote.alerts?.rows||[]).filter(item=>item.LEIDA!=='SI');
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
       const nuevasAlertas=alerts.filter(item=>!idsAlertasConocidas.has(String(item.ID)));
+      const nuevasAsignaciones=notifications.filter(esAlertaAsignacion).filter(item=>!idsAsignacionesMostradas.has(String(item.ID)));
       if(avisosInicializados){
-        [...nuevasAlertas.map(item=>({item,tipo:'alerta'})),...nuevasNotificaciones.map(item=>({item,tipo:'notificacion'}))]
+        [...nuevasAlertas.map(item=>({item,tipo:'alerta'})),...nuevasNotificaciones.filter(item=>!esAlertaAsignacion(item)).map(item=>({item,tipo:'notificacion'}))]
           .sort((a,b)=>fechaOrdenAviso(a.item)-fechaOrdenAviso(b.item)).slice(-3)
           .forEach(({item,tipo})=>mostrarToastAviso(item,tipo));
       }
+      const asignacionesAMostrar=avisosInicializados?nuevasAsignaciones.slice(-3):nuevasAsignaciones.slice(-1);
+      asignacionesAMostrar.sort((a,b)=>fechaOrdenAviso(a)-fechaOrdenAviso(b)).forEach((item,indice)=>setTimeout(()=>mostrarAlertaAsignacionMenu(item),indice*4100));
       idsNotificacionesConocidas=new Set(notifications.map(item=>String(item.ID)));
       idsAlertasConocidas=new Set(alerts.map(item=>String(item.ID)));
+      idsAsignacionesMostradas=new Set([...idsAsignacionesMostradas,...notifications.filter(esAlertaAsignacion).map(item=>String(item.ID))]);
       estadoAvisos={notifications,alerts};
       avisosInicializados=true;
       const firma=`N:${firmaColeccionAvisos(notifications)}|A:${firmaColeccionAvisos(alerts)}`;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validación local de estructura, estilos y referencias de la Web 4.2.39."""
+"""Validación local de estructura, estilos y referencias de la Web 4.2.40."""
 from __future__ import annotations
 
 from collections import Counter
@@ -10,7 +10,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent
-CACHE_TAG = "4.2.39-ui3"
+CACHE_TAG = "4.2.40-ui3"
 MODERN_CSS = f"interfaz-moderna.css?v={CACHE_TAG}"
 
 
@@ -117,7 +117,7 @@ def main() -> int:
         if "?v=4.2.36" in text:
             errors.append(f"{script.name}: conserva la etiqueta de caché antigua 4.2.36")
 
-    print("VALIDACIÓN WEB 4.2.39")
+    print("VALIDACIÓN WEB 4.2.40")
     print(f"HTML revisados: {len(html_files)}")
     print(f"CSS revisados: {len(css_files)}")
     print(f"JavaScript inventariados: {len(js_files)}")

@@ -151,7 +151,7 @@
       const nuevos = [...unicos.values()];
       const firma = JSON.stringify(nuevos.map(item => [
         item.id || '', Number(item.latitud), Number(item.longitud), item.nombre || '', item.direccion || '',
-        Boolean(item.activo), Boolean(item.seguido), item.detalle || ''
+        Boolean(item.activo), Boolean(item.seguido), item.detalle || '', item.acciones || ''
       ]));
       const sinCambios = firma === this.firmaMarcadores;
       this.firmaMarcadores = firma;
@@ -354,8 +354,9 @@
         const punto = latitudLongitudAMundo(item.latitud, item.longitud, this.nivel);
         let boton = this.nodosMarcadores.get(clave);
         if (!boton) {
-          boton = document.createElement('button');
-          boton.type = 'button';
+          boton = document.createElement('div');
+          boton.tabIndex = 0;
+          boton.setAttribute('role','button');
           boton.dataset.marcadorId = clave;
           const icono = document.createElement('i');
           icono.textContent = '⌖';
@@ -369,14 +370,21 @@
           boton.append(icono, etiqueta, detalle);
           boton.addEventListener('click', evento => {
             evento.stopPropagation();
+            if (evento.target.closest('[data-map-close]')) { boton.classList.remove('abierto'); return; }
+            if (evento.target.closest('button,a,input,label')) return;
             this.capaMarcadores.querySelectorAll('.mapa-marcador.abierto').forEach(nodo => { if (nodo !== boton) nodo.classList.remove('abierto'); });
             boton.classList.toggle('abierto');
+          });
+          boton.addEventListener('keydown', evento => {
+            if ((evento.key === 'Enter' || evento.key === ' ') && evento.target === boton) {
+              evento.preventDefault(); boton.click();
+            }
           });
           this.nodosMarcadores.set(clave, boton);
           this.capaMarcadores.appendChild(boton);
         }
         boton.style.transform = `translate3d(${punto.x - izquierda}px, ${punto.y - arriba}px, 0) translate(-50%, -50%)`;
-        const firmaContenido = `${item.activo ? '1' : '0'}|${item.seguido ? '1' : '0'}|${item.nombre || ''}|${item.direccion || ''}|${item.detalle || ''}`;
+        const firmaContenido = `${item.activo ? '1' : '0'}|${item.seguido ? '1' : '0'}|${item.nombre || ''}|${item.direccion || ''}|${item.detalle || ''}|${item.acciones || ''}`;
         if (boton.dataset.firmaContenido !== firmaContenido) {
           const abierto = boton.classList.contains('abierto');
           boton.className = `mapa-marcador ${item.activo ? 'activo' : 'antiguo'} ${item.seguido ? 'seguido' : ''} ${abierto ? 'abierto' : ''}`.trim();
@@ -388,7 +396,7 @@
           if(etiqueta&&!titulo){titulo=document.createElement('strong');subtitulo=document.createElement('small');subtitulo.className='mapa-etiqueta-direccion';etiqueta.replaceChildren(titulo,subtitulo);}
           if(titulo)titulo.textContent=item.nombre||'Conductor';
           if(subtitulo){subtitulo.textContent=direccion;subtitulo.hidden=!direccion;}
-          boton.querySelector(':scope > .mapa-detalle').innerHTML = item.detalle || '';
+          boton.querySelector(':scope > .mapa-detalle').innerHTML = `<div class="mapa-detalle-contenido">${item.detalle || ''}</div><div class="mapa-detalle-acciones">${item.acciones || ''}<button type="button" class="btn danger small" data-map-close aria-label="Cerrar detalle">× Cerrar</button></div>`;
           boton.dataset.firmaContenido = firmaContenido;
         }
       });

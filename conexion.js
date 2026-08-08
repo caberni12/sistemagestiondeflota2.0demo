@@ -10,7 +10,7 @@
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
     changePassword:'cambiarContrasena', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
     assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', sendNotification:'enviarNotificacion',
-    readNotification:'marcarNotificacionLeida', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
+    readNotification:'marcarNotificacionLeida', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
     officeQuickStatus:'estadoRapidoOficinaVirtual', officeTasks:'pendientesOficinaVirtual',
@@ -59,7 +59,7 @@
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
-  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','list','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','backupCatalog','backupTable']);
+  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','backupCatalog','backupTable']);
   const clientIpCacheKey = 'flotas_ip_publica_v1';
   const claveCachePersistente = config.CLAVE_CACHE_MODULOS_LOCAL || 'sistema_gestion_flotas_cache_modulos_v1';
   const accionesCachePersistente = new Set(['dashboard','operationsSummary','list','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint']);
@@ -392,6 +392,7 @@
         recurso: descriptor.payload.resource ? (recursosAplicacion[descriptor.payload.resource] || descriptor.payload.resource) : undefined,
         filtros: descriptor.payload.filters,
         limite: descriptor.payload.limit,
+        desde: descriptor.payload.offset,
         marcaTiempo: descriptor.payload.marcaTiempo,
       }));
       let values;
@@ -758,7 +759,7 @@
   async function localRequest(action, payload) {
     await Promise.resolve();
     switch (action) {
-      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.39', now:iso() };
+      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.40', now:iso() };
       case 'status': return {
         connected:true, needsSetup:activeRows(localDb.users).length === 0, spreadsheetName:'Base local del navegador',
         rows:{ users:activeRows(localDb.users).length, vehicles:activeRows(localDb.vehicles).length,
@@ -1023,7 +1024,10 @@
     if(key==='companies')rows=rows.slice().sort((a,b)=>{const activeA=String(a.ESTADO||'Activo')==='Activo'?1:0,activeB=String(b.ESTADO||'Activo')==='Activo'?1:0;if(activeA!==activeB)return activeB-activeA;return new Date(b.ACTUALIZADO_EN||b.CREADO_EN||0)-new Date(a.ACTUALIZADO_EN||a.CREADO_EN||0);});
     const filters = payload.filters || {};
     rows = rows.filter(row => Object.entries(filters).every(([k,v]) => !v || String(row[k] || '').toLowerCase() === String(v).toLowerCase()));
-    return { rows, total:rows.length };
+    const camposFecha=['FECHA_HORA','FECHA_ENVIO','FECHA_INICIO','ULTIMA_CONEXION','ACTUALIZADO_EN','CREADO_EN'];
+    rows=rows.slice().sort((a,b)=>{const campo=camposFecha.find(nombre=>a[nombre]||b[nombre]);return campo?(new Date(b[campo]||0)-new Date(a[campo]||0)):0;});
+    const limite=Math.max(1,Number(payload.limit||payload.limite||150)),desde=Math.max(0,Number(payload.offset||payload.desde||0)),pagina=rows.slice(desde,desde+limite);
+    return { rows:pagina, total:pagina.length, desde, limite, hasMore:desde+pagina.length<rows.length, orden:'MAS_RECIENTES_PRIMERO' };
   }
   function localNormalizeDocument(data,user,existing={}){
     const input={...(data||{})},driver=localDriver(user),admin=user.ROL_ID==='ROL-ADMIN';
@@ -1690,7 +1694,7 @@
       alerts:{nombre:'Alertas',estado:'OK',detalle:`${activeRows(localDb.alerts).length} registros`},
       history:{nombre:'Historiales',estado:'OK',detalle:`${activeRows(localDb.history).length} eventos operativos · ${activeRows(localDb.checkins).length} check-ins`}
     };
-    return{version:'4.2.39',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
+    return{version:'4.2.40',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
   }
   function localRepairSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','ACTUALIZAR');
@@ -1753,7 +1757,7 @@
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.39',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'Oficina Virtual',version:'4.2.40',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
