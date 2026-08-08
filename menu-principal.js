@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.41';
+  const VERSION='4.2.42';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -168,10 +168,12 @@
     construirMenu();
     programarInterruptorOficinaVirtual();
     actualizarInterruptorAvisosEmergentes();
+    actualizarInterruptorVozAsignaciones();
     programarRevisionAutomaticaOficina(1800);
   }
   function esAdministradorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR';}
   function esSupervisorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-SUPERVISOR'||rol==='SUPERVISOR';}
+  function puedeAceptarAsignacionesAjenasMenu(){const permisos=Array.isArray(usuario?.PERMISOS)?usuario.PERMISOS:[];return esAdministradorMenu()||(esSupervisorMenu()&&(permisos.includes('*:*')||(permisos.includes('NOTIFICACIONES:ACEPTAR_ASIGNACIONES_AJENAS')&&permisos.includes('NOTIFICACIONES:MARCAR_LEIDA'))));}
   function puedeConfigurarAvisosMenu(){return esAdministradorMenu()||esSupervisorMenu();}
   function claveAvisosEmergentesMenu(){return `flotas_avisos_emergentes_admin_v1_${String(usuario?.ID||usuario?.USUARIO_ID||'sin_usuario')}`;}
   function avisosEmergentesActivosMenu(){
@@ -194,6 +196,17 @@
     if(!activo)document.querySelectorAll('.toast-aviso-menu').forEach(nodo=>nodo.remove());
     cambiarEstado(activo?'Avisos emergentes activados':'Avisos emergentes silenciados · pendientes en el icono','listo');
     window.dispatchEvent(new CustomEvent('flotas:avisos-emergentes',{detail:{activo}}));
+  }
+  function claveVozAsignacionesMenu(){return `flotas_voz_asignaciones_v1_${String(usuario?.ID||usuario?.USUARIO_ID||'sin_usuario')}`;}
+  function vozAsignacionesActivaMenu(){try{return localStorage.getItem(claveVozAsignacionesMenu())!=='NO';}catch(_){return true;}}
+  function actualizarInterruptorVozAsignaciones(){const input=$('#interruptorVozAsignaciones');if(input&&usuario)input.checked=vozAsignacionesActivaMenu();}
+  function cambiarVozAsignaciones(){
+    const input=$('#interruptorVozAsignaciones');if(!input||!usuario)return;
+    const activa=input.checked;
+    try{localStorage.setItem(claveVozAsignacionesMenu(),activa?'SI':'NO');}
+    catch(_){input.checked=!activa;cambiarEstado('No se pudo guardar la preferencia de voz','advertencia');return;}
+    if(!activa&&'speechSynthesis'in window)try{window.speechSynthesis.cancel();}catch(_){ }
+    cambiarEstado(activa?'Voz de asignaciones activada':'Voz silenciada · las alertas visuales siguen activas','listo');
   }
   function programarInterruptorOficinaVirtual(){
     const contenedor=$('#modoAutoOficinaMenu'),input=$('#interruptorModoAutoOficina');
@@ -237,7 +250,7 @@
   function mostrarToastAviso(item,tipo){if(!avisosEmergentesActivosMenu())return;const contenedor=$('#toastAvisosMenu'),nodo=document.createElement('article');nodo.className=`toast-aviso-menu ${tipo}`;nodo.innerHTML=`<i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(tipo==='alerta'?'Nueva alerta':'Nueva notificación')}</b><small>${escapar(item.TITULO||item.MENSAJE||'Existe un nuevo aviso pendiente.')}</small></div><button type="button" aria-label="Cerrar">×</button>`;contenedor.append(nodo);nodo.querySelector('button').addEventListener('click',()=>nodo.remove());setTimeout(()=>nodo.remove(),5200);}
   function esAlertaAsignacion(item){return ['RUTA_ASIGNADA','OPERACION_ASIGNADA'].includes(String(item?.CATEGORIA_EMERGENTE||'').toUpperCase())&&String(item?.ESTADO_RESPUESTA||'PENDIENTE').toUpperCase()==='PENDIENTE';}
   function anunciarAsignacionVoz(item){
-    if(!('speechSynthesis'in window)||!avisosEmergentesActivosMenu())return;
+    if(!('speechSynthesis'in window)||!avisosEmergentesActivosMenu()||!vozAsignacionesActivaMenu())return;
     const clase=String(item.CATEGORIA_EMERGENTE||'').startsWith('OPERACION')?'operación':'ruta';
     const texto=`Nueva ${clase} asignada para ${item.DESTINATARIO_NOMBRE||'el conductor'}. ${item.NOMBRE_ASIGNACION||''}. Desde ${item.ORIGEN||'origen no informado'} hasta ${item.DESTINO||'destino no informado'}.`;
     try{window.speechSynthesis.cancel();const voz=new SpeechSynthesisUtterance(texto);voz.lang='es-CL';voz.rate=1;window.speechSynthesis.speak(voz);}catch(_){ }
@@ -268,22 +281,23 @@
     const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',`Nueva ${clase} asignada`);
     const distancia=item.DISTANCIA_KM==null||item.DISTANCIA_KM===''?'Distancia por calcular':`${escapar(item.DISTANCIA_KM)} km estimados`;
     const minutos=item.DURACION_MINUTOS==null||item.DURACION_MINUTOS===''?'Tiempo por calcular':`${escapar(item.DURACION_MINUTOS)} min estimados`;
-    nodo.innerHTML=`<header><i>${clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>Nueva ${clase} asignada</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ Aceptar</button></footer>`;
+    const etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Supervisor':'Aceptar';
+    nodo.innerHTML=`<header><i>${clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>Nueva ${clase} asignada</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
     document.body.append(nodo);alertaAsignacionVisible=nodo;
     nodo.querySelectorAll('[data-respuesta]').forEach(boton=>boton.addEventListener('click',()=>responderAlertaAsignacionMenu(item,boton.dataset.respuesta,boton)));
     if(document.hidden)hacerPersistenteAlertaAsignacionMenu(nodo);
     anunciarAsignacionVoz(item);
     setTimeout(()=>{if(alertaAsignacionVisible===nodo&&nodo.dataset.persistente!=='1'&&!document.hidden){nodo.remove();alertaAsignacionVisible=null;}},6000);
   }
-  function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ Aceptar asignación</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
+  function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Supervisor':'Aceptar asignación',mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ ${etiquetaAceptar}</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
   async function actualizarAvisos(){
     if(!usuario)return;
     if(consultaAvisosPendiente)return consultaAvisosPendiente;
     consultaAvisosPendiente=(async()=>{
-      const consultas=[];
+    const consultas=[];
       if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'notifications',action:'list',payload:{resource:'notifications',cache:false}});
-      if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'assignments',action:'assignmentAlerts',payload:{limit:20,cache:false}});
+      if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'assignments',action:'assignmentAlerts',payload:{limit:puedeAceptarAsignacionesAjenasMenu()?150:20,cache:false}});
       if(puedeAvisos('ALERTAS'))consultas.push({key:'alerts',action:'list',payload:{resource:'alerts',cache:false}});
       const lote=consultas.length?await api.requestBatch(consultas,{force:true}):{};
       const notifications=[...new Map([...(lote.notifications?.rows||[]),...(lote.assignments?.rows||[])].filter(item=>item.LEIDA!=='SI').map(item=>[String(item.ID),item])).values()];
@@ -525,6 +539,7 @@
   $('#capaMenu').addEventListener('click',cerrarMenu);
   $('#interruptorModoAutoOficina').addEventListener('change',cambiarModoOficinaVirtual);
   $('#interruptorAvisosEmergentes').addEventListener('change',cambiarAvisosEmergentes);
+  $('#interruptorVozAsignaciones').addEventListener('change',cambiarVozAsignaciones);
   $('#cerrarSesionMenu').addEventListener('click',cerrarSesion);
   $('#notificacionesMenu').addEventListener('click',alternarPanelAvisos);
   $('#cerrarAvisosMenu').addEventListener('click',cerrarPanelAvisos);

@@ -45,7 +45,7 @@ button{cursor:pointer}
 @media(max-width:720px){.preconfig-grid{grid-template-columns:1fr}.campo-completo{grid-column:auto}.preconfiguracion{padding:22px 18px}}
 
 
-/* Login móvil 4.2.41-ui2: el teclado no cubre Usuario, Contraseña ni Ingresar */
+/* Login móvil 4.2.42-ui2: el teclado no cubre Usuario, Contraseña ni Ingresar */
 :root{--alto-visible-login:100dvh}
 @media(max-width:900px){
   html,body{min-height:100%;overflow-x:hidden}
