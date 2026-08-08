@@ -10,7 +10,7 @@
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
     changePassword:'cambiarContrasena', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
     assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', sendNotification:'enviarNotificacion',
-    readNotification:'marcarNotificacionLeida', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
+    readNotification:'marcarNotificacionLeida', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
     officeQuickStatus:'estadoRapidoOficinaVirtual', officeTasks:'pendientesOficinaVirtual',
@@ -759,7 +759,7 @@
   async function localRequest(action, payload) {
     await Promise.resolve();
     switch (action) {
-      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.40', now:iso() };
+      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.41', now:iso() };
       case 'status': return {
         connected:true, needsSetup:activeRows(localDb.users).length === 0, spreadsheetName:'Base local del navegador',
         rows:{ users:activeRows(localDb.users).length, vehicles:activeRows(localDb.vehicles).length,
@@ -834,6 +834,9 @@
       case 'backupTable': return localBackupTable(payload);
       case 'sendNotification': return localSendNotification(payload);
       case 'readNotification': return localReadNotification(payload);
+      case 'assignmentAlerts': return localAssignmentAlerts(payload);
+      case 'respondAssignmentAlert': return localRespondAssignmentAlert(payload);
+      case 'resendAssignmentAlert': return localResendAssignmentAlert(payload);
       case 'readAlert': return localReadAlert(payload);
       case 'heartbeat': return localHeartbeat(payload);
       case 'realtimeSummary': return localRealtimeSummary(payload);
@@ -1402,8 +1405,8 @@
       DESTINO_LATITUD:data.DESTINO_LATITUD||'',DESTINO_LONGITUD:data.DESTINO_LONGITUD||'',PARADAS_CODIFICADAS:data.PARADAS_CODIFICADAS||'',
       PROVEEDOR_NAVEGACION:['Google Maps','Waze'].includes(data.PROVEEDOR_NAVEGACION)?data.PROVEEDOR_NAVEGACION:'Google Maps',ESTADO:'Asignada',
       INSTRUCCIONES:data.INSTRUCCIONES||'',FECHA_ASIGNACION:now,FECHA_INICIO:'',FECHA_FIN:'',CRONOMETRO_INICIO:now,CRONOMETRO_FIN:'',TIEMPO_TRANSCURRIDO_SEGUNDOS:0,TIEMPO_TRANSCURRIDO_TEXTO:'00:00:00',CREADO_POR:user.ID,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};
-    localDb.routes.push(route);localRecordRouteHistory(route,'ASIGNADA',user,`Ruta asignada a ${driver.NOMBRE}`);const notification=localCreateNotification({DESTINATARIO_USUARIO_ID:driver.USUARIO_ID||'',DESTINATARIO_CONDUCTOR_ID:driver.ID,
-      TITULO:'Nueva ruta asignada',MENSAJE:`${route.NOMBRE}: ${route.ORIGEN} → ${route.DESTINO}`,TIPO:'Ruta',PRIORIDAD:data.PRIORIDAD||'Alta',RUTA_ID:route.ID,OPERACION_ID:route.OPERACION_ID,CREADO_POR:user.ID});
+    localDb.routes.push(route);localRecordRouteHistory(route,'ASIGNADA',user,`Ruta asignada a ${driver.NOMBRE}`);const notification=localCreateNotification({DESTINATARIO_USUARIO_ID:driver.USUARIO_ID||'',DESTINATARIO_CONDUCTOR_ID:driver.ID,DESTINATARIO_NOMBRE:driver.NOMBRE,
+      TITULO:'Nueva ruta asignada',MENSAJE:`${route.NOMBRE}: ${route.ORIGEN} → ${route.DESTINO}`,TIPO:'Ruta',PRIORIDAD:data.PRIORIDAD||'Alta',RUTA_ID:route.ID,OPERACION_ID:route.OPERACION_ID,CATEGORIA_EMERGENTE:'RUTA_ASIGNADA',NOMBRE_ASIGNACION:route.NOMBRE,ORIGEN:route.ORIGEN,DESTINO:route.DESTINO,ESTADO_RESPUESTA:'PENDIENTE',CREADO_POR:user.ID});
     audit(user,'ASIGNAR','RUTAS',`Ruta asignada a ${driver.NOMBRE}`,route.ID);saveLocal();return{row:route,notification};
   }
   function localUpdateRouteStatus(payload){
@@ -1428,6 +1431,7 @@
     if(unique){const existing=activeRows(localDb.notifications).find(row=>String(row.CLAVE_UNICA||'')===unique&&String(row.DESTINATARIO_USUARIO_ID||'')===recipient);if(existing)return existing;}
     const now=iso(),row={ID:id('NOT'),DESTINATARIO_USUARIO_ID:recipient,DESTINATARIO_CONDUCTOR_ID:data.DESTINATARIO_CONDUCTOR_ID||'',
       TITULO:data.TITULO,MENSAJE:data.MENSAJE,TIPO:data.TIPO||'Información',PRIORIDAD:data.PRIORIDAD||'Normal',RUTA_ID:data.RUTA_ID||'',OPERACION_ID:data.OPERACION_ID||'',CLAVE_UNICA:unique,
+      CATEGORIA_EMERGENTE:data.CATEGORIA_EMERGENTE||'',NOMBRE_ASIGNACION:data.NOMBRE_ASIGNACION||'',DESTINATARIO_NOMBRE:data.DESTINATARIO_NOMBRE||'',ASIGNADO_POR_NOMBRE:data.ASIGNADO_POR_NOMBRE||'',ORIGEN:data.ORIGEN||'',DESTINO:data.DESTINO||'',DISTANCIA_KM:data.DISTANCIA_KM??'',DURACION_MINUTOS:data.DURACION_MINUTOS??'',ESTADO_RESPUESTA:data.ESTADO_RESPUESTA||'',FECHA_RESPUESTA:'',RESPONDIDO_POR:'',
       LEIDA:'NO',FECHA_ENVIO:now,FECHA_LECTURA:'',LEIDA_POR:'',CREADO_POR:data.CREADO_POR||'',CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.notifications.push(row);return row;
   }
   function localNotifyRoles(roleIds,data){
@@ -1448,8 +1452,12 @@
   function localReadNotification(payload){
     const user=requireLocalUser(),row=find('notifications',payload.id||payload.NOTIFICACION_ID);requireLocalPermission(user,'NOTIFICACIONES','ACTUALIZAR');
     if(!row)throw new Error('NOTIFICACION_NO_ENCONTRADA');if(!localFilterRows('notifications',[row],user).length)throw new Error('PERMISO_DENEGADO');
+    if(['RUTA_ASIGNADA','OPERACION_ASIGNADA'].includes(String(row.CATEGORIA_EMERGENTE||''))&&String(row.ESTADO_RESPUESTA||'PENDIENTE')==='PENDIENTE')throw new Error('ASIGNACION_REQUIERE_ACEPTACION');
     row.LEIDA='SI';row.FECHA_LECTURA=iso();row.LEIDA_POR=user.ID;row.ACTUALIZADO_EN=iso();saveLocal();return{row,persistenciaConfirmada:true};
   }
+  function localAssignmentAlerts(payload={}){const user=requireLocalUser(),driver=localDriver(user),rows=activeRows(localDb.notifications).filter(row=>['RUTA_ASIGNADA','OPERACION_ASIGNADA'].includes(String(row.CATEGORIA_EMERGENTE||''))&&String(row.ESTADO_RESPUESTA||'PENDIENTE')==='PENDIENTE'&&(row.DESTINATARIO_USUARIO_ID===user.ID||(driver&&row.DESTINATARIO_CONDUCTOR_ID===driver.ID))).sort((a,b)=>new Date(b.FECHA_ENVIO)-new Date(a.FECHA_ENVIO)).slice(0,Math.min(20,Math.max(1,Number(payload.limit||payload.LIMITE||10))));return{rows,total:rows.length,serverTime:iso()};}
+  function localRespondAssignmentAlert(payload){const user=requireLocalUser(),data=payload.data||payload,idNotificacion=payload.id||data.NOTIFICACION_ID||data.ID,row=find('notifications',idNotificacion),driver=localDriver(user),respuesta=String(data.RESPUESTA||'CERRADA').toUpperCase();if(!row||!['RUTA_ASIGNADA','OPERACION_ASIGNADA'].includes(String(row.CATEGORIA_EMERGENTE||'')))throw new Error('AVISO_ASIGNACION_NO_ENCONTRADO');if(row.DESTINATARIO_USUARIO_ID!==user.ID&&(!driver||row.DESTINATARIO_CONDUCTOR_ID!==driver.ID))throw new Error('PERMISO_DENEGADO');if(!['ACEPTADA','CERRADA'].includes(respuesta))throw new Error('RESPUESTA_ASIGNACION_INVALIDA');const fecha=iso();Object.assign(row,{ESTADO_RESPUESTA:respuesta,FECHA_RESPUESTA:fecha,RESPONDIDO_POR:user.ID,LEIDA:'SI',FECHA_LECTURA:fecha,LEIDA_POR:user.ID,ACTUALIZADO_EN:fecha});saveLocal();return{row,respuesta,persistenciaConfirmada:true};}
+  function localResendAssignmentAlert(payload){const user=requireLocalUser();if(!['ROL-ADMIN','ROL-SUPERVISOR'].includes(user.ROL_ID))throw new Error('ALERTA_ASIGNACION_NO_AUTORIZADA');const data=payload.data||payload,clase=String(data.CLASE||'').toUpperCase(),registroId=String(data.REGISTRO_ID||payload.id||''),registro=find(clase==='RUTA'?'routes':'operations',registroId);if(!['RUTA','OPERACION'].includes(clase)||!registro)throw new Error('ASIGNACION_REENVIO_INVALIDA');const driver=find('drivers',registro.CONDUCTOR_ID);if(!driver)throw new Error('CONDUCTOR_NO_ENCONTRADO');const fecha=iso(),anteriores=activeRows(localDb.notifications).filter(row=>row.DESTINATARIO_CONDUCTOR_ID===driver.ID&&row.CATEGORIA_EMERGENTE===`${clase}_ASIGNADA`&&String(row.ESTADO_RESPUESTA||'PENDIENTE')==='PENDIENTE'&&(clase==='RUTA'?row.RUTA_ID===registro.ID:row.OPERACION_ID===registro.ID));anteriores.forEach(row=>Object.assign(row,{ESTADO_RESPUESTA:'CERRADA',FECHA_RESPUESTA:fecha,RESPONDIDO_POR:user.ID,LEIDA:'SI',FECHA_LECTURA:fecha,LEIDA_POR:user.ID,ACTUALIZADO_EN:fecha}));const route=clase==='RUTA'?registro:(registro.RUTA_ID?find('routes',registro.RUTA_ID):null),nombre=clase==='RUTA'?(registro.NOMBRE||`Ruta ${registro.ID}`):(route?.NOMBRE||`Operación ${registro.ID}`),origen=registro.ORIGEN||registro.BASE_DIRECCION||route?.ORIGEN||'Origen no informado',destino=registro.DESTINO||registro.PUNTO_RETORNO||route?.DESTINO||'Destino no informado';const row=localCreateNotification({DESTINATARIO_USUARIO_ID:driver.USUARIO_ID||'',DESTINATARIO_CONDUCTOR_ID:driver.ID,DESTINATARIO_NOMBRE:driver.NOMBRE,TITULO:`Nueva ${clase==='RUTA'?'ruta':'operación'} asignada`,MENSAJE:`${nombre}: ${origen} → ${destino}`,TIPO:clase==='RUTA'?'Ruta':'Operación',PRIORIDAD:'Urgente',RUTA_ID:clase==='RUTA'?registro.ID:(registro.RUTA_ID||''),OPERACION_ID:clase==='OPERACION'?registro.ID:(registro.OPERACION_ID||''),CATEGORIA_EMERGENTE:`${clase}_ASIGNADA`,NOMBRE_ASIGNACION:nombre,ORIGEN:origen,DESTINO:destino,ESTADO_RESPUESTA:'PENDIENTE',CLAVE_UNICA:`REENVIO-${clase}-${registro.ID}-${Date.now()}`,CREADO_POR:user.ID});audit(user,'REENVIAR_ALERTA_ASIGNACION',clase==='RUTA'?'RUTAS':'OPERACIONES',`Alerta reenviada a ${driver.NOMBRE}`,registro.ID);saveLocal();return{row,reenviada:true,avisosAnterioresCerrados:anteriores.length};}
   function localReadAlert(payload){
     const user=requireLocalUser(),row=find('alerts',payload.id||payload.ALERTA_ID);requireLocalPermission(user,'ALERTAS','ACTUALIZAR');
     if(!row)throw new Error('ALERTA_NO_ENCONTRADA');if(!localFilterRows('alerts',[row],user).length)throw new Error('PERMISO_DENEGADO');
@@ -1694,7 +1702,7 @@
       alerts:{nombre:'Alertas',estado:'OK',detalle:`${activeRows(localDb.alerts).length} registros`},
       history:{nombre:'Historiales',estado:'OK',detalle:`${activeRows(localDb.history).length} eventos operativos · ${activeRows(localDb.checkins).length} check-ins`}
     };
-    return{version:'4.2.40',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
+    return{version:'4.2.41',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
   }
   function localRepairSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','ACTUALIZAR');
@@ -1757,7 +1765,7 @@
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.40',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'Oficina Virtual',version:'4.2.41',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');

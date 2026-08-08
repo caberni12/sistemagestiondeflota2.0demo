@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.40';
+  const VERSION='4.2.41';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -253,6 +253,14 @@
       cambiarEstado(respuesta==='ACEPTADA'?'Asignación aceptada':'Aviso cerrado','listo');
     }catch(_){if(boton)boton.disabled=false;cambiarEstado('No se pudo confirmar la asignación','advertencia');}
   }
+  function hacerPersistenteAlertaAsignacionMenu(nodo){
+    if(!nodo||nodo.dataset.persistente==='1')return;
+    nodo.dataset.persistente='1';
+    nodo.classList.add('persistente');
+    nodo.querySelectorAll('[data-respuesta="CERRADA"]').forEach(boton=>boton.remove());
+    const cuerpo=nodo.querySelector('.alerta-asignacion-cuerpo');
+    if(cuerpo&&!cuerpo.querySelector('.alerta-asignacion-pendiente'))cuerpo.insertAdjacentHTML('beforeend','<p class="alerta-asignacion-pendiente">Aviso pendiente: permanecerá en la bandeja hasta que presione Aceptar.</p>');
+  }
   function mostrarAlertaAsignacionMenu(item){
     if(!avisosEmergentesActivosMenu()||!item?.ID)return;
     alertaAsignacionVisible?.remove();
@@ -263,10 +271,11 @@
     nodo.innerHTML=`<header><i>${clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>Nueva ${clase} asignada</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ Aceptar</button></footer>`;
     document.body.append(nodo);alertaAsignacionVisible=nodo;
     nodo.querySelectorAll('[data-respuesta]').forEach(boton=>boton.addEventListener('click',()=>responderAlertaAsignacionMenu(item,boton.dataset.respuesta,boton)));
+    if(document.hidden)hacerPersistenteAlertaAsignacionMenu(nodo);
     anunciarAsignacionVoz(item);
-    setTimeout(()=>{if(alertaAsignacionVisible===nodo){nodo.remove();alertaAsignacionVisible=null;}},3800);
+    setTimeout(()=>{if(alertaAsignacionVisible===nodo&&nodo.dataset.persistente!=='1'&&!document.hidden){nodo.remove();alertaAsignacionVisible=null;}},6000);
   }
-  function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small></div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',()=>{cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));}
+  function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ Aceptar asignación</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
   async function actualizarAvisos(){
     if(!usuario)return;
@@ -274,9 +283,10 @@
     consultaAvisosPendiente=(async()=>{
       const consultas=[];
       if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'notifications',action:'list',payload:{resource:'notifications',cache:false}});
+      if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'assignments',action:'assignmentAlerts',payload:{limit:20,cache:false}});
       if(puedeAvisos('ALERTAS'))consultas.push({key:'alerts',action:'list',payload:{resource:'alerts',cache:false}});
       const lote=consultas.length?await api.requestBatch(consultas,{force:true}):{};
-      const notifications=(lote.notifications?.rows||[]).filter(item=>item.LEIDA!=='SI');
+      const notifications=[...new Map([...(lote.notifications?.rows||[]),...(lote.assignments?.rows||[])].filter(item=>item.LEIDA!=='SI').map(item=>[String(item.ID),item])).values()];
       const alerts=(lote.alerts?.rows||[]).filter(item=>item.LEIDA!=='SI');
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
       const nuevasAlertas=alerts.filter(item=>!idsAlertasConocidas.has(String(item.ID)));
@@ -287,7 +297,7 @@
           .forEach(({item,tipo})=>mostrarToastAviso(item,tipo));
       }
       const asignacionesAMostrar=avisosInicializados?nuevasAsignaciones.slice(-3):nuevasAsignaciones.slice(-1);
-      asignacionesAMostrar.sort((a,b)=>fechaOrdenAviso(a)-fechaOrdenAviso(b)).forEach((item,indice)=>setTimeout(()=>mostrarAlertaAsignacionMenu(item),indice*4100));
+      asignacionesAMostrar.sort((a,b)=>fechaOrdenAviso(a)-fechaOrdenAviso(b)).forEach((item,indice)=>setTimeout(()=>mostrarAlertaAsignacionMenu(item),indice*6500));
       idsNotificacionesConocidas=new Set(notifications.map(item=>String(item.ID)));
       idsAlertasConocidas=new Set(alerts.map(item=>String(item.ID)));
       idsAsignacionesMostradas=new Set([...idsAsignacionesMostradas,...notifications.filter(esAlertaAsignacion).map(item=>String(item.ID))]);
@@ -522,7 +532,7 @@
   $('#cambiarTemaMenu').addEventListener('click',()=>{oscuro=!oscuro;localStorage.setItem('flotas_tema',oscuro?'dark':'light');aplicarTema();});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'){cerrarMenu();cerrarPanelAvisos();}});
   document.addEventListener('click',event=>{if(!$('#panelAvisosMenu').contains(event.target)&&!$('#notificacionesMenu').contains(event.target))cerrarPanelAvisos();});
-  document.addEventListener('visibilitychange',()=>{if(usuario&&!cerrandoSesion)programarAvisos(document.hidden?30000:150);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&alertaAsignacionVisible)hacerPersistenteAlertaAsignacionMenu(alertaAsignacionVisible);if(usuario&&!cerrandoSesion)programarAvisos(document.hidden?30000:150);});
   window.addEventListener('storage',event=>{
     if(event.key===window.CONFIGURACION_FLOTAS.CLAVE_SESION_LOCAL&&!event.newValue)irAcceso('cerrada');
   });
