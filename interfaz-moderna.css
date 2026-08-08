@@ -202,6 +202,15 @@ body{
 :where(.btn,.boton-principal,.boton-icono,.icon-button):active:not(:disabled){transform:translateY(0) scale(.985)}
 :where(button,.btn,.boton-principal,.boton-icono,.icon-button):disabled{cursor:not-allowed;opacity:.58;box-shadow:none;transform:none}
 
+.heading-actions .dashboard-refresh-circle{
+  width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;
+  flex:0 0 52px!important;padding:0!important;border-radius:50%!important;
+  color:#fff!important;background:linear-gradient(145deg,var(--primary),var(--primary-dark))!important;
+  border:0!important;font-size:26px!important;font-weight:800;box-shadow:0 10px 24px rgba(11,95,89,.28)!important;
+}
+.heading-actions .dashboard-refresh-circle:hover{transform:translateY(-2px) rotate(20deg)!important;box-shadow:0 14px 28px rgba(11,95,89,.34)!important}
+.heading-actions .dashboard-refresh-circle.is-loading::after{width:21px;height:21px;border-width:3px}
+
 :where(.boton-icono,.icon-button){
   border-radius:var(--ui-radius-sm);
   border-color:var(--ui-border);

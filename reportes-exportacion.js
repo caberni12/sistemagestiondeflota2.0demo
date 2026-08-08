@@ -20,6 +20,17 @@
     const clean=String(value||fallback).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
     return clean||fallback;
   }
+  function fechaVisible(value){
+    if(value===null||value===undefined||value==='')return '';
+    const raw=String(value).trim(),onlyDate=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(onlyDate)return `${onlyDate[3]}/${onlyDate[2]}/${onlyDate[1]}`;
+    const date=value instanceof Date?value:new Date(value);if(Number.isNaN(date.getTime()))return texto(value);
+    const hasTime=value instanceof Date||/[T\s]\d{2}:\d{2}/.test(raw);
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:hasTime?'2-digit':undefined,minute:hasTime?'2-digit':undefined,hourCycle:'h23'}).formatToParts(date).map(part=>[part.type,part.value]));
+    const base=`${parts.day}/${parts.month}/${parts.year}`;return hasTime?`${base}:${parts.hour}:${parts.minute}`:base;
+  }
+  function campoFecha(key){return /(^|_)(FECHA|CREADO|ACTUALIZADO|GENERADO|VIGENTE|VENCIMIENTO|EMISION|REVISION|LECTURA|CONEXION|ACCESO|EXPIRACION)(_|$)/i.test(String(key||''));}
+  function normalizarFechasFila(row){if(!row||typeof row!=='object'||Array.isArray(row))return row;return Object.fromEntries(Object.entries(row).map(([key,value])=>[key,campoFecha(key)?fechaVisible(value):value]));}
   function fechaArchivo(){return new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');}
   function descargar(blob,nombre){
     const url=URL.createObjectURL(blob),a=document.createElement('a');
@@ -34,7 +45,7 @@
   });}
   function limitarCelda(value,max=32000){const s=texto(value);return s.length>max?s.slice(0,max-1)+'…':s;}
   function hoja(nombre,rows){
-    const normalized=filasNormalizadas(rows),headers=columnas(normalized);
+    const normalized=filasNormalizadas(rows).map(normalizarFechasFila),headers=columnas(normalized);
     return {nombre:String(nombre||'Datos').slice(0,31),headers,rows:normalized};
   }
   function aplanar(obj,prefix='',out=[]){
@@ -59,7 +70,7 @@
     const estado=report?.estadoOficina||{},diagnostico=report?.diagnostico||{};
     const resumen=[
       {CAMPO:'Título',VALOR:meta.titulo||'Reporte de Oficina Virtual'},
-      {CAMPO:'Fecha de generación',VALOR:meta.fecha||report?.generadoEn||new Date().toISOString()},
+      {CAMPO:'Fecha de generación',VALOR:fechaVisible(meta.fecha||report?.generadoEn||new Date())},
       {CAMPO:'Generado por',VALOR:meta.generadoPor||report?.generadoPor?.NOMBRE||report?.generadoPor?.CORREO||''},
       {CAMPO:'Resumen',VALOR:meta.resumen||''},
       {CAMPO:'Estado de la API',VALOR:diagnostico.estado||diagnostico.ESTADO||'Verificada'},
@@ -119,7 +130,7 @@
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${rows}</sheetData>${sheet.headers.length?`<autoFilter ref="A1:${lastCol}${lastRow}"/>`:''}</worksheet>`;
   }
   async function xlsxDeHojas(sheets){
-    const JSZip=await cargarScript('jszip.min.js?v=4.2.39-ui1','JSZip'),zip=new JSZip();
+    const JSZip=await cargarScript('jszip.min.js?v=4.2.39-ui3','JSZip'),zip=new JSZip();
     const safeSheets=sheets.map((s,index)=>({...s,nombre:(s.nombre||`Hoja ${index+1}`).replace(/[\\/*?:\[\]]/g,' ').slice(0,31)||`Hoja ${index+1}`}));
     zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${safeSheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`);
     zip.folder('_rels').file('.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`);
@@ -149,7 +160,7 @@
     const items=[{text:meta.titulo||'Reporte del Sistema de Gestión de Flotas',size:17,bold:true,gap:8}];
     if(meta.subtitulo)items.push({text:meta.subtitulo,size:10,bold:false,gap:8});
     if(meta.autor)items.push({text:`Generado por: ${meta.autor}`,size:9,bold:false});
-    items.push({text:`Fecha: ${meta.fecha||new Date().toLocaleString('es-CL')}`,size:9,bold:false,gap:10});
+    items.push({text:`Fecha: ${fechaVisible(meta.fecha||new Date())}`,size:9,bold:false,gap:10});
     sheets.forEach(sheet=>{
       items.push({text:sheet.nombre,size:12,bold:true,gap:5});
       if(!sheet.rows.length){items.push({text:'Sin registros.',size:9,bold:false,gap:8});return;}
