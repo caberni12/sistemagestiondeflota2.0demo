@@ -1,5 +1,5 @@
 /*
- * Sistema de Gestión de Flotas 4.2.50
+ * Sistema de Gestión de Flotas 4.2.52
  * Capa visual unificada y progresiva.
  * Se carga después de los estilos existentes para modernizar la interfaz
  * sin alterar la lógica JavaScript ni la estructura de los módulos.
@@ -701,4 +701,44 @@ body.oscuro .driver-home [data-toggle-tracking]:disabled{
 @media(max-width:1180px){
   .driver-home{align-items:stretch}
   .driver-home > .card{align-self:stretch}
+}
+
+
+/* ================================================================
+   WEB 4.2.52 · UNIFORMIDAD VISUAL DE TODOS LOS MÓDULOS
+   Solo presentación. No modifica acciones, permisos, API, SQL ni datos.
+   ================================================================ */
+body.modo-modulo-iframe{
+  color:var(--ui-text);
+  background:var(--ui-bg);
+}
+body.modo-modulo-iframe .content{
+  color:var(--ui-text);
+  background:var(--ui-bg);
+}
+body.modo-modulo-iframe :where(.card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,.tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,.permission-button-section,.backup-database-card,.document-review-panel,.operation-verification,.table-wrap,.modal){
+  border-color:var(--ui-border);
+}
+body.modo-modulo-iframe :where(.heading h1,.heading h2,.heading h3,.card-header h1,.card-header h2,.card-header h3,.modal-header h1,.modal-header h2,.modal-header h3){
+  color:var(--ui-text);
+}
+body.modo-modulo-iframe :where(.heading p,.card-header p,.helper,.muted,.field>span){
+  color:var(--ui-text-soft);
+}
+html:not(.tema-oscuro-inicial) body.modo-modulo-iframe:not(.dark):not(.oscuro) :where(.content,.card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,.tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,.permission-button-section,.backup-database-card,.document-review-panel,.operation-verification,.table-wrap,.modal){
+  background-color:#fff;
+  color:#111;
+}
+html:not(.tema-oscuro-inicial) body.modo-modulo-iframe:not(.dark):not(.oscuro) :where(.heading h1,.heading h2,.heading h3,.card-header h1,.card-header h2,.card-header h3,.modal-header h1,.modal-header h2,.modal-header h3){
+  color:#111;
+}
+html:not(.tema-oscuro-inicial) body.modo-modulo-iframe:not(.dark):not(.oscuro) :where(.heading p,.card-header p,.helper,.muted,.field>span){
+  color:#333;
+}
+body.dark.modo-modulo-iframe :where(.content,.card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,.tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,.permission-button-section,.backup-database-card,.document-review-panel,.operation-verification,.table-wrap,.modal),
+body.oscuro.modo-modulo-iframe :where(.content,.card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,.tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,.permission-button-section,.backup-database-card,.document-review-panel,.operation-verification,.table-wrap,.modal),
+html.tema-oscuro-inicial body.modo-modulo-iframe :where(.content,.card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,.tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,.permission-button-section,.backup-database-card,.document-review-panel,.operation-verification,.table-wrap,.modal){
+  background-color:var(--ui-surface);
+  color:var(--ui-text);
+  border-color:var(--ui-border);
 }

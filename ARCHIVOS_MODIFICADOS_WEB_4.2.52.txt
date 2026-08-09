@@ -1,0 +1,36 @@
+ARCHIVOS MODIFICADOS · WEB 4.2.52 VISUAL UNIFICADA
+
+Cambios exclusivamente visuales/cache CSS.
+
+CSS:
+- interfaz-moderna.css (bloque global de uniformidad)
+
+HTML de presentación con actualización del identificador de caché CSS:
+- alertas.html
+- auditoria.html
+- checkin-aprobaciones.html
+- checkin-historial.html
+- checkin-vehicular.html
+- combustible.html
+- conductores.html
+- conexiones-en-linea.html
+- configuracion.html
+- documentos.html
+- empresa.html
+- historial.html
+- main.html
+- mantenciones.html
+- notificaciones.html
+- oficina-virtual.html
+- operaciones.html
+- panel-principal.html
+- reportes.html
+- rutas.html
+- ubicacion-tiempo-real.html
+- usuarios.html
+- vehiculos.html
+
+NO MODIFICADOS:
+- index.html
+- Todos los archivos .js
+- SQL / API / Supabase

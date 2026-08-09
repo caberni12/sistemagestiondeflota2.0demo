@@ -1,0 +1,44 @@
+SISTEMA DE GESTIÓN DE FLOTAS · VALIDACIÓN VISUAL WEB 4.2.52
+
+Alcance: solo versión Web y solo presentación/estilos.
+No se modifican SQL, API, Supabase, permisos, acciones ni lógica funcional.
+
+[OK] 22 módulos revisados — 22
+[OK] Misma revisión CSS en todos los módulos — 4.2.52-ui13
+[OK] Sin estilos inline por módulo — 0 estilos embebidos/inline
+[OK] Misma clase raíz visual de módulo — modo-modulo-iframe
+[OK] Contenedor principal usa CSS 4.2.52-ui13 — ['menu-principal.css?v=4.2.52-ui13', 'responsive.css?v=4.2.52-ui13', 'interfaz-moderna.css?v=4.2.52-ui13']
+[OK] index.html intacto — SHA-256 idéntico
+[OK] JavaScript intacto — 10 archivos JS idénticos
+[OK] Referencias JavaScript HTML intactas — sin cambios
+[OK] CSS sin errores de parseo — OK
+[OK] Tema claro global blanco/negro — presente
+[OK] Tema oscuro preservado — presente
+[OK] Bloque de uniformidad 4.2.52 presente — presente
+
+MÓDULOS REVISADOS:
+- alertas.html
+- auditoria.html
+- checkin-aprobaciones.html
+- checkin-historial.html
+- checkin-vehicular.html
+- combustible.html
+- conductores.html
+- conexiones-en-linea.html
+- configuracion.html
+- documentos.html
+- empresa.html
+- historial.html
+- mantenciones.html
+- notificaciones.html
+- oficina-virtual.html
+- operaciones.html
+- panel-principal.html
+- reportes.html
+- rutas.html
+- ubicacion-tiempo-real.html
+- usuarios.html
+- vehiculos.html
+
+NOTA SOBRE NAVEGADORES:
+La revisión automatizada disponible en este entorno es estática/estructural. El motor Chromium local bloquea por política administrativa la navegación a archivos/localización localhost, por lo que no se afirma una ejecución física completa en Chrome/Edge/Firefox/Safari. La capa CSS mantiene los fallbacks y prefijos de compatibilidad ya incorporados.
