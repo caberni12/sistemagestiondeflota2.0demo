@@ -149,6 +149,13 @@
   $('#mostrarContrasena').addEventListener('click',()=>{const input=$('#contrasenaAcceso');input.type=input.type==='password'?'text':'password';$('#mostrarContrasena').setAttribute('aria-label',input.type==='password'?'Mostrar contraseña':'Ocultar contraseña');});
   $('#abrirConfiguracionEmpresa').addEventListener('click',()=>{const input=$('#rutConexionEmpresa');input.focus();mantenerControlVisible(input);});
   $('#reintentarConexion').addEventListener('click',()=>comprobar({redirigir:false}));
+  $('#limpiarConexionEmpresa').addEventListener('click',()=>{
+    const empresa=api.getEmpresaConexion?.();
+    if(!empresa?.configurada){mostrarSeleccionEmpresa();return;}
+    if(!confirm(`¿Desea borrar la conexión de ${empresa.nombre||'esta empresa'} y las credenciales de sesión guardadas en este navegador?\n\nLos datos de la Base de Datos no se eliminarán.`))return;
+    api.setAuth({});api.borrarConexionEmpresa?.();loginForm.reset();companyForm.reset();ocultarMensaje();ocultarMensaje(mensajeEmpresa);
+    cambiarEstado('Conexión borrada del dispositivo');mostrarSeleccionEmpresa();mostrarMensaje('La conexión y la sesión guardadas fueron eliminadas. Ingrese el RUT de la nueva empresa.','exito',mensajeEmpresa);
+  });
   const parametros=new URLSearchParams(location.search),avisoSesion=parametros.get('sesion');
   comprobar().then(()=>{if(avisoSesion==='cerrada')mostrarMensaje('La sesión fue cerrada correctamente.','exito');if(avisoSesion==='expirada')mostrarMensaje('La sesión realmente expiró o fue invalidada. Ingrese nuevamente.');});
 })();

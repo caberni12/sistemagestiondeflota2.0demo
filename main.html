@@ -10,10 +10,10 @@
   <meta name="description" content="Panel principal modular del Sistema de Gestión de Flotas">
   <title>Panel principal · Sistema de Gestión de Flotas</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="menu-principal.css?v=4.2.45-ui1">
-  <link rel="stylesheet" href="responsive.css?v=4.2.45-ui1">
-  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.45-ui1">
-  <script src="tema.js?v=4.2.45-ui1"></script>
+  <link rel="stylesheet" href="menu-principal.css?v=4.2.46-ui5">
+  <link rel="stylesheet" href="responsive.css?v=4.2.46-ui5">
+  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.46-ui5">
+  <script src="tema.js?v=4.2.46-ui5"></script>
 </head>
 <body class="verificando-sesion">
   <noscript><div class="sin-javascript">Debe habilitar JavaScript para utilizar el sistema.</div></noscript>
@@ -30,21 +30,26 @@
       <nav id="navegacionModular" aria-label="Módulos del sistema"></nav>
       <footer class="pie-menu">
         <div class="usuario-menu"><span id="avatarMenu">US</span><div><b id="nombreUsuarioMenu">Usuario</b><small id="rolUsuarioMenu">Sesión pendiente</small></div></div>
-        <label class="modo-auto-oficina-menu" id="modoAutoOficinaMenu" hidden>
-          <span><b>Oficina Virtual</b><small>Modo automático</small></span>
-          <input id="interruptorModoAutoOficina" type="checkbox" aria-label="Activar modo automático de Oficina Virtual">
-          <i></i>
-        </label>
-        <label class="modo-auto-oficina-menu" id="avisosEmergentesMenu" hidden>
-          <span><b>Avisos emergentes</b><small>Los pendientes siguen en el icono</small></span>
-          <input id="interruptorAvisosEmergentes" type="checkbox" aria-label="Mostrar alertas y notificaciones emergentes">
-          <i></i>
-        </label>
-        <label class="modo-auto-oficina-menu" id="vozAsignacionesMenu">
-          <span><b>Voz de asignaciones</b><small>La alerta visual siempre se mantiene</small></span>
-          <input id="interruptorVozAsignaciones" type="checkbox" aria-label="Activar voz para nuevas rutas y operaciones">
-          <i></i>
-        </label>
+        <details class="preferencias-rapidas-menu">
+          <summary><span><b>Preferencias rápidas</b><small>Alertas, voz e IA</small></span><i aria-hidden="true">⌄</i></summary>
+          <div class="preferencias-rapidas-cuerpo">
+            <label class="modo-auto-oficina-menu" id="modoAutoOficinaMenu" hidden>
+              <span><b>Oficina Virtual IA</b><small>Análisis automático del sistema</small></span>
+              <input id="interruptorModoAutoOficina" type="checkbox" aria-label="Activar modo automático de Oficina Virtual IA">
+              <i></i>
+            </label>
+            <label class="modo-auto-oficina-menu" id="avisosEmergentesMenu" hidden>
+              <span><b>Avisos emergentes</b><small>Los pendientes siguen en la campana</small></span>
+              <input id="interruptorAvisosEmergentes" type="checkbox" aria-label="Mostrar alertas y notificaciones emergentes">
+              <i></i>
+            </label>
+            <label class="modo-auto-oficina-menu" id="vozAsignacionesMenu">
+              <span><b>Voz de asignaciones</b><small>La alerta visual siempre permanece</small></span>
+              <input id="interruptorVozAsignaciones" type="checkbox" aria-label="Activar voz para nuevas rutas y operaciones">
+              <i></i>
+            </label>
+          </div>
+        </details>
         <button class="boton-menu-secundario cerrar-sesion" id="cerrarSesionMenu" type="button">↪ Cerrar sesión</button>
       </footer>
     </aside>
@@ -79,8 +84,8 @@
     </main>
   </div>
 
-  <script src="configuracion.js?v=4.2.45-ui1"></script>
-  <script src="conexion.js?v=4.2.45-ui1"></script>
-  <script src="menu-principal.js?v=4.2.45-ui1"></script>
+  <script src="configuracion.js?v=4.2.46-ui5"></script>
+  <script src="conexion.js?v=4.2.46-ui5"></script>
+  <script src="menu-principal.js?v=4.2.46-ui5"></script>
 </body>
 </html>

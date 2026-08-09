@@ -22,7 +22,7 @@ server = (root / 'Codigo_Completo.gs').read_text(encoding='utf-8')
 configuration = (root / 'configuracion.js').read_text(encoding='utf-8')
 main = (root / 'main.html').read_text(encoding='utf-8')
 menu = (root / 'menu-principal.js').read_text(encoding='utf-8')
-url_servicio = 'https://script.google.com/macros/s/AKfycbwsCNlbr_Oe0zCpAUjmLN63D3DycxoR9k6okfHl7NPRU1jkAXFJbx5Iz_EStTJkl93l/exec'
+url_servicio = 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec'
 if url_servicio not in configuration:
     errors.append('La nueva URL /exec no está integrada en configuracion.js')
 

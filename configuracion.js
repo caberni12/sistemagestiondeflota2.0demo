@@ -3,7 +3,7 @@
  * Conexión rápida a Base de Datos central.
  */
 window.CONFIGURACION_FLOTAS = Object.freeze({
-  VERSION: '4.2.45',
+  VERSION: '4.2.46',
   GPS_AUTOMATICO_OBLIGATORIO: true,
   MODO: 'supabase',
   MODO_MODULAR: true,

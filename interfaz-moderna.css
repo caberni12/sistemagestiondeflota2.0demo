@@ -1,5 +1,5 @@
 /*
- * Sistema de Gestión de Flotas 4.2.45
+ * Sistema de Gestión de Flotas 4.2.46
  * Capa visual unificada y progresiva.
  * Se carga después de los estilos existentes para modernizar la interfaz
  * sin alterar la lógica JavaScript ni la estructura de los módulos.
@@ -85,6 +85,10 @@
   --tema-texto-suave-oscuro:#a5b8b4;
   --tema-borde-oscuro:#29413d;
 }
+
+/* Expedientes documentales 4.2.46: tarjetas por persona o vehículo. */
+.document-expedient-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px}.document-expedient-toolbar .search-box{flex:1}.document-expedient-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.document-expedient-card{display:flex;flex-direction:column;gap:15px;min-height:265px;padding:20px;border:1px solid var(--border,#d7e2e0);border-top:5px solid #d49a26;border-radius:22px;background:linear-gradient(145deg,var(--surface,#fff),color-mix(in srgb,var(--surface,#fff) 88%,#d9f5ef));box-shadow:0 12px 30px rgba(15,65,59,.09)}.document-expedient-card.complete{border-top-color:#10a37f}.document-expedient-card.expired{border-top-color:#d64545}.document-expedient-card.empty{border-top-color:#7b8b91;opacity:.88}.document-expedient-card header{display:flex;gap:13px;align-items:flex-start}.document-expedient-card header>i{display:grid;place-items:center;flex:0 0 48px;height:48px;border-radius:15px;background:#e0f5f0;font-style:normal;font-size:23px}.document-expedient-card header span{font-size:10px;letter-spacing:.12em;font-weight:800;color:var(--primary,#0d776c)}.document-expedient-card h3{margin:3px 0;font-size:18px}.document-expedient-card header p,.document-expedient-next{margin:0;color:var(--muted,#647579);font-size:12px}.document-expedient-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}.document-expedient-stats span,.document-expedient-modal-summary span{padding:9px 10px;border-radius:12px;background:var(--background,#f3f8f7);font-size:11px;color:var(--muted,#647579)}.document-expedient-stats b,.document-expedient-modal-summary b{display:block;font-size:18px;color:var(--text,#153035)}.document-expedient-stats .ok b{color:#0b8d6b}.document-expedient-stats .warning b{color:#b17600}.document-expedient-stats .danger b{color:#c53636}.document-expedient-card>.btn{margin-top:auto}.document-expedient-modal{display:grid;gap:16px}.document-expedient-modal-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.document-expedient-list{display:grid;gap:10px;max-height:min(58vh,620px);overflow:auto;padding-right:3px}.document-expedient-item{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px;border:1px solid var(--border,#d7e2e0);border-radius:16px;background:var(--surface,#fff)}.document-expedient-item h4{margin:5px 0 2px}.document-expedient-item p,.document-expedient-item small{margin:0;color:var(--muted,#647579)}
+@media(max-width:640px){.document-expedient-toolbar{align-items:stretch;flex-direction:column}.document-expedient-grid{grid-template-columns:1fr}.document-expedient-modal-summary{grid-template-columns:1fr}.document-expedient-item{align-items:stretch;flex-direction:column}.document-expedient-item .btn{width:100%}}
 
 body.dark,
 body.oscuro{
