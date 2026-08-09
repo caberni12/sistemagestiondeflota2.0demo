@@ -1,9 +1,19 @@
-# Sistema de Gestión de Flotas Web 4.2.49
+# Sistema de Gestión de Flotas — Web 4.2.50
 
-Web oficial del Sistema de Gestión de Flotas. Esta revisión incorpora QR obligatorio para el check-in del Conductor, revisión Aprobar/Anular de inspecciones No conforme, notificación que abre directamente la inspección, acceso inmediato a Asignación de Ruta y aceptación de ruta con inicio + GPS + navegación planificada.
+Versión Web corregida sobre la base 4.2.49.
 
-Para el Conductor, el checklist permanece oculto hasta validar mediante QR el vehículo que tiene asignado. Administración, Gerencia y Operador pueden visualizar la inspección directamente y gestionar No conformes.
+## Cambios visuales
+- Tema claro: fondo blanco real (#FFFFFF), texto negro (#111111), texto secundario oscuro (#333333).
+- Tarjetas, tablas, filtros, formularios y modales con superficies blancas en modo claro.
+- Se conserva el menú lateral y los colores semánticos para estados, alertas y acciones.
+- Tema oscuro conservado y sincronizado entre menú principal y módulos.
 
-La trazabilidad de rutas está restringida a Operador/Administrador/Gerencia, conecta los hitos punto por punto y muestra fecha arriba, hora debajo y duración. Las rutas activas se muestran en botones compactos y las acciones de tabla permanecen horizontales al lado izquierdo.
+## Compatibilidad
+- Capa común para Chrome, Edge, Firefox y Safari modernos.
+- Fallback de requestIdleCallback y String.replaceAll.
+- Prefijo -webkit-backdrop-filter para Safari.
+- Fallback de altura dinámica (dvh), color-mix y desplazamiento táctil.
+- Controles de formulario normalizados sin alterar las acciones existentes.
 
-Consulte `../../00_LEEME_PRIMERO.md` y `../../04_DOCUMENTACION/18_FLUJO_QR_CHECKIN_REVISION_NOTIFICACIONES_4.2.49_ANDROID_3.3.3.md`.
+## Funcionalidad
+No se modificó la lógica de negocio de Check-in, rutas, GPS, notificaciones, permisos ni Supabase.

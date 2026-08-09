@@ -2792,7 +2792,7 @@
         return;
       }
       const script=document.createElement('script');
-      script.src='mapa.js?v=4.2.49-ui10';
+      script.src='mapa.js?v=4.2.50-ui11';
       script.async=true;
       script.dataset.mapaFlotas='dinamico';
       script.onload=comprobar;
@@ -4908,7 +4908,7 @@
     if(!confirm('¿Confirma la limpieza total? Se conservarán únicamente usuarios, roles, permisos, empresa y configuración.'))return;
     await conCargaBoton(button,'Limpiando…',async()=>{try{const result=await api.request('clearOperationalData',{confirmacion:'LIMPIAR DATOS'});if(result.persistenciaConfirmada!==true)throw new Error('LIMPIEZA_NO_CONFIRMADA');invalidarListasFormulario();cacheVistasModulo.clear();const total=Object.values(result.tablas||{}).reduce((sum,value)=>sum+Number(value||0),0);toast('Sistema operativo limpiado',`${number(total)} registros fueron retirados. Usuarios, roles, permisos y empresa se conservaron.`);await actualizarSeccionEnSegundoPlano('settings');}catch(error){toast('No se pudo limpiar',translateError(error),'error');}});
   }
-  function setTheme(dark){document.body.classList.toggle('dark',dark);localStorage.setItem('flotas_tema',dark?'dark':'light');window.TemaFlotas?.aplicarGuardado?.();}
+  function setTheme(dark){document.body.classList.toggle('dark',dark);document.documentElement.classList.toggle('tema-oscuro-inicial',dark);document.documentElement.style.colorScheme=dark?'dark':'light';localStorage.setItem('flotas_tema',dark?'dark':'light');window.TemaFlotas?.aplicarGuardado?.();}
 
   function openModal(){const token=++secuenciaModal;$('#modalBackdrop').classList.add('open');document.body.classList.add('modal-open');return token;}
   function closeModal(){secuenciaModal+=1;$('#modalBackdrop').classList.remove('open');document.body.classList.remove('modal-open');}

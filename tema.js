@@ -1,6 +1,11 @@
 (function(){
   'use strict';
   const CLAVE='flotas_paleta_global_v1';
+  /* Compatibilidad Web 4.2.50: fallbacks seguros para Safari/Firefox/Chromium. */
+  if(!window.requestIdleCallback){window.requestIdleCallback=function(cb,opts){const inicio=Date.now();return setTimeout(function(){cb({didTimeout:false,timeRemaining:function(){return Math.max(0,50-(Date.now()-inicio));}});},Math.min(Number(opts&&opts.timeout)||1,50));};}
+  if(!window.cancelIdleCallback){window.cancelIdleCallback=function(id){clearTimeout(id);};}
+  if(!String.prototype.replaceAll){Object.defineProperty(String.prototype,'replaceAll',{configurable:true,writable:true,value:function(search,replacement){if(search instanceof RegExp){if(!search.global)throw new TypeError('replaceAll requiere una expresión regular global');return this.replace(search,replacement);}return this.split(String(search)).join(String(replacement));}});}
+
   const HEX=/^#[0-9A-F]{6}$/i;
   const CAMPOS=Object.freeze({
     principal:'COLOR_PRINCIPAL',secundario:'COLOR_SECUNDARIO',acento:'COLOR_ACENTO',
@@ -11,7 +16,7 @@
   });
   const PREDETERMINADOS=Object.freeze({
     COLOR_PRINCIPAL:'#0E9F91',COLOR_SECUNDARIO:'#08746B',COLOR_ACENTO:'#3578E5',
-    COLOR_FONDO:'#F3F7FA',COLOR_SUPERFICIE:'#FFFFFF',COLOR_TEXTO:'#173047',COLOR_TEXTO_SECUNDARIO:'#65798B',COLOR_BORDE:'#DCE6EC',
+    COLOR_FONDO:'#FFFFFF',COLOR_SUPERFICIE:'#FFFFFF',COLOR_TEXTO:'#111111',COLOR_TEXTO_SECUNDARIO:'#333333',COLOR_BORDE:'#D9DEE2',
     COLOR_MENU:'#071725',COLOR_MENU_SECUNDARIO:'#0D2638',COLOR_EXITO:'#0E9F91',COLOR_ADVERTENCIA:'#D89216',COLOR_PELIGRO:'#DC4D60',
     COLOR_FONDO_OSCURO:'#071725',COLOR_SUPERFICIE_OSCURO:'#0D2638',COLOR_TEXTO_OSCURO:'#E9F1F7',COLOR_TEXTO_SECUNDARIO_OSCURO:'#9EB0BF',COLOR_BORDE_OSCURO:'#214359',
     TEMA_PREDETERMINADO:'Sistema'
@@ -21,7 +26,7 @@
     azul:{nombre:'Azul corporativo',valores:{...PREDETERMINADOS,COLOR_PRINCIPAL:'#2563EB',COLOR_SECUNDARIO:'#1D4ED8',COLOR_ACENTO:'#06B6D4',COLOR_MENU:'#0F172A',COLOR_MENU_SECUNDARIO:'#172554',COLOR_EXITO:'#059669'}},
     naranja:{nombre:'Naranja operativo',valores:{...PREDETERMINADOS,COLOR_PRINCIPAL:'#EA580C',COLOR_SECUNDARIO:'#C2410C',COLOR_ACENTO:'#2563EB',COLOR_MENU:'#2B160B',COLOR_MENU_SECUNDARIO:'#4A2511',COLOR_ADVERTENCIA:'#F59E0B'}},
     morado:{nombre:'Morado ejecutivo',valores:{...PREDETERMINADOS,COLOR_PRINCIPAL:'#7C3AED',COLOR_SECUNDARIO:'#5B21B6',COLOR_ACENTO:'#DB2777',COLOR_MENU:'#1E1533',COLOR_MENU_SECUNDARIO:'#312052',COLOR_EXITO:'#059669'}},
-    neutro:{nombre:'Gris neutro',valores:{...PREDETERMINADOS,COLOR_PRINCIPAL:'#475569',COLOR_SECUNDARIO:'#334155',COLOR_ACENTO:'#0F766E',COLOR_MENU:'#111827',COLOR_MENU_SECUNDARIO:'#1F2937',COLOR_FONDO:'#F1F5F9',COLOR_TEXTO:'#0F172A'}}
+    neutro:{nombre:'Gris neutro',valores:{...PREDETERMINADOS,COLOR_PRINCIPAL:'#475569',COLOR_SECUNDARIO:'#334155',COLOR_ACENTO:'#0F766E',COLOR_MENU:'#111827',COLOR_MENU_SECUNDARIO:'#1F2937',COLOR_FONDO:'#FFFFFF',COLOR_SUPERFICIE:'#FFFFFF',COLOR_TEXTO:'#111111',COLOR_TEXTO_SECUNDARIO:'#333333',COLOR_BORDE:'#D9DEE2'}}
   });
   function valido(value){return HEX.test(String(value||''));}
   function hex(value,fallback){return valido(value)?String(value).toUpperCase():fallback;}
@@ -36,6 +41,17 @@
       if(campo==='TEMA_PREDETERMINADO')return;
       out[campo]=hex(datos[campo],PREDETERMINADOS[campo]);
     });
+    /* Migra automáticamente la antigua paleta gris predeterminada al nuevo tema claro blanco/negro. */
+    const migracionesClaro={
+      COLOR_FONDO:new Set(['#F3F7FA','#F3F7F8','#F1F5F9','#EEF5F4']),
+      COLOR_TEXTO:new Set(['#173047','#17312F','#15312F']),
+      COLOR_TEXTO_SECUNDARIO:new Set(['#65798B','#667B79','#667B78']),
+      COLOR_BORDE:new Set(['#DCE6EC','#D9E5E4','#D8E5E3'])
+    };
+    if(migracionesClaro.COLOR_FONDO.has(out.COLOR_FONDO))out.COLOR_FONDO=PREDETERMINADOS.COLOR_FONDO;
+    if(migracionesClaro.COLOR_TEXTO.has(out.COLOR_TEXTO))out.COLOR_TEXTO=PREDETERMINADOS.COLOR_TEXTO;
+    if(migracionesClaro.COLOR_TEXTO_SECUNDARIO.has(out.COLOR_TEXTO_SECUNDARIO))out.COLOR_TEXTO_SECUNDARIO=PREDETERMINADOS.COLOR_TEXTO_SECUNDARIO;
+    if(migracionesClaro.COLOR_BORDE.has(out.COLOR_BORDE))out.COLOR_BORDE=PREDETERMINADOS.COLOR_BORDE;
     const modo=String(datos.TEMA_PREDETERMINADO||PREDETERMINADOS.TEMA_PREDETERMINADO);
     out.TEMA_PREDETERMINADO=['Claro','Oscuro','Sistema'].includes(modo)?modo:'Sistema';
     return out;
@@ -84,5 +100,8 @@
   }
   function aplicarGuardado(){return aplicar(guardado(),{guardar:false});}
   window.TemaFlotas=Object.freeze({CAMPOS,PREDETERMINADOS,PREAJUSTES,normalizar,guardado,aplicar,aplicarEmpresa,aplicarGuardado,modoOscuroInicial,contraste,mezclar,valido});
+  const oscuroInicial=modoOscuroInicial();
+  document.documentElement.classList.toggle('tema-oscuro-inicial',oscuroInicial);
+  document.documentElement.style.colorScheme=oscuroInicial?'dark':'light';
   aplicarGuardado();
 })();

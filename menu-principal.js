@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.48';
+  const VERSION='4.2.50';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -397,6 +397,8 @@
   function aplicarTema(){
     window.TemaFlotas?.aplicarGuardado?.();
     document.body.classList.toggle('oscuro',oscuro);
+    document.documentElement.classList.toggle('tema-oscuro-inicial',oscuro);
+    document.documentElement.style.colorScheme=oscuro?'dark':'light';
     $('#cambiarTemaMenu').textContent=oscuro?'☀':'☾';
     enviar({tipo:'flotas:tema',oscuro});
   }

@@ -1,0 +1,46 @@
+SISTEMA DE GESTIÓN DE FLOTAS · VALIDACIÓN WEB 4.2.51 VISUAL
+
+RESULTADO: APROBADO PARA ENTREGA COMO CORRECCIÓN VISUAL
+
+1. ALCANCE
+[OK] Solo versión Web.
+[OK] Sin cambios SQL.
+[OK] Sin cambios API/Supabase.
+[OK] Android no incluido ni modificado.
+
+2. INTEGRIDAD FUNCIONAL
+[OK] index.html SHA-256 idéntico a Web 4.2.50.
+[OK] main.html SHA-256 idéntico a Web 4.2.50.
+[OK] Todos los archivos JavaScript son byte-a-byte idénticos a Web 4.2.50.
+[OK] No se modificaron acciones, permisos, Check-in, rutas, GPS ni notificaciones.
+
+3. PRESENTACIÓN
+[OK] Panel del Conductor usa fondo blanco real en tema claro.
+[OK] Texto principal negro y texto secundario gris oscuro.
+[OK] Origen, destino, indicaciones, reloj y metadatos recuperan contraste.
+[OK] Botones secundarios de ruta permanecen blancos con texto oscuro.
+[OK] Los colores semánticos de estado se mantienen.
+[OK] Tarjeta Mi conexión no se estira innecesariamente en escritorio.
+[OK] Botón GPS obligatorio deshabilitado conserva contraste legible.
+[OK] Tema oscuro conserva superficies oscuras y texto claro.
+[OK] Responsive existente se mantiene sin alterar su lógica.
+
+4. VALIDACIÓN TÉCNICA
+[OK] interfaz-moderna.css procesado con tinycss2: 0 errores de parseo.
+[OK] Llaves CSS balanceadas.
+[OK] panel-principal.html procesado correctamente por parser HTML.
+[OK] Todas las referencias locales de panel-principal.html existen.
+[OK] Cache-busting CSS actualizado a 4.2.51-ui12 sin cambiar scripts.
+
+5. COMPATIBILIDAD DE NAVEGADORES
+La corrección 4.2.51 usa CSS estándar (variables CSS, Grid/Flexbox, :not(),
+:where(), media queries y propiedades de color/borde) soportado por versiones
+modernas de Chrome, Edge, Firefox y Safari. No se introdujeron APIs JavaScript
+ni eventos nuevos, por lo que las acciones siguen usando exactamente el mismo
+código funcional de Web 4.2.50.
+
+Limitación de la validación: en este entorno no es posible ejecutar una matriz
+real de Chrome + Edge + Firefox + Safari. La comprobación realizada es estática,
+de sintaxis, integridad y compatibilidad de código. Debe hacerse una prueba visual
+final en los navegadores de destino después de publicar para confirmar diferencias
+de renderizado propias del sistema operativo/fuentes.

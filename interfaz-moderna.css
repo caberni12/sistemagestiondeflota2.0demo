@@ -1,5 +1,5 @@
 /*
- * Sistema de Gestión de Flotas 4.2.48
+ * Sistema de Gestión de Flotas 4.2.50
  * Capa visual unificada y progresiva.
  * Se carga después de los estilos existentes para modernizar la interfaz
  * sin alterar la lógica JavaScript ni la estructura de los módulos.
@@ -8,20 +8,20 @@
 :root{
   color-scheme:light;
   --ui-font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --ui-bg:#f3f7f8;
-  --ui-surface:#ffffff;
-  --ui-surface-soft:#f7fafb;
-  --ui-surface-muted:#eaf1f3;
-  --ui-text:#17312f;
-  --ui-text-soft:#667b79;
-  --ui-border:#d9e5e4;
-  --ui-primary:#0b7f74;
-  --ui-primary-strong:#075d56;
+  --ui-bg:var(--tema-fondo,#ffffff);
+  --ui-surface:var(--tema-superficie,#ffffff);
+  --ui-surface-soft:var(--tema-superficie-2,#ffffff);
+  --ui-surface-muted:var(--tema-superficie-3,#ffffff);
+  --ui-text:var(--tema-texto,#111111);
+  --ui-text-soft:var(--tema-texto-suave,#333333);
+  --ui-border:var(--tema-borde,#d9dee2);
+  --ui-primary:var(--tema-principal,#0e9f91);
+  --ui-primary-strong:var(--tema-secundario,#08746b);
   --ui-primary-soft:#e5f6f3;
-  --ui-success:#168a57;
-  --ui-warning:#c98212;
-  --ui-danger:#c74655;
-  --ui-info:#3778d4;
+  --ui-success:var(--tema-exito,#168a57);
+  --ui-warning:var(--tema-advertencia,#c98212);
+  --ui-danger:var(--tema-peligro,#c74655);
+  --ui-info:var(--tema-acento,#3778d4);
   --ui-radius-xs:9px;
   --ui-radius-sm:12px;
   --ui-radius-md:16px;
@@ -93,13 +93,13 @@
 body.dark,
 body.oscuro{
   color-scheme:dark;
-  --ui-bg:#091513;
-  --ui-surface:#11211f;
-  --ui-surface-soft:#182b28;
-  --ui-surface-muted:#203632;
-  --ui-text:#eef7f5;
-  --ui-text-soft:#a5b8b4;
-  --ui-border:#29413d;
+  --ui-bg:var(--tema-fondo-oscuro,#091513);
+  --ui-surface:var(--tema-superficie-oscura,#11211f);
+  --ui-surface-soft:var(--tema-superficie-oscura-2,#182b28);
+  --ui-surface-muted:var(--tema-superficie-oscura-3,#203632);
+  --ui-text:var(--tema-texto-oscuro,#eef7f5);
+  --ui-text-soft:var(--tema-texto-suave-oscuro,#a5b8b4);
+  --ui-border:var(--tema-borde-oscuro,#29413d);
   --ui-primary:#42c6b7;
   --ui-primary-strong:#20a999;
   --ui-primary-soft:#153a35;
@@ -267,7 +267,7 @@ body{
   background:color-mix(in srgb,var(--ui-surface) 94%,var(--ui-primary-soft));
   color:var(--ui-text-soft);
   border-bottom-color:var(--ui-border);
-  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 }
 .table-wrap tbody tr{transition:background-color var(--ui-transition)}
 .table-wrap tbody tr:nth-child(even){background:color-mix(in srgb,var(--ui-surface-soft) 55%,transparent)}
@@ -277,7 +277,7 @@ body{
 /* Modales y capas flotantes */
 .modal-backdrop{
   background:rgba(5,23,21,.55);
-  backdrop-filter:blur(7px) saturate(.92);
+  -webkit-backdrop-filter:blur(7px) saturate(.92);backdrop-filter:blur(7px) saturate(.92);
 }
 .modal{
   border:1px solid color-mix(in srgb,var(--ui-border) 88%,transparent);
@@ -288,7 +288,7 @@ body{
 .modal-header{
   border-bottom-color:var(--ui-border);
   background:color-mix(in srgb,var(--ui-surface) 95%,transparent);
-  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
 }
 
 .toast,.toast-aviso-menu{
@@ -301,7 +301,7 @@ body{
 :where(.topbar,.barra-modular){
   border-bottom-color:var(--ui-border);
   background:color-mix(in srgb,var(--ui-surface) 89%,transparent);
-  backdrop-filter:blur(16px) saturate(1.15);
+  -webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);
   box-shadow:0 1px 0 rgba(255,255,255,.28);
 }
 
@@ -319,7 +319,7 @@ body{
   border-radius:var(--ui-radius-md);
   background:color-mix(in srgb,var(--ui-surface) 96%,transparent);
   box-shadow:var(--ui-shadow-lg);
-  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
 }
 
 .connection-status,.save-status,.estado-modular{
@@ -338,7 +338,7 @@ body{
   border-color:color-mix(in srgb,var(--ui-border) 88%,transparent);
   background:color-mix(in srgb,var(--ui-surface) 94%,transparent);
   box-shadow:var(--ui-shadow-lg);
-  backdrop-filter:blur(18px) saturate(1.08);
+  -webkit-backdrop-filter:blur(18px) saturate(1.08);backdrop-filter:blur(18px) saturate(1.08);
 }
 .resumen-acceso article,.hero-preview div{
   border-color:rgba(255,255,255,.16);
@@ -371,7 +371,7 @@ body{
 .map-toolbar,.map-status-legend{
   border-color:var(--ui-border);
   background:color-mix(in srgb,var(--ui-surface) 91%,transparent);
-  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
 }
 .mapa-detalle,.mapa-marcador>span{
   border-color:color-mix(in srgb,var(--ui-border) 85%,transparent);
@@ -429,4 +429,276 @@ body.oscuro .document-secure-frame{background:#fff}
   body{background:#fff!important;color:#000!important}
   :where(.sidebar,.menu-lateral,.topbar,.barra-modular,.toolbar,.heading-actions,.btn,.boton-icono,.icon-button,.toast-stack,.toast-avisos-menu){display:none!important}
   :where(.card,.metric-card,.table-wrap,.map-card){box-shadow:none!important;border-color:#cbd5e1!important}
+}
+
+
+/* ================================================================
+   WEB 4.2.50 · TEMA CLARO BLANCO/NEGRO + COMPATIBILIDAD MULTINAVEGADOR
+   ================================================================ */
+html:not(.tema-oscuro-inicial){background:#fff;color:#111}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro){
+  --ui-bg:#fff;
+  --ui-surface:#fff;
+  --ui-surface-soft:#fff;
+  --ui-surface-muted:#fff;
+  --ui-text:#111;
+  --ui-text-soft:#333;
+  --ui-border:#d9dee2;
+  --bg:#fff;--fondo:#fff;--surface:#fff;--superficie:#fff;--surface-2:#fff;--surface-soft:#fff;--superficie-suave:#fff;--surface-3:#fff;
+  --text:#111;--texto:#111;--muted:#333;--suave:#333;--texto-suave:#333;--line:#d9dee2;--border:#d9dee2;--borde:#d9dee2;
+  background:#fff;
+  color:#111;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(
+  .content,.module-content,.area-modular,.contenedor-iframe,.panel-acceso,
+  .card,.metric-card,.quick-action,.device-card,.route-card,.notification-card,
+  .tracking-filter-card,.map-card,.backend-card,.office-tool-card,.office-task,
+  .permission-button-section,.backup-database-card,.document-review-panel,
+  .operation-verification,.settings-grid article,.table-wrap,.modal,.modal-content,
+  .panel-avisos-menu,.resumen-avisos-menu>div,.document-expedient-card,
+  .document-expedient-item,.document-expedient-stats span,.document-expedient-modal-summary span,
+  .tarjeta-acceso,.empresa-conectada-acceso,.estado-empresa-pendiente
+){background-color:#fff;color:#111}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .panel-acceso{background:#fff!important}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .tarjeta-acceso{background:#fff!important;border-color:#d9dee2!important}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(h1,h2,h3,h4,h5,h6,b,strong,label,dt,dd,p,span,small){text-shadow:none}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.helper,.muted,.subtext,.card-header p,.heading p,.field small,.field>span,.toolbar label,.info-item span,.metric-card span,.quick-action p,.document-expedient-next){color:#333}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.field input,.field select,.field textarea,.toolbar input,.toolbar select,.campo input,input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),select,textarea){background:#fff;color:#111;border-color:#d9dee2}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(input,select,textarea)::placeholder{color:#666;opacity:1}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .table-wrap table{background:#fff;color:#111}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .table-wrap :where(thead,tbody,tr,th,td){background:#fff;color:#111}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .table-wrap :where(th,td){border-color:#d9dee2}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .table-wrap tbody tr:nth-child(even){background:#fff}
+@media (hover:hover){html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .table-wrap tbody tr:hover{background:rgba(14,159,145,.045)}}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.topbar,.barra-modular){background:#fff;color:#111;border-color:#d9dee2}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.boton-icono,.icon-button,.btn.soft,.btn.secondary,.panel-avisos-menu>footer button){background:#fff;color:#111;border-color:#d9dee2}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.boton-icono,.icon-button,.btn.soft,.btn.secondary,.panel-avisos-menu>footer button):hover{background:rgba(14,159,145,.055)}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) :where(.estado-conexion,.estado-empresa-pendiente){background:#fff}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .document-expedient-card{background:#fff!important}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .document-expedient-card header>i{background:rgba(14,159,145,.10)}
+
+/* El modo oscuro conserva superficies oscuras y alto contraste, incluido acceso. */
+html.tema-oscuro-inicial body:not(.dark):not(.oscuro){
+  --ui-bg:var(--tema-fondo-oscuro,#091513);
+  --ui-surface:var(--tema-superficie-oscura,#11211f);
+  --ui-surface-soft:var(--tema-superficie-oscura-2,#182b28);
+  --ui-surface-muted:var(--tema-superficie-oscura-3,#203632);
+  --ui-text:var(--tema-texto-oscuro,#eef7f5);
+  --ui-text-soft:var(--tema-texto-suave-oscuro,#a5b8b4);
+  --ui-border:var(--tema-borde-oscuro,#29413d);
+  --bg:var(--ui-bg);--fondo:var(--ui-bg);--surface:var(--ui-surface);--superficie:var(--ui-surface);--surface-2:var(--ui-surface-soft);--surface-soft:var(--ui-surface-soft);--superficie-suave:var(--ui-surface-soft);--surface-3:var(--ui-surface-muted);
+  --text:var(--ui-text);--texto:var(--ui-text);--muted:var(--ui-text-soft);--suave:var(--ui-text-soft);--texto-suave:var(--ui-text-soft);--line:var(--ui-border);--border:var(--ui-border);--borde:var(--ui-border);
+  background:var(--ui-bg);color:var(--ui-text);
+}
+html.tema-oscuro-inicial{background:var(--tema-fondo-oscuro,#091513);color:var(--tema-texto-oscuro,#eef7f5)}
+html.tema-oscuro-inicial .panel-acceso,body.dark .panel-acceso,body.oscuro .panel-acceso{background:var(--ui-bg)!important}
+html.tema-oscuro-inicial .tarjeta-acceso,body.dark .tarjeta-acceso,body.oscuro .tarjeta-acceso{background:var(--ui-surface)!important;color:var(--ui-text)!important;border-color:var(--ui-border)!important}
+html.tema-oscuro-inicial :where(.campo input,.campo select,.campo textarea),body.dark :where(.campo input,.campo select,.campo textarea),body.oscuro :where(.campo input,.campo select,.campo textarea){background:var(--ui-surface)!important;color:var(--ui-text)!important;border-color:var(--ui-border)!important}
+html.tema-oscuro-inicial :where(.encabezado-formulario p,.descripcion-conexion-inicial,.detalle-servicio),body.dark :where(.encabezado-formulario p,.descripcion-conexion-inicial,.detalle-servicio),body.oscuro :where(.encabezado-formulario p,.descripcion-conexion-inicial,.detalle-servicio){color:var(--ui-text-soft)!important}
+
+/* Controles consistentes Chrome / Edge / Firefox / Safari. */
+button,input,select,textarea{font:inherit;-webkit-font-smoothing:antialiased}
+button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input,textarea,select{min-width:0}
+select{color-scheme:inherit}
+input[type="date"],input[type="time"],input[type="datetime-local"]{color-scheme:inherit}
+@supports (-webkit-touch-callout:none){
+  input,select,textarea{font-size:max(16px,1em)}
+  .table-wrap{-webkit-overflow-scrolling:touch}
+}
+@supports not (color:color-mix(in srgb,#000 50%,#fff)){
+  :where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid rgba(14,159,145,.50)}
+  :where(input,select,textarea)::placeholder{color:#666}
+  *{scrollbar-color:var(--ui-primary) transparent}
+}
+@supports not (height:100dvh){
+  .pagina-acceso{min-height:100vh}
+  .modal-backdrop,.qr-backdrop{min-height:100vh}
+}
+
+/* ================================================================
+   WEB 4.2.51 · AJUSTE VISUAL DEL PANEL PRINCIPAL DEL CONDUCTOR
+   Solo presentación: no cambia API, SQL, permisos, acciones ni flujos.
+   ================================================================ */
+
+/* El panel del Conductor no debe estirar la tarjeta de conexión a la altura
+   de la ruta. Cada bloque conserva únicamente la altura de su contenido. */
+.driver-home{
+  align-items:start;
+}
+.driver-home > .card{
+  align-self:start;
+}
+
+/* TEMA CLARO · blanco real + texto negro de alto contraste. */
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home{
+  color:#111;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero{
+  background:#fff!important;
+  color:#111!important;
+  border:1px solid #d9dee2!important;
+  border-top:5px solid var(--ui-primary)!important;
+  box-shadow:var(--ui-shadow-sm)!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero > .card-header{
+  padding-bottom:12px;
+  border-bottom:1px solid #e5e7eb;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero > .card-header :where(h3,p),
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-card header h4{
+  color:#111;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero > .card-header p,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-card header p,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-meta{
+  color:#333!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero > .route-card{
+  margin-top:12px;
+  background:#fff!important;
+  color:#111!important;
+  border:1px solid #d9dee2!important;
+  box-shadow:none!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-path{
+  background:#fff!important;
+  color:#111!important;
+  border:1px solid #e5e7eb;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-path span,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-path b,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-instructions,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-instructions b{
+  color:#111!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-clock{
+  background:#fff!important;
+  color:#111!important;
+  border-color:#d9dee2!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-clock small{
+  color:#333!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-clock b{
+  color:#111!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-clock.running b{
+  color:var(--ui-primary-strong)!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-actions .btn.soft,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-actions a.btn.soft{
+  background:#fff!important;
+  color:#111!important;
+  border-color:#cfd6dc!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-actions .btn.soft:hover,
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-route-hero .route-actions a.btn.soft:hover{
+  background:#fff!important;
+  color:var(--ui-primary-strong)!important;
+  border-color:var(--ui-primary)!important;
+}
+
+/* Tarjeta Mi conexión: compacta, blanca y legible. */
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home > .card:not(.driver-route-hero){
+  background:#fff!important;
+  color:#111!important;
+  border-color:#d9dee2!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home > .card:not(.driver-route-hero) .card-header :where(h3,p){
+  color:#111!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home > .card:not(.driver-route-hero) .card-header p{
+  color:#333!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home .tracking-notice.active{
+  color:#174f45!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home .tracking-notice.active b{
+  color:#174f45!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home .tracking-notice.active span{
+  color:#285f56!important;
+}
+html:not(.tema-oscuro-inicial) body:not(.dark):not(.oscuro) .driver-home [data-toggle-tracking]:disabled{
+  opacity:1!important;
+  background:#fff!important;
+  color:#176534!important;
+  border:1px solid #9bd7ac!important;
+  box-shadow:none!important;
+  cursor:not-allowed;
+}
+
+/* El fondo del contenido del Panel principal permanece blanco en tema claro. */
+html:not(.tema-oscuro-inicial) body.modo-modulo-iframe:not(.dark):not(.oscuro),
+html:not(.tema-oscuro-inicial) body.modo-modulo-iframe:not(.dark):not(.oscuro) .content{
+  background:#fff!important;
+}
+
+/* TEMA OSCURO · conservar la identidad oscura y el contraste correcto. */
+html.tema-oscuro-inicial .driver-route-hero,
+body.dark .driver-route-hero,
+body.oscuro .driver-route-hero{
+  background:var(--ui-surface)!important;
+  color:var(--ui-text)!important;
+  border:1px solid var(--ui-border)!important;
+  border-top:5px solid var(--ui-primary)!important;
+}
+html.tema-oscuro-inicial .driver-route-hero > .card-header,
+body.dark .driver-route-hero > .card-header,
+body.oscuro .driver-route-hero > .card-header{
+  padding-bottom:12px;
+  border-bottom:1px solid var(--ui-border);
+}
+html.tema-oscuro-inicial .driver-route-hero > .card-header :where(h3,p),
+html.tema-oscuro-inicial .driver-route-hero .route-card header h4,
+body.dark .driver-route-hero > .card-header :where(h3,p),
+body.dark .driver-route-hero .route-card header h4,
+body.oscuro .driver-route-hero > .card-header :where(h3,p),
+body.oscuro .driver-route-hero .route-card header h4{
+  color:var(--ui-text);
+}
+html.tema-oscuro-inicial .driver-route-hero > .card-header p,
+html.tema-oscuro-inicial .driver-route-hero .route-card header p,
+html.tema-oscuro-inicial .driver-route-hero .route-meta,
+body.dark .driver-route-hero > .card-header p,
+body.dark .driver-route-hero .route-card header p,
+body.dark .driver-route-hero .route-meta,
+body.oscuro .driver-route-hero > .card-header p,
+body.oscuro .driver-route-hero .route-card header p,
+body.oscuro .driver-route-hero .route-meta{
+  color:var(--ui-text-soft)!important;
+}
+html.tema-oscuro-inicial .driver-route-hero > .route-card,
+html.tema-oscuro-inicial .driver-route-hero .route-path,
+html.tema-oscuro-inicial .driver-route-hero .route-clock,
+body.dark .driver-route-hero > .route-card,
+body.dark .driver-route-hero .route-path,
+body.dark .driver-route-hero .route-clock,
+body.oscuro .driver-route-hero > .route-card,
+body.oscuro .driver-route-hero .route-path,
+body.oscuro .driver-route-hero .route-clock{
+  background:var(--ui-surface-soft)!important;
+  color:var(--ui-text)!important;
+  border-color:var(--ui-border)!important;
+}
+html.tema-oscuro-inicial .driver-route-hero .route-actions .btn.soft,
+body.dark .driver-route-hero .route-actions .btn.soft,
+body.oscuro .driver-route-hero .route-actions .btn.soft{
+  background:var(--ui-surface)!important;
+  color:var(--ui-text)!important;
+  border-color:var(--ui-border)!important;
+}
+html.tema-oscuro-inicial .driver-home [data-toggle-tracking]:disabled,
+body.dark .driver-home [data-toggle-tracking]:disabled,
+body.oscuro .driver-home [data-toggle-tracking]:disabled{
+  opacity:1!important;
+  background:var(--ui-surface-soft)!important;
+  color:var(--ui-success)!important;
+  border-color:var(--ui-success)!important;
+}
+
+@media(max-width:1180px){
+  .driver-home{align-items:stretch}
+  .driver-home > .card{align-self:stretch}
 }

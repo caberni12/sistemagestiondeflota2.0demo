@@ -21,7 +21,7 @@ button{cursor:pointer}
 .marca-acceso,.mensaje-acceso,.resumen-acceso{position:relative;z-index:1}
 .marca-acceso{display:flex;align-items:center;gap:14px}.marca-acceso img{width:56px;height:56px;border-radius:16px;background:#fff;padding:6px;object-fit:contain}.marca-acceso strong,.marca-acceso span{display:block}.marca-acceso strong{font-size:16px}.marca-acceso span{margin-top:4px;font-size:12px;color:#bce2dd}
 .mensaje-acceso{max-width:710px;margin:70px 0}.etiqueta{display:block;font-size:11px;font-weight:850;letter-spacing:.13em}.mensaje-acceso .etiqueta{color:#a9dfd8}.mensaje-acceso h1{max-width:750px;margin:16px 0 18px;font-size:clamp(34px,5vw,66px);line-height:1.04;letter-spacing:-.045em}.mensaje-acceso p{max-width:620px;margin:0;color:#d6eeeb;font-size:clamp(15px,1.7vw,19px);line-height:1.65}
-.resumen-acceso{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.resumen-acceso article{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(3,45,42,.26);backdrop-filter:blur(10px)}.resumen-acceso i{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.13);font-style:normal}.resumen-acceso b,.resumen-acceso span{display:block}.resumen-acceso b{font-size:13px}.resumen-acceso span{margin-top:3px;color:#bce2dd;font-size:10px}
+.resumen-acceso{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.resumen-acceso article{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(3,45,42,.26);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}.resumen-acceso i{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.13);font-style:normal}.resumen-acceso b,.resumen-acceso span{display:block}.resumen-acceso b{font-size:13px}.resumen-acceso span{margin-top:3px;color:#bce2dd;font-size:10px}
 .panel-acceso{display:grid;place-items:center;padding:28px;background:radial-gradient(circle at top right,#fff 0,#f4f8f7 48%,#eaf2f1 100%)}
 .tarjeta-acceso{width:min(100%,470px);padding:clamp(25px,4vw,42px);border:1px solid rgba(216,229,227,.9);border-radius:24px;background:rgba(255,255,255,.94);box-shadow:var(--sombra)}
 .encabezado-formulario .etiqueta{color:var(--primario)}.encabezado-formulario h2{margin:9px 0 7px;font-size:32px;letter-spacing:-.035em}.encabezado-formulario p{margin:0;color:var(--suave);line-height:1.55}
@@ -47,7 +47,7 @@ button{cursor:pointer}
 @media(max-width:720px){.preconfig-grid{grid-template-columns:1fr}.campo-completo{grid-column:auto}.preconfiguracion{padding:22px 18px}}
 
 
-/* Login móvil 4.2.49-ui10: el teclado no cubre Usuario, Contraseña ni Ingresar */
+/* Login móvil 4.2.50-ui11: el teclado no cubre Usuario, Contraseña ni Ingresar */
 :root{--alto-visible-login:100dvh}
 @media(max-width:900px){
   html,body{min-height:100%;overflow-x:hidden}

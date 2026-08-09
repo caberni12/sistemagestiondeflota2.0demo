@@ -1,0 +1,39 @@
+VALIDACIÓN WEB 4.2.50 — TEMA Y COMPATIBILIDAD
+Resultado: 28/28 comprobaciones aprobadas
+
+ALCANCE: validación estática y de sintaxis para Chrome/Edge (Chromium), Firefox y Safari modernos. El entorno bloqueó la navegación de navegador headless, por lo que no se afirma una ejecución real en Safari/Firefox dentro de este contenedor.
+
+[OK] Archivos HTML presentes — 25 HTML
+[OK] Referencias locales existentes
+[OK] Capa visual cargada en todas las pantallas
+[OK] Tema cargado en todas las pantallas
+[OK] Cache-busting actualizado a 4.2.50
+[OK] Sintaxis JavaScript
+[OK] Sintaxis CSS principal
+[OK] Tema claro blanco
+[OK] Texto principal negro
+[OK] Texto secundario oscuro
+[OK] Tema oscuro conservado
+[OK] Tema sincronizado menú/módulos
+[OK] Preferencia de tema persistente
+[OK] Fallback requestIdleCallback
+[OK] Fallback replaceAll
+[OK] Fallback color-mix
+[OK] Fallback 100dvh
+[OK] Sin dependencia CSS :has
+[OK] Compatibilidad backdrop-filter Safari — unprefixed=17, webkit=17
+[OK] Acción QR Check-in
+[OK] Acción rutas
+[OK] Acción GPS
+[OK] Acción notificaciones
+[OK] Acción cambio de tema menú
+[OK] Propagación postMessage iframe
+[OK] Contraste negro/blanco WCAG — 18.88:1
+[OK] Contraste secundario/blanco WCAG — 12.63:1
+[OK] Contraste oscuro principal — 15.88:1
+
+CAMBIOS PRINCIPALES:
+- Tema claro: superficies blancas y texto negro/oscuro.
+- Tema oscuro: conservado y sincronizado entre menú y módulos.
+- Fallbacks para diferencias de motor CSS/JS.
+- No se alteró la lógica de negocio ni las llamadas a Supabase.

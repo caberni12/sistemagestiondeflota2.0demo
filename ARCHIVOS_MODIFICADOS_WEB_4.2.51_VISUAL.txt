@@ -1,0 +1,29 @@
+SISTEMA DE GESTIÓN DE FLOTAS · WEB 4.2.51 VISUAL
+
+ARCHIVOS MODIFICADOS RESPECTO A WEB 4.2.50
+1. interfaz-moderna.css
+   - Corrección visual del Panel Principal del Conductor.
+   - Tema claro blanco/negro de alto contraste.
+   - Tema oscuro conservado.
+   - Tarjeta "Mi conexión" compacta en escritorio.
+   - Datos internos de ruta legibles sobre blanco.
+   - Estado GPS obligatorio deshabilitado legible.
+
+2. panel-principal.html
+   - Únicamente se actualizó el identificador de caché de las tres hojas CSS
+     de 4.2.50-ui11 a 4.2.51-ui12.
+   - No se modificó estructura, acciones ni JavaScript.
+
+ARCHIVOS FUNCIONALES NO MODIFICADOS
+- index.html
+- main.html
+- aplicacion.js
+- conexion.js
+- tema.js
+- menu-principal.js
+- configuracion.js
+- mapa.js
+- qr-flotas.js
+- reportes-exportacion.js
+
+No se incluyen cambios SQL, API, Supabase ni Android.
