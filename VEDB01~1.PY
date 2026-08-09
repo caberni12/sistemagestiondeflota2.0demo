@@ -9,8 +9,8 @@ errors = []
 required = [
     'Codigo_Completo.gs', 'aplicacion.js', 'conexion.js', 'configuracion.js',
     'combustible.html', 'checkin-vehicular.html', 'operaciones.html', 'oficina-virtual.html',
-    'main.html', 'menu-principal.js',
-    'CAMBIOS_VERSION_3.18.4.md', 'LEEME_ACTUALIZACION_3.18.4.md', 'PRUEBAS_VERSION_3.18.4.md',
+    'CAMBIOS_VERSION_3.18.1.md', 'LEEME_ACTUALIZACION_3.18.1.md',
+    'PRUEBAS_VERSION_3.18.1.md',
 ]
 for name in required:
     if not (root / name).is_file():
@@ -20,14 +20,9 @@ app = (root / 'aplicacion.js').read_text(encoding='utf-8')
 connection = (root / 'conexion.js').read_text(encoding='utf-8')
 server = (root / 'Codigo_Completo.gs').read_text(encoding='utf-8')
 configuration = (root / 'configuracion.js').read_text(encoding='utf-8')
-main = (root / 'main.html').read_text(encoding='utf-8')
-menu = (root / 'menu-principal.js').read_text(encoding='utf-8')
-url_servicio = 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec'
-if url_servicio not in configuration:
-    errors.append('La nueva URL /exec no está integrada en configuracion.js')
 
 for value in [
-    "VERSION: '3.18.4'", 'data-open-fuel-qr', 'data-open-checkin-qr',
+    "VERSION: '3.18.1'", 'data-open-fuel-qr', 'data-open-checkin-qr',
     "openQr('combustible')", "openQr('checkin')", 'aplicarVehiculoQrCheckin',
     "api.request('validateVehicleQr',{codigo:limpio,contexto:context})",
     'AUTORIZACION_QR',
@@ -36,7 +31,7 @@ for value in [
         errors.append(f'La interfaz QR contextual no contiene: {value}')
 
 for value in [
-    "const VERSION_APLICACION = '3.18.4'", 'normalizarContextoQrVehiculo_',
+    "const VERSION_APLICACION = '3.18.1'", 'normalizarContextoQrVehiculo_',
     'consumirAutorizacionQr_', 'CONTEXTO:context',
     "context === 'combustible'", "context === 'checkin'",
     'COMBUSTIBLE_ASIGNACION_ACTIVA_REQUERIDA', 'acceso mediante QR',
@@ -76,55 +71,10 @@ for value in ['officeQuickStatus', 'officeTasks', 'officeStatus', 'officeAsk', '
     if value not in connection:
         errors.append(f'El modo local de Oficina Virtual no contiene: {value}')
 
-for value in [
-    'avisosEmergentesMenu', 'interruptorAvisosEmergentes',
-    'Los pendientes siguen en el icono',
-]:
-    if value not in main:
-        errors.append(f'El interruptor administrativo no contiene: {value}')
-
-for value in [
-    'claveAvisosEmergentesMenu', 'avisosEmergentesActivosMenu',
-    "localStorage.setItem(claveAvisosEmergentesMenu(),activo?'SI':'NO')",
-    "document.querySelectorAll('.toast-aviso-menu')",
-    'if(!avisosEmergentesActivosMenu())return',
-    'Avisos emergentes silenciados · pendientes en el icono',
-]:
-    if value not in menu:
-        errors.append(f'El control del menú no contiene: {value}')
-
-for value in [
-    'api.requestBatch(consultas,{force:true})',
-    'if(consultaAvisosPendiente)return consultaAvisosPendiente',
-    'firmaColeccionAvisos', 'firmaAvisosRenderizada',
-    'programarAvisos(document.hidden?30000',
-    'requestIdleCallback', 'Date.now()-oficinaConsultadaEn<60000',
-    "if(auth.user&&!desdeModulo)await esperar(350)",
-    "data.tipo==='flotas:actualizar-avisos'",
-]:
-    if value not in menu:
-        errors.append(f'La optimización de rendimiento no contiene: {value}')
-
-if "setInterval(actualizarAvisos" in menu:
-    errors.append('Los avisos todavía pueden superponer consultas mediante setInterval')
-
-for value in [
-    'claveAvisosEmergentes', 'avisosEmergentesActivos',
-    'if(embeddedMode||!avisosEmergentesActivos())return',
-    "if(embeddedMode){postParent({tipo:'flotas:actualizar-avisos'});return;}",
-    'notificationSnapshotReady&&avisosEmergentesActivos()',
-    "badge.textContent=count>99?'99+':String(count)",
-]:
-    if value not in app:
-        errors.append(f'La cola silenciosa no contiene: {value}')
-
-if "api.request('readNotification'" in menu or "api.request('readAlert'" in menu:
-    errors.append('El interruptor no debe marcar avisos como leídos')
-
 for html in root.glob('*.html'):
     text = html.read_text(encoding='utf-8')
-    if 'aplicacion.js' in text and 'aplicacion.js?v=3.18.4' not in text:
-        errors.append(f'{html.name} no referencia aplicacion.js 3.18.4')
+    if 'aplicacion.js' in text and 'aplicacion.js?v=3.18.1' not in text:
+        errors.append(f'{html.name} no referencia aplicacion.js 3.18.1')
 
 for js in root.glob('*.js'):
     result = subprocess.run(['node', '--check', str(js)], capture_output=True, text=True)
@@ -142,4 +92,4 @@ if errors:
     print('\n'.join(errors))
     sys.exit(1)
 
-print('Sistema web 3.18.4 verificado correctamente.')
+print('Sistema web 3.18.1 verificado correctamente.')

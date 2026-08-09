@@ -1,35 +1,38 @@
 # Sistema de Gestión de Flotas 3.1.1
 
-# Estructura de carpeta única 2.8.0
+# Estructura modular 2.8.0
 
-Todos los archivos deben subirse al mismo nivel en GitHub. No se utilizan subcarpetas.
+## Flujo principal
 
-## Archivos principales
+`index.html` → inicio de sesión → `main.html` → botón hamburguesa → vista seleccionada.
 
-- `index.html`: preconfiguración automática cuando no hay usuarios e inicio de sesión cuando el sistema ya está configurado.
-- `main.html`: contenedor del menú y de las vistas.
-- `menu-principal.js`: navegación con un único iframe.
-- `configuracion.js`: dirección del servicio y parámetros.
-- `conexion.js`: comunicación con Google Apps Script y modo local.
-- `aplicacion.js`: lógica de las vistas.
-- `estilos.css` y `responsive.css`: diseño general y adaptable.
+`main.html` mantiene un único iframe. Al abrir otra opción, la vista anterior se descarga y se libera.
 
-## Vistas de check-in
+## Flujo preoperacional
 
-- `checkin-vehicular.html`
-- `checkin-aprobaciones.html`
-- `checkin-historial.html`
+1. El conductor abre `checkin-vehicular.html`.
+2. Selecciona el vehículo y completa los 18 controles.
+3. El sistema evalúa la inspección.
+4. Si hay observaciones leves, Administrador o Supervisor revisa en `checkin-aprobaciones.html`.
+5. Una falla crítica bloquea la salida.
+6. El módulo Operaciones solo acepta un check-in aprobado, vigente, sin utilizar y coincidente.
+7. Al iniciar, el check-in queda vinculado a la operación y marcado como utilizado.
+8. La trazabilidad queda disponible en `checkin-historial.html`.
 
-## Backend de check-in
+## Flujo de primera configuración
 
-- `22_Checkin_Vehicular.gs`
+`index.html` consulta el estado del servicio. Si no existe ningún usuario con acceso, cambia automáticamente del formulario de inicio de sesión al formulario de preconfiguración. Después de crear la empresa y el primer Administrador, abre `main.html`.
 
-Todos estos archivos permanecen en la raíz junto con el resto del proyecto.
+## Flujo de permisos
 
-## Archivos de la versión 2.8.0
+El Administrador puede mantener los permisos del rol o guardar una matriz personalizada por usuario. La sesión permanece activa, mientras el servidor vuelve a calcular los permisos efectivos en cada solicitud.
 
-- `23_Permisos_Usuario.gs`: permisos personalizados sin invalidar sesiones.
-- `MEJORAS_VERSION_2.8.0.md`: resumen de preconfiguración, permisos y voz.
-- `PRUEBAS_VERSION_2.8.0.md`: validaciones ejecutadas.
+## Flujo de voz
 
-La preconfiguración está integrada en `index.html`. Los comandos de voz pertenecen a `notificaciones.html` y se implementan desde `aplicacion.js`.
+El módulo `notificaciones.html` permite escuchar pendientes, activar comandos predefinidos y dictar el título o el cuerpo de una notificación.
+
+## Arquitectura de carga rápida 3.5.0
+- `main.html` conserva un solo iframe durante toda la sesión.
+- Los cambios de módulo se envían mediante `postMessage` y no reemplazan el archivo cargado.
+- `conexion.js` mantiene una copia de lectura en memoria y `localStorage`.
+- El botón **Sincronizar** invalida solo las dependencias del módulo actual.

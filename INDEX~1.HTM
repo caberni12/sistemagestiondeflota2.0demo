@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5f59">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="Acceso al Sistema de Gestión de Flotas">
+  <title>Iniciar sesión · Sistema de Gestión de Flotas</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="acceso.css?v=4.2.50-ui11">
+  <link rel="stylesheet" href="responsive.css?v=4.2.50-ui11">
+  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.50-ui11">
+  <script src="tema.js?v=4.2.50-ui11"></script>
+</head>
+<body>
+  <noscript><div class="aviso-sin-js">Debe habilitar JavaScript para iniciar sesión.</div></noscript>
+
+  <main class="pagina-acceso">
+    <section class="presentacion-acceso" aria-label="Presentación del sistema">
+      <div class="marca-acceso">
+        <img id="logoEmpresaAcceso" src="logo.svg" alt="Logotipo de la empresa">
+        <div>
+          <strong id="nombreEmpresaAcceso">Sistema de Gestión de Flotas</strong>
+          <span>Control operacional y seguimiento</span>
+        </div>
+      </div>
+      <div class="mensaje-acceso">
+        <span class="etiqueta">PLATAFORMA OPERACIONAL</span>
+        <h1>Administración y seguimiento de flotas en un solo lugar.</h1>
+        <p>Ingrese con su cuenta para acceder al panel principal y a los módulos autorizados para su perfil.</p>
+      </div>
+      <div class="resumen-acceso" aria-hidden="true">
+        <article><i>⌖</i><div><b>Ubicación</b><span>Seguimiento independiente</span></div></article>
+        <article><i>➜</i><div><b>Rutas</b><span>Operación organizada</span></div></article>
+        <article><i>▣</i><div><b>Flota</b><span>Información centralizada</span></div></article>
+      </div>
+    </section>
+
+    <section class="panel-acceso">
+      <form class="tarjeta-acceso conexion-empresa-inicial" id="formularioConexionEmpresa" novalidate>
+        <div class="encabezado-formulario encabezado-con-ajuste">
+          <div><span class="etiqueta">CONFIGURACIÓN DEL DISPOSITIVO</span><h2>Conectar empresa</h2></div>
+          <button class="icono-ajuste-login" id="abrirConfiguracionEmpresa" type="button" aria-label="Configurar conexión de empresa" title="Configurar conexión">⚙</button>
+        </div>
+        <p class="descripcion-conexion-inicial">Este paso se realiza una sola vez. Ingrese el RUT para encontrar internamente la base correspondiente.</p>
+        <div class="mensaje-formulario oculto" id="mensajeConexionEmpresa" role="alert"></div>
+        <label class="campo">
+          <span>RUT de la empresa</span>
+          <input id="rutConexionEmpresa" name="rutEmpresaConexion" autocomplete="organization" inputmode="text" required placeholder="76.123.456-0">
+        </label>
+        <div class="estado-empresa-pendiente" id="estadoEmpresaPendiente" role="status" aria-live="polite">
+          <i>○</i><div><b>Conexión pendiente</b><span>La dirección del servicio permanecerá oculta.</span></div>
+        </div>
+        <button class="boton-principal" id="botonConexionEmpresa" type="submit">Buscar y conectar</button>
+        <small class="detalle-servicio">Solo se mostrará el nombre de la empresa y la confirmación de conexión.</small>
+      </form>
+
+      <form class="tarjeta-acceso preconfiguracion oculto" id="formularioPreconfiguracion" novalidate>
+        <div class="encabezado-formulario">
+          <span class="etiqueta">PRECONFIGURACIÓN AUTOMÁTICA</span>
+          <h2>Configurar el sistema</h2>
+          <p>No existen usuarios registrados. Cree la empresa y el primer administrador para comenzar.</p>
+        </div>
+        <div class="mensaje-formulario oculto" id="mensajePreconfiguracion" role="alert"></div>
+        <div class="preconfig-grid">
+          <label class="campo campo-completo"><span>Nombre de la empresa</span><input name="nombreEmpresa" required placeholder="Ej. Transportes del Sur"></label>
+          <label class="campo"><span>RUT de la empresa</span><input name="rutEmpresa" placeholder="76.000.000-0"></label>
+          <label class="campo"><span>Teléfono de la empresa</span><input name="telefonoEmpresa" autocomplete="tel" placeholder="+56 9 0000 0000"></label>
+          <label class="campo campo-completo"><span>Nombre del administrador</span><input name="nombre" autocomplete="name" required placeholder="Nombre completo"></label>
+          <label class="campo"><span>Correo del administrador</span><input name="correo" type="email" autocomplete="username" required placeholder="administrador@empresa.cl"></label>
+          <label class="campo"><span>Teléfono del administrador</span><input name="telefono" autocomplete="tel" placeholder="+56 9 0000 0000"></label>
+          <label class="campo"><span>Contraseña</span><input name="contrasena" type="password" autocomplete="new-password" minlength="8" required placeholder="Mínimo 8 caracteres"></label>
+          <label class="campo"><span>Confirmar contraseña</span><input name="contrasenaConfirmacion" type="password" autocomplete="new-password" minlength="8" required placeholder="Repita la contraseña"></label>
+        </div>
+        <label class="aceptacion-preconfig"><input name="confirmacion" type="checkbox" value="SI" required><span>Confirmo que estos datos crearán la cuenta administradora principal.</span></label>
+        <button class="boton-principal" id="botonPreconfiguracion" type="submit">Configurar y entrar</button>
+        <small class="detalle-servicio">La configuración solo aparece mientras no exista ningún usuario con acceso.</small>
+      </form>
+
+      <form class="tarjeta-acceso oculto" id="formularioAcceso" novalidate>
+        <div class="encabezado-formulario">
+          <span class="etiqueta">ACCESO SEGURO</span>
+          <h2>Iniciar sesión</h2>
+          <p>Use el correo y la contraseña registrados en el sistema.</p>
+        </div>
+
+        <div class="empresa-conectada-acceso" id="empresaConectadaAcceso">
+          <i>✓</i><div><b id="nombreEmpresaConectada">Empresa conectada</b><span id="rutEmpresaConectada">Conexión establecida</span></div>
+        </div>
+
+        <div class="estado-conexion" id="estadoConexion" role="status" aria-live="polite">
+          <i></i><span>Comprobando conexión…</span>
+        </div>
+
+        <div class="mensaje-formulario oculto" id="mensajeFormulario" role="alert"></div>
+
+        <label class="campo">
+          <span>Usuario</span>
+          <input id="correoAcceso" name="correo" type="email" autocomplete="username" inputmode="email" required placeholder="Correo electrónico del usuario">
+        </label>
+
+        <label class="campo">
+          <span>Contraseña</span>
+          <div class="campo-contrasena">
+            <input id="contrasenaAcceso" name="contrasena" type="password" autocomplete="current-password" required placeholder="Ingrese su contraseña">
+            <button id="mostrarContrasena" type="button" aria-label="Mostrar contraseña">◉</button>
+          </div>
+        </label>
+
+        <button class="boton-principal" id="botonAcceso" type="submit">Ingresar</button>
+        <button class="boton-enlace" id="reintentarConexion" type="button">Comprobar conexión</button>
+        <button class="boton-enlace boton-limpiar-conexion" id="limpiarConexionEmpresa" type="button">Limpiar conexión y cambiar empresa</button>
+        <small class="detalle-servicio" id="detalleServicio">Preparando servicio de datos…</small>
+      </form>
+    </section>
+  </main>
+
+  <script src="configuracion.js?v=4.2.50-ui11"></script>
+  <script src="conexion.js?v=4.2.50-ui11"></script>
+  <script src="acceso.js?v=4.2.50-ui11"></script>
+</body>
+</html>
