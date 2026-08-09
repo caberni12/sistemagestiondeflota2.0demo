@@ -3,13 +3,15 @@
  * Conexión rápida a Base de Datos central.
  */
 window.CONFIGURACION_FLOTAS = Object.freeze({
-  VERSION: '4.2.43',
+  VERSION: '4.2.45',
   GPS_AUTOMATICO_OBLIGATORIO: true,
   MODO: 'supabase',
   MODO_MODULAR: true,
-  DIRECCION_APLICACION: 'https://yepaxfnmuugljizgzxya.supabase.co/functions/v1/flotas-api',
-  SUPABASE_URL: 'https://yepaxfnmuugljizgzxya.supabase.co',
-  SUPABASE_CLAVE_PUBLICA: 'sb_publishable_t7Vt-OTFr5_76Jt0ffb59Q_9PzdNWCe',
+  DIRECCION_APLICACION: '',
+  DIRECTORIO_EMPRESAS_URL: 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec',
+  DIRECTORIO_EMPRESAS_OBLIGATORIO: true,
+  CLAVE_CONEXION_EMPRESA: 'sistema_gestion_flotas_conexion_empresa_v1',
+  TIEMPO_ESPERA_DIRECTORIO_MILISEGUNDOS: 18000,
   CLAVE_ALMACENAMIENTO_LOCAL: 'sistema_gestion_flotas_base_local_v3',
   CLAVE_SESION_LOCAL: 'sistema_gestion_flotas_sesion_v3',
   TIEMPO_ESPERA_MILISEGUNDOS: 20000,

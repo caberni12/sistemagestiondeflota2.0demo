@@ -10,10 +10,10 @@
   <meta name="description" content="Acceso al Sistema de Gestión de Flotas">
   <title>Iniciar sesión · Sistema de Gestión de Flotas</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="acceso.css?v=4.2.43-ui1">
-  <link rel="stylesheet" href="responsive.css?v=4.2.43-ui1">
-  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.43-ui1">
-  <script src="tema.js?v=4.2.43-ui1"></script>
+  <link rel="stylesheet" href="acceso.css?v=4.2.45-ui1">
+  <link rel="stylesheet" href="responsive.css?v=4.2.45-ui1">
+  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.45-ui1">
+  <script src="tema.js?v=4.2.45-ui1"></script>
 </head>
 <body>
   <noscript><div class="aviso-sin-js">Debe habilitar JavaScript para iniciar sesión.</div></noscript>
@@ -40,6 +40,24 @@
     </section>
 
     <section class="panel-acceso">
+      <form class="tarjeta-acceso conexion-empresa-inicial" id="formularioConexionEmpresa" novalidate>
+        <div class="encabezado-formulario encabezado-con-ajuste">
+          <div><span class="etiqueta">CONFIGURACIÓN DEL DISPOSITIVO</span><h2>Conectar empresa</h2></div>
+          <button class="icono-ajuste-login" id="abrirConfiguracionEmpresa" type="button" aria-label="Configurar conexión de empresa" title="Configurar conexión">⚙</button>
+        </div>
+        <p class="descripcion-conexion-inicial">Este paso se realiza una sola vez. Ingrese el RUT para encontrar internamente la base correspondiente.</p>
+        <div class="mensaje-formulario oculto" id="mensajeConexionEmpresa" role="alert"></div>
+        <label class="campo">
+          <span>RUT de la empresa</span>
+          <input id="rutConexionEmpresa" name="rutEmpresaConexion" autocomplete="organization" inputmode="text" required placeholder="76.123.456-0">
+        </label>
+        <div class="estado-empresa-pendiente" id="estadoEmpresaPendiente" role="status" aria-live="polite">
+          <i>○</i><div><b>Conexión pendiente</b><span>La dirección del servicio permanecerá oculta.</span></div>
+        </div>
+        <button class="boton-principal" id="botonConexionEmpresa" type="submit">Buscar y conectar</button>
+        <small class="detalle-servicio">Solo se mostrará el nombre de la empresa y la confirmación de conexión.</small>
+      </form>
+
       <form class="tarjeta-acceso preconfiguracion oculto" id="formularioPreconfiguracion" novalidate>
         <div class="encabezado-formulario">
           <span class="etiqueta">PRECONFIGURACIÓN AUTOMÁTICA</span>
@@ -62,11 +80,15 @@
         <small class="detalle-servicio">La configuración solo aparece mientras no exista ningún usuario con acceso.</small>
       </form>
 
-      <form class="tarjeta-acceso" id="formularioAcceso" novalidate>
+      <form class="tarjeta-acceso oculto" id="formularioAcceso" novalidate>
         <div class="encabezado-formulario">
           <span class="etiqueta">ACCESO SEGURO</span>
           <h2>Iniciar sesión</h2>
           <p>Use el correo y la contraseña registrados en el sistema.</p>
+        </div>
+
+        <div class="empresa-conectada-acceso" id="empresaConectadaAcceso">
+          <i>✓</i><div><b id="nombreEmpresaConectada">Empresa conectada</b><span id="rutEmpresaConectada">Conexión establecida</span></div>
         </div>
 
         <div class="estado-conexion" id="estadoConexion" role="status" aria-live="polite">
@@ -95,8 +117,8 @@
     </section>
   </main>
 
-  <script src="configuracion.js?v=4.2.43-ui1"></script>
-  <script src="conexion.js?v=4.2.43-ui1"></script>
-  <script src="acceso.js?v=4.2.43-ui1"></script>
+  <script src="configuracion.js?v=4.2.45-ui1"></script>
+  <script src="conexion.js?v=4.2.45-ui1"></script>
+  <script src="acceso.js?v=4.2.45-ui1"></script>
 </body>
 </html>

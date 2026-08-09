@@ -431,7 +431,7 @@
       SISTEMA_YA_INICIALIZADO:'El sistema ya tiene usuarios registrados.', AUTENTICACION_REQUERIDA:'La sesión no está disponible.', SESION_INVALIDA:'La sesión dejó de ser válida.',
       SESION_EXPIRADA:'La sesión expiró.', PERMISO_DENEGADO:'Su rol no tiene permiso para realizar esta acción.', ULTIMO_ADMINISTRADOR_PROTEGIDO:'No se puede quitar o desactivar al último administrador activo.', CONTRASENAS_NO_COINCIDEN:'Las contraseñas no coinciden.', RECURSO_NO_ENCONTRADO:'El recurso solicitado no existe.',
       REGISTRO_NO_ENCONTRADO:'El registro no existe.', NOMBRE_USUARIO_REQUERIDO:'Ingrese el nombre completo del usuario.', ROL_USUARIO_INVALIDO:'Seleccione un rol válido para el usuario.', USUARIO_VALOR_NUMERICO_INVALIDO:'La base de datos tenía un límite numérico insuficiente para la versión de permisos. Ejecute el SQL correctivo 4.2.3 y vuelva a intentar.', VALOR_NUMERICO_FUERA_DE_RANGO:'Uno de los valores numéricos supera el límite permitido.', USUARIO_NO_CONFIRMADO:'El servidor no pudo confirmar el usuario guardado.', SIN_CAMBIOS_PARA_GUARDAR:'No se detectaron cambios para guardar.', NO_PUEDE_ELIMINAR_SU_PROPIA_CUENTA:'No puede eliminar la cuenta con la que tiene la sesión abierta.', NO_PUEDE_DESCONECTAR_SU_PROPIA_SESION:'Use Cerrar sesión para desconectar su propia cuenta.', MOTIVO_DESCONEXION_REQUERIDO:'Escriba un motivo de al menos 5 caracteres.', SESIONES_NO_DISPONIBLES:'No fue posible consultar las sesiones del usuario.', ULTIMO_ADMINISTRADOR_NO_PUEDE_MODIFICARSE:'Debe existir al menos otro Administrador activo antes de cambiar este rol o estado.', ULTIMO_ADMINISTRADOR_NO_PUEDE_ELIMINARSE:'No se puede eliminar el último Administrador activo.', VEHICULO_NO_DISPONIBLE:'El vehículo no está disponible.', CONDUCTOR_NO_DISPONIBLE:'El conductor no está disponible.',
-      OPERACION_NO_ACTIVA:'La operación ya no está activa.', CORREO_YA_EXISTE:'El correo ya está registrado.', DIRECCION_APLICACION_NO_CONFIGURADA:'Falta configurar la dirección de la aplicación en configuracion.js.',
+      OPERACION_NO_ACTIVA:'La operación ya no está activa.', CORREO_YA_EXISTE:'El correo ya está registrado.', DIRECCION_APLICACION_NO_CONFIGURADA:'Falta configurar la dirección de la aplicación en configuracion.js.', CONEXION_EMPRESA_REQUERIDA:'Primero conecte este dispositivo con una empresa.', DIRECTORIO_EMPRESAS_NO_CONFIGURADO:'Falta configurar el directorio empresarial de Google Apps Script.', DIRECTORIO_EMPRESAS_NO_DISPONIBLE:'El directorio empresarial no está disponible temporalmente.', RUT_EMPRESA_INVALIDO:'Ingrese un RUT de empresa válido.', RUT_INVALIDO:'Ingrese un RUT de empresa válido.', EMPRESA_NO_REGISTRADA:'El RUT no está registrado en el directorio empresarial.', EMPRESA_INACTIVA:'La conexión de esta empresa está inactiva.', EMPRESA_BLOQUEADA:'La empresa está bloqueada. Contacte al Administrador.', CONEXION_EMPRESA_NO_DISPONIBLE:'La empresa fue encontrada, pero su servicio no respondió correctamente.', RESPUESTA_DIRECTORIO_INVALIDA:'El directorio devolvió una configuración incompleta.', TIEMPO_DE_ESPERA_DIRECTORIO:'El directorio tardó demasiado en responder.',
       ID_HOJA_NO_CONFIGURADO:'La base de datos central no está configurada correctamente.', TIEMPO_DE_ESPERA_AGOTADO:'La base de datos tardó demasiado en responder.',
       CONTRASENA_ACTUAL_INVALIDA:'La contraseña actual no es correcta.', FORMATO_LOGOTIPO_INVALIDO:'El formato del logotipo no es válido.', LOGOTIPO_DEMASIADO_GRANDE:'El logotipo supera el tamaño máximo de 1,5 MB.',
       ID_HOJA_NO_CONFIGURADO:'La base de datos central no está configurada correctamente.', CONFIRMACION_REQUERIDA:'Debe escribir exactamente “LIMPIAR DATOS”.',
@@ -866,7 +866,7 @@
   }
 
   function precargarModulos() {
-    // Regla 4.2.43: no consultar todos los módulos a la vez. Cada módulo
+    // Regla 4.2.45: no consultar todos los módulos a la vez. Cada módulo
     // sincroniza únicamente sus propios datos cuando el usuario lo abre.
     return;
   }
@@ -2600,7 +2600,7 @@
         return;
       }
       const script=document.createElement('script');
-      script.src='mapa.js?v=4.2.43-ui1';
+      script.src='mapa.js?v=4.2.45-ui1';
       script.async=true;
       script.dataset.mapaFlotas='dinamico';
       script.onload=comprobar;
@@ -2839,7 +2839,7 @@
         <article class="card">
           <div class="card-header"><div><h3>Identificación de la empresa</h3><p>Datos comerciales y legales</p></div></div>
           <div class="form-grid">
-            <label class="field"><span>RUT</span><input name="RUT" value="${companyValue(company,'RUT')}" placeholder="76.123.456-7"></label>
+            <label class="field"><span>RUT</span><input name="RUT" value="${companyValue(company,'RUT')}" placeholder="76.123.456-0"></label>
             <label class="field"><span>Razón social</span><input name="RAZON_SOCIAL" value="${companyValue(company,'RAZON_SOCIAL')}" required></label>
             <label class="field"><span>Nombre de fantasía</span><input name="NOMBRE_FANTASIA" value="${companyValue(company,'NOMBRE_FANTASIA')}" required></label>
             <label class="field"><span>Giro o actividad</span><input name="GIRO" value="${companyValue(company,'GIRO')}"></label>
@@ -2952,10 +2952,11 @@
   async function renderSettings(){
     await sincronizarPuntoOperacionDispositivo({silencioso:true});
     const remote=api.isRemote();let company=empresaConPuntoDispositivo(currentCompany||{});
+    const empresaConexion=api.getEmpresaConexion?.()||{};
     try{const result=await api.request('list',{resource:'companies'});company=seleccionarEmpresaPrincipal(result.rows||[])||company;currentCompany=company;applyBranding(company);}catch(_){ }
     const tema=window.TemaFlotas?.normalizar?.(company)||company;
     return heading('PARÁMETROS','Configuración administrativa','Administre los parámetros internos, el modo de visualización y la identidad del sistema.')+
-    `${currentUser?.ROL_ID==='ROL-ADMIN'?'<section class="connection-admin-shell"><article class="card"><div class="card-header"><div><span class="eyebrow">SOLO ADMINISTRADOR</span><h3>Configuración de conexión Android</h3><p>La dirección del servicio se administra aquí y nunca se muestra en el login. Las claves privadas no se exponen en Web ni Android.</p></div><span class="status ok">Protegida</span></div><div class="info-grid"><div class="info-item full"><span>Servicio central</span><b>${esc(config.DIRECCION_APLICACION||"Configurado internamente")}</b></div></div><div class="form-actions"><button class="btn primary" type="button" data-open-android-connection>Administrar conexión del dispositivo</button></div><p class="helper">En navegador se muestra la configuración central en modo de solo lectura. En la aplicación Android, el botón abre el panel nativo protegido por rol.</p></article></section>':''}`+
+    `${currentUser?.ROL_ID==='ROL-ADMIN'?`<section class="connection-admin-shell"><article class="card"><div class="card-header"><div><span class="eyebrow">SOLO ADMINISTRADOR</span><h3>Conexión empresarial del dispositivo</h3><p>La empresa se resuelve por RUT mediante el directorio independiente de Google Apps Script. La dirección trabaja internamente y nunca aparece en pantalla.</p></div><span class="status ok">✓ Conexión establecida</span></div><div class="info-grid"><div class="info-item"><span>Empresa</span><b>${esc(empresaConexion.nombre||'Configurada')}</b></div><div class="info-item"><span>RUT</span><b>${esc(empresaConexion.rut||'Registrado internamente')}</b></div></div><div class="form-actions"><button class="btn primary" type="button" data-open-company-connection>Cambiar empresa por RUT</button></div><p class="helper">Al cambiar de empresa se cerrará la sesión actual y se solicitará el acceso correspondiente a la nueva base.</p></article></section>`:''}`+
     `<div class="settings-grid"><article class="card"><div class="card-header"><div><h3>Base de datos</h3><p>Estado de la información del sistema</p></div>${status(remote?'Central conectada':'Local activa')}</div><div class="info-grid"><div class="info-item"><span>Tipo</span><b>${remote?'Base de datos central':'Base de datos local'}</b></div><div class="info-item"><span>Sincronización</span><b>${remote?'Activa entre dispositivos':'Solo en este dispositivo'}</b></div></div></article><article class="card"><div class="card-header"><div><h3>Modo de pantalla</h3><p>Preferencia individual de este dispositivo</p></div></div><div class="setting-row"><div><b>Modo oscuro</b><span>Puede cambiarlo sin modificar la paleta guardada</span></div><label class="switch"><input id="darkSwitch" type="checkbox" ${document.body.classList.contains('dark')?'checked':''}><i></i></label></div><button class="btn soft" data-nav="company">Abrir datos de empresa</button></article></div>`+
     `<section class="system-health-shell"><article class="card system-health-card"><div class="card-header"><div><h3>Diagnóstico y reparación</h3><p>Comprueba tablas, campos, permisos y requisitos de los módulos críticos.</p></div><span class="status" id="systemHealthStatus">Sin ejecutar</span></div><div id="systemHealthResult" class="system-health-result"><div class="module-diagnostic"><i>✓</i><div><b>Herramienta de mantenimiento disponible</b><span>Ejecute el diagnóstico después de actualizar el servicio central. La reparación no elimina registros.</span></div></div></div><div class="form-actions">${hasPermission('OFICINA_VIRTUAL','DIAGNOSTICAR')?'<button class="btn soft" type="button" data-diagnose-system>Revisar sistema</button>':''}${hasPermission('OFICINA_VIRTUAL','REPARAR')?'<button class="btn primary" type="button" data-repair-system>Reparar estructura</button>':''}</div></article></section>`+
     `${currentUser?.ROL_ID==='ROL-ADMIN'&&hasPermission('CONFIGURACION','RESPALDO_GENERAL')?'<section class="backup-database-shell"><article class="card backup-database-card"><div class="card-header"><div><span class="eyebrow">RESPALDO GENERAL</span><h3>Descargar Base de Datos en XLSX</h3><p>Genera un libro Excel con una hoja por cada tabla y todos los registros disponibles hasta la fecha.</p></div><span class="status ok">Solo Administrador</span></div><div class="backup-feature-list"><span>✓ Incluye registros activos e históricos</span><span>✓ Protege contraseñas, tokens y credenciales</span><span>✓ Agrega resumen de tablas y totales</span></div><div class="backup-status" data-backup-status>Listo para generar el respaldo.</div><div class="form-actions"><button class="btn primary" type="button" data-backup-database>⬇ Descargar respaldo XLSX</button></div></article></section>':''}`+
@@ -3301,6 +3302,29 @@
     await conCargaBoton(button,'Eliminando…',async()=>{try{await api.request('deleteFuel',{data:{CARGA_ID:chargeId,SOLICITUD_ID:authorizationId,IP_PUBLICA:clientPublicIp}});invalidarListasFormulario('fuel','fuelAuthorizations','vehicles');cacheVistasModulo.delete('fuel');cacheVistasModulo.delete('dashboard');toast('Carga eliminada','Se utilizó la autorización administrativa aprobada.');actualizarSeccionEnSegundoPlano('fuel');}catch(error){toast('No se pudo eliminar',translateError(error),'error');}});
   }
 
+  function abrirCambioConexionEmpresa(){
+    if(currentUser?.ROL_ID!=='ROL-ADMIN'){toast('Acceso restringido','Solo el Administrador puede cambiar la conexión empresarial.','error');return;}
+    const actual=api.getEmpresaConexion?.()||{};
+    $('#modalEyebrow').textContent='CONFIGURACIÓN PROTEGIDA';
+    $('#modalTitle').textContent='Cambiar empresa conectada';
+    $('#modalBody').innerHTML=`<form id="companyConnectionForm" class="form-grid"><div class="operation-policy-fixed full"><i>✓</i><div><b>${esc(actual.nombre||'Empresa configurada')}</b><span>${esc(actual.rut||'RUT registrado')} · La dirección del servicio permanece oculta.</span></div></div><label class="field full"><span>RUT de la nueva empresa</span><input name="RUT_EMPRESA" autocomplete="off" inputmode="text" required placeholder="76.123.456-0"></label><p class="helper full">El directorio comprobará la empresa y su servicio. Si la conexión es válida, esta sesión se cerrará para iniciar con las credenciales de la nueva empresa.</p><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Buscar y conectar</button></div></form>`;
+    openModal();
+    const form=$('#companyConnectionForm');
+    $('[data-cancel-modal]',form).addEventListener('click',closeModal);
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      const button=$('button[type="submit"]',form);
+      conCargaBoton(button,'Comprobando…',async()=>{
+        try{
+          const empresa=await api.resolverConexionEmpresa(form.elements.RUT_EMPRESA.value);
+          api.setAuth({});
+          toast('Conexión establecida',`${empresa.nombre} quedó guardada en este navegador.`);
+          setTimeout(()=>location.replace('index.html?sesion=cerrada'),450);
+        }catch(error){toast('No se pudo cambiar la empresa',translateError(error),'error');}
+      });
+    });
+  }
+
   function bindSection() {
     $('[data-record-limit]')?.addEventListener('change',async event=>{
       const select=event.currentTarget,value=select.value;
@@ -3310,11 +3334,7 @@
       try{await go(currentSection,{force:true});}
       finally{if(select.isConnected)select.disabled=false;}
     });
-    $('[data-open-android-connection]')?.addEventListener('click',()=>{
-      if(currentUser?.ROL_ID!=='ROL-ADMIN'){toast('Acceso restringido','Solo el Administrador puede modificar la conexión.','error');return;}
-      if(window.AndroidConfig&&typeof window.AndroidConfig.abrirConfiguracion==='function'){window.AndroidConfig.abrirConfiguracion();return;}
-      toast('Configuración central protegida','En la versión Web la dirección se administra en configuracion.js o variables del despliegue; las claves privadas no se muestran.');
-    });
+    $('[data-open-company-connection]')?.addEventListener('click',abrirCambioConexionEmpresa);
     $$('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>navigateSection(btn.dataset.nav)));
     $('[data-office-review]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Revisando…',()=>ejecutarRevisionOficinaVirtual(event.currentTarget)));
     $('[data-office-repair]')?.addEventListener('click',event=>conCargaBoton(event.currentTarget,'Reparando…',()=>repararConOficinaVirtual(event.currentTarget)));

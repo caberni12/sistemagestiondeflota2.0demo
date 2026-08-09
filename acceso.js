@@ -4,11 +4,14 @@
   const api=window.ConexionFlotas;
   const loginForm=$('#formularioAcceso');
   const setupForm=$('#formularioPreconfiguracion');
+  const companyForm=$('#formularioConexionEmpresa');
   const loginButton=$('#botonAcceso');
   const setupButton=$('#botonPreconfiguracion');
+  const companyButton=$('#botonConexionEmpresa');
   const estado=$('#estadoConexion');
   const mensaje=$('#mensajeFormulario');
   const mensajeSetup=$('#mensajePreconfiguracion');
+  const mensajeEmpresa=$('#mensajeConexionEmpresa');
 
   const errores={
     CREDENCIALES_INVALIDAS:'Correo o contraseña incorrectos.',
@@ -23,6 +26,17 @@
     CONTRASENAS_NO_COINCIDEN:'Las contraseñas no coinciden.',
     CONTRASENA_REQUERIDA:'Ingrese una contraseña.',
     ULTIMO_ADMINISTRADOR_PROTEGIDO:'Debe existir al menos un administrador activo.'
+    ,DIRECTORIO_EMPRESAS_NO_CONFIGURADO:'Falta publicar y configurar el directorio empresarial de Google Apps Script.'
+    ,DIRECTORIO_EMPRESAS_NO_DISPONIBLE:'El directorio empresarial no está disponible temporalmente.'
+    ,TIEMPO_DE_ESPERA_DIRECTORIO:'El directorio tardó demasiado en responder.'
+    ,RUT_EMPRESA_INVALIDO:'Ingrese un RUT de empresa válido.'
+    ,RUT_INVALIDO:'Ingrese un RUT de empresa válido.'
+    ,EMPRESA_NO_REGISTRADA:'El RUT no está registrado en el directorio empresarial.'
+    ,EMPRESA_INACTIVA:'La conexión de esta empresa está inactiva. Contacte al Administrador.'
+    ,EMPRESA_BLOQUEADA:'La empresa está bloqueada. Contacte al Administrador.'
+    ,CONEXION_EMPRESA_NO_DISPONIBLE:'La empresa fue encontrada, pero su servicio no respondió correctamente.'
+    ,RESPUESTA_DIRECTORIO_INVALIDA:'El directorio devolvió una configuración incompleta.'
+    ,CONEXION_EMPRESA_REQUERIDA:'Primero conecte este dispositivo con una empresa.'
   };
   function textoError(error){const clave=api.authErrorCode?.(error)||String(error?.message||error||'ERROR');return errores[clave]||clave.replaceAll('_',' ').toLowerCase().replace(/^./,letra=>letra.toUpperCase());}
   function mostrarMensaje(texto,tipo='error',destino=mensaje){destino.textContent=texto;destino.className=`mensaje-formulario ${tipo==='exito'?'exito':''}`;}
@@ -31,15 +45,27 @@
   function bloquear(boton,activo,texto,normal){boton.disabled=activo;boton.textContent=activo?texto:normal;}
   function aplicarEmpresa(empresa){if(!empresa)return;window.TemaFlotas?.aplicarEmpresa?.(empresa,{guardar:true});const nombre=empresa.NOMBRE_FANTASIA||empresa.RAZON_SOCIAL||empresa.NOMBRE||'';const logo=empresa.DIRECCION_LOGOTIPO||'';if(nombre)$('#nombreEmpresaAcceso').textContent=nombre;if(logo)$('#logoEmpresaAcceso').src=logo;}
   function entrar(){location.replace('main.html');}
-  function mostrarPreconfiguracion(){loginForm.classList.add('oculto');setupForm.classList.remove('oculto');cambiarEstado('Preconfiguración requerida','preconfig');$('#detalleServicio').textContent='Sin usuarios registrados';setTimeout(()=>setupForm.elements.nombreEmpresa?.focus(),80);}
-  function mostrarAcceso(){setupForm.classList.add('oculto');loginForm.classList.remove('oculto');}
+  function mostrarPreconfiguracion(){companyForm.classList.add('oculto');loginForm.classList.add('oculto');setupForm.classList.remove('oculto');cambiarEstado('Preconfiguración requerida','preconfig');$('#detalleServicio').textContent='Sin usuarios registrados';setTimeout(()=>setupForm.elements.nombreEmpresa?.focus(),80);}
+  function mostrarAcceso(){companyForm.classList.add('oculto');setupForm.classList.add('oculto');loginForm.classList.remove('oculto');}
+  function mostrarSeleccionEmpresa(){loginForm.classList.add('oculto');setupForm.classList.add('oculto');companyForm.classList.remove('oculto');setTimeout(()=>$('#rutConexionEmpresa')?.focus(),80);}
+  function aplicarConexionEmpresa(empresa){
+    if(!empresa?.configurada)return;
+    $('#nombreEmpresaConectada').textContent=empresa.nombre||'Empresa conectada';
+    $('#rutEmpresaConectada').textContent=`RUT ${empresa.rut} · Conexión establecida`;
+    if(empresa.nombre)$('#nombreEmpresaAcceso').textContent=empresa.nombre;
+  }
 
   async function comprobar({redirigir=true}={}){
     ocultarMensaje();ocultarMensaje(mensajeSetup);
-    const auth=api.getAuth();
-    if(redirigir&&auth.token&&auth.user){cambiarEstado('Sesión guardada','conectado');entrar();return true;}
+    let empresaConexion=api.getEmpresaConexion?.()||{configurada:true};
+    if(api.conexionEmpresaRequerida?.()&&!empresaConexion.configurada){mostrarSeleccionEmpresa();return false;}
+    aplicarConexionEmpresa(empresaConexion);
     cambiarEstado(`Conectando con ${api.backendLabel()}…`);
     try{
+      empresaConexion=await api.validarEmpresaActivaParaAcceso();
+      aplicarConexionEmpresa(empresaConexion);
+      const auth=api.getAuth();
+      if(redirigir&&auth.token&&auth.user){cambiarEstado('Sesión guardada','conectado');entrar();return true;}
       const meResult=auth.token?await api.request('me',{cache:false}).then(value=>({value})).catch(error=>({error})):null;
       const usuarioSesion=meResult?.value?.user||meResult?.value?.usuario;if(usuarioSesion){api.setAuth({...auth,user:usuarioSesion});if(redirigir){entrar();return true;}}
       else if(meResult?.error&&api.isAuthError?.(meResult.error))api.setAuth({});
@@ -47,8 +73,29 @@
       aplicarEmpresa(status.company);$('#detalleServicio').textContent=`${api.backendLabel()} disponible`;
       if(status.needsSetup){mostrarPreconfiguracion();return false;}
       mostrarAcceso();cambiarEstado('Servicio conectado','conectado');return true;
-    }catch(error){cambiarEstado('Conexión temporalmente inestable','error');$('#detalleServicio').textContent=api.backendLabel();mostrarMensaje(api.isAuthError?.(error)?textoError(error):'No fue posible comprobar el servicio. Puede reintentar sin perder su sesión.');return false;}
+    }catch(error){api.setAuth({});mostrarAcceso();cambiarEstado(String(error?.message||'')==='EMPRESA_BLOQUEADA'?'Empresa bloqueada':'Conexión temporalmente inestable','error');$('#detalleServicio').textContent=api.backendLabel();mostrarMensaje(textoError(error));return false;}
   }
+
+  companyForm.addEventListener('submit',async event=>{
+    event.preventDefault();ocultarMensaje(mensajeEmpresa);if(!companyForm.reportValidity())return;
+    bloquear(companyButton,true,'Buscando empresa…','Buscar y conectar');
+    try{
+      const empresa=await api.resolverConexionEmpresa(companyForm.elements.rutEmpresaConexion.value);
+      api.setAuth({});
+      loginForm.reset();
+      aplicarConexionEmpresa(empresa);
+      const indicador=$('#estadoEmpresaPendiente');
+      indicador.querySelector('i').textContent='✓';
+      indicador.querySelector('b').textContent='Conexión establecida';
+      indicador.querySelector('span').textContent=`${empresa.nombre} · RUT ${empresa.rut}`;
+      indicador.style.borderColor='#bce4d7';indicador.style.background='#edf9f5';
+      mostrarMensaje('La conexión quedó guardada en este navegador. Ya puede iniciar sesión.','exito',mensajeEmpresa);
+      // La validación empresarial solo habilita el formulario. El usuario
+      // siempre debe escribir sus credenciales para iniciar una sesión nueva.
+      setTimeout(()=>comprobar({redirigir:false}),650);
+    }catch(error){mostrarMensaje(textoError(error),'error',mensajeEmpresa);}
+    finally{bloquear(companyButton,false,'Buscando empresa…','Buscar y conectar');}
+  });
 
   setupForm.addEventListener('submit',async event=>{
     event.preventDefault();ocultarMensaje(mensajeSetup);if(!setupForm.reportValidity())return;
@@ -67,7 +114,7 @@
 
   loginForm.addEventListener('submit',async event=>{
     event.preventDefault();ocultarMensaje();if(!loginForm.reportValidity())return;bloquear(loginButton,true,'Ingresando…','Ingresar');
-    try{const datos=Object.fromEntries(new FormData(loginForm).entries());const ipPromise=api.getClientIp?.().catch(()=> '')||Promise.resolve('');const resultado=await api.request('login',datos);api.setAuth({token:resultado.token,sessionId:resultado.sessionId||'',user:resultado.user,expiresAt:resultado.expiresAt||''});ipPromise.then(IP_PUBLICA=>api.registerConnectionIp?.({IP_PUBLICA})).catch(()=>{});cambiarEstado('Acceso correcto','conectado');mostrarMensaje('Sesión iniciada. Abriendo el panel principal…','exito');entrar();}
+    try{await api.validarEmpresaActivaParaAcceso();const datos=Object.fromEntries(new FormData(loginForm).entries());const ipPromise=api.getClientIp?.().catch(()=> '')||Promise.resolve('');const resultado=await api.request('login',datos);api.setAuth({token:resultado.token,sessionId:resultado.sessionId||'',user:resultado.user,expiresAt:resultado.expiresAt||''});ipPromise.then(IP_PUBLICA=>api.registerConnectionIp?.({IP_PUBLICA})).catch(()=>{});cambiarEstado('Acceso correcto','conectado');mostrarMensaje('Sesión iniciada. Abriendo el panel principal…','exito');entrar();}
     catch(error){mostrarMensaje(textoError(error));cambiarEstado('Acceso no autorizado','error');$('#contrasenaAcceso').select();}
     finally{bloquear(loginButton,false,'Ingresando…','Ingresar');}
   });
@@ -100,6 +147,7 @@
     ajustarVista();
   }
   $('#mostrarContrasena').addEventListener('click',()=>{const input=$('#contrasenaAcceso');input.type=input.type==='password'?'text':'password';$('#mostrarContrasena').setAttribute('aria-label',input.type==='password'?'Mostrar contraseña':'Ocultar contraseña');});
+  $('#abrirConfiguracionEmpresa').addEventListener('click',()=>{const input=$('#rutConexionEmpresa');input.focus();mantenerControlVisible(input);});
   $('#reintentarConexion').addEventListener('click',()=>comprobar({redirigir:false}));
   const parametros=new URLSearchParams(location.search),avisoSesion=parametros.get('sesion');
   comprobar().then(()=>{if(avisoSesion==='cerrada')mostrarMensaje('La sesión fue cerrada correctamente.','exito');if(avisoSesion==='expirada')mostrarMensaje('La sesión realmente expiró o fue invalidada. Ingrese nuevamente.');});

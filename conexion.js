@@ -56,6 +56,7 @@
 
   let localDb = loadLocal();
   let auth = loadAuth();
+  let conexionEmpresa = cargarConexionEmpresa();
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
@@ -121,6 +122,167 @@
     catch (_) { return {}; }
   }
 
+  function urlHttpsValida(valor) {
+    try {
+      const url = new URL(String(valor || '').trim());
+      return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+    } catch (_) { return false; }
+  }
+
+  function cargarConexionEmpresa() {
+    try {
+      const guardada = JSON.parse(localStorage.getItem(config.CLAVE_CONEXION_EMPRESA) || 'null');
+      return guardada && urlHttpsValida(guardada.url) && guardada.rut ? guardada : null;
+    } catch (_) { return null; }
+  }
+
+  function direccionAplicacionActual() {
+    if (conexionEmpresa && urlHttpsValida(conexionEmpresa.url)) return conexionEmpresa.url;
+    if (config.DIRECTORIO_EMPRESAS_OBLIGATORIO !== false) return '';
+    return String(config.DIRECCION_APLICACION || '').trim();
+  }
+
+  function directorioEmpresasConfigurado() {
+    const direccion = String(config.DIRECTORIO_EMPRESAS_URL || '').trim();
+    return urlHttpsValida(direccion) && !direccion.includes('REEMPLAZAR_');
+  }
+
+  function obtenerConexionEmpresa() {
+    return conexionEmpresa ? {
+      configurada: true,
+      nombre: String(conexionEmpresa.nombre || '').trim(),
+      rut: String(conexionEmpresa.rut || '').trim(),
+      guardadaEn: conexionEmpresa.guardadaEn || ''
+    } : { configurada:false, nombre:'', rut:'', guardadaEn:'' };
+  }
+
+  function normalizarRutEmpresa(valor) {
+    return String(valor || '').toUpperCase().replace(/[^0-9K]/g, '');
+  }
+
+  function rutEmpresaValido(valor) {
+    const rut = normalizarRutEmpresa(valor);
+    if (!/^[0-9]{7,8}[0-9K]$/.test(rut)) return false;
+    const cuerpo = rut.slice(0, -1);
+    let suma = 0, multiplicador = 2;
+    for (let indice = cuerpo.length - 1; indice >= 0; indice -= 1) {
+      suma += Number(cuerpo[indice]) * multiplicador;
+      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+    }
+    const resultado = 11 - (suma % 11);
+    const esperado = resultado === 11 ? '0' : resultado === 10 ? 'K' : String(resultado);
+    return rut.slice(-1) === esperado;
+  }
+
+  function cabecerasPublicasPara(urlServicio) {
+    return {};
+  }
+
+  function solicitarDirectorioJsonp(rut) {
+    if (!directorioEmpresasConfigurado()) return Promise.reject(new Error('DIRECTORIO_EMPRESAS_NO_CONFIGURADO'));
+    return new Promise((resolve, reject) => {
+      const callback = `flotasDirectorio${Date.now()}${Math.floor(Math.random() * 100000)}`;
+      const script = document.createElement('script');
+      const temporizador = setTimeout(() => finalizar(new Error('TIEMPO_DE_ESPERA_DIRECTORIO')), Number(config.TIEMPO_ESPERA_DIRECTORIO_MILISEGUNDOS || 18000));
+      const finalizar = (error, datos) => {
+        clearTimeout(temporizador);
+        try { delete window[callback]; } catch (_) { window[callback] = undefined; }
+        script.remove();
+        if (error) reject(error); else resolve(datos);
+      };
+      window[callback] = datos => finalizar(null, datos);
+      script.onerror = () => finalizar(new Error('DIRECTORIO_EMPRESAS_NO_DISPONIBLE'));
+      const direccion = new URL(config.DIRECTORIO_EMPRESAS_URL);
+      direccion.searchParams.set('accion', 'resolverConexion');
+      direccion.searchParams.set('rut', rut);
+      direccion.searchParams.set('callback', callback);
+      direccion.searchParams.set('_', String(Date.now()));
+      script.src = direccion.toString();
+      script.async = true;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function comprobarServicioEmpresa(urlServicio) {
+    if (!urlHttpsValida(urlServicio)) throw new Error('CONEXION_EMPRESA_INVALIDA');
+    const controller = new AbortController();
+    const temporizador = setTimeout(() => controller.abort(), Number(config.TIEMPO_ESPERA_DIRECTORIO_MILISEGUNDOS || 18000));
+    try {
+      const response = await fetch(urlServicio, {
+        method:'POST',
+        headers:{'Content-Type':'application/json;charset=utf-8','Accept':'application/json',...cabecerasPublicasPara(urlServicio)},
+        body:JSON.stringify({accion:'salud', action:'salud', origen:'WEB'}),
+        cache:'no-store', redirect:'follow', signal:controller.signal
+      });
+      const datos = await response.json();
+      if (!response.ok || !datos || datos.ok !== true) throw new Error('CONEXION_EMPRESA_NO_DISPONIBLE');
+      return true;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('TIEMPO_DE_ESPERA_DIRECTORIO');
+      if (String(error?.message || '') === 'CONEXION_EMPRESA_NO_DISPONIBLE') throw error;
+      throw new Error('CONEXION_EMPRESA_NO_DISPONIBLE');
+    } finally { clearTimeout(temporizador); }
+  }
+
+  async function resolverConexionEmpresa(rutIngresado) {
+    const rut = normalizarRutEmpresa(rutIngresado);
+    if (!rutEmpresaValido(rut)) throw new Error('RUT_EMPRESA_INVALIDO');
+    const respuesta = await solicitarDirectorioJsonp(rut);
+    if (!respuesta || respuesta.ok !== true) throw new Error(String(respuesta?.error || 'EMPRESA_NO_REGISTRADA'));
+    const nombre = String(respuesta.empresa?.nombre || '').trim();
+    const rutFormateado = String(respuesta.empresa?.rut || rut).trim();
+    const url = String(respuesta.conexion?.url || '').trim();
+    if (!nombre || !urlHttpsValida(url)) throw new Error('RESPUESTA_DIRECTORIO_INVALIDA');
+    await comprobarServicioEmpresa(url);
+    conexionEmpresa = { nombre, rut:rutFormateado, url, guardadaEn:new Date().toISOString() };
+    localStorage.setItem(config.CLAVE_CONEXION_EMPRESA, JSON.stringify(conexionEmpresa));
+    // Configurar o cambiar la empresa nunca inicia sesión automáticamente.
+    // Se elimina cualquier sesión anterior antes de habilitar el login real.
+    setAuth({});
+    limpiarCache();
+    window.dispatchEvent(new CustomEvent('flotas:conexion-empresa-cambiada', {detail:obtenerConexionEmpresa()}));
+    return obtenerConexionEmpresa();
+  }
+
+  async function validarEmpresaActivaParaAcceso() {
+    if (!conexionEmpresa) throw new Error('CONEXION_EMPRESA_REQUERIDA');
+    const rut = normalizarRutEmpresa(conexionEmpresa.rut);
+    if (!rutEmpresaValido(rut)) throw new Error('RUT_EMPRESA_INVALIDO');
+    const respuesta = await solicitarDirectorioJsonp(rut);
+    if (!respuesta || respuesta.ok !== true) throw new Error(String(respuesta?.error || 'EMPRESA_NO_REGISTRADA'));
+    const estado = String(respuesta.empresa?.estado || '').trim().toUpperCase();
+    const nombre = String(respuesta.empresa?.nombre || '').trim();
+    const rutFormateado = String(respuesta.empresa?.rut || rut).trim();
+    const url = String(respuesta.conexion?.url || '').trim();
+    if (estado !== 'ACTIVA') throw new Error('EMPRESA_BLOQUEADA');
+    if (!nombre || !urlHttpsValida(url)) throw new Error('RESPUESTA_DIRECTORIO_INVALIDA');
+    const cambioServicio = conexionEmpresa.url !== url;
+    conexionEmpresa = {nombre, rut:rutFormateado, url, guardadaEn:conexionEmpresa.guardadaEn || new Date().toISOString()};
+    localStorage.setItem(config.CLAVE_CONEXION_EMPRESA, JSON.stringify(conexionEmpresa));
+    if (cambioServicio) {
+      setAuth({});
+      limpiarCache();
+      window.dispatchEvent(new CustomEvent('flotas:conexion-empresa-cambiada', {detail:obtenerConexionEmpresa()}));
+    }
+    return obtenerConexionEmpresa();
+  }
+
+  async function sincronizarConexionEmpresa({forzar=false}={}) {
+    if (!conexionEmpresa) throw new Error('CONEXION_EMPRESA_REQUERIDA');
+    // Los módulos reutilizan la conexión guardada. La comprobación silenciosa
+    // de ACTIVA/BLOQUEADA se realiza por separado al abrir el acceso y justo
+    // antes de crear una nueva sesión.
+    return obtenerConexionEmpresa();
+  }
+
+  function borrarConexionEmpresa() {
+    conexionEmpresa = null;
+    localStorage.removeItem(config.CLAVE_CONEXION_EMPRESA);
+    setAuth({});
+    limpiarCache();
+    window.dispatchEvent(new CustomEvent('flotas:conexion-empresa-cambiada', {detail:obtenerConexionEmpresa()}));
+  }
+
   function saveLocal() {
     localStorage.setItem(config.CLAVE_ALMACENAMIENTO_LOCAL, JSON.stringify(localDb));
     window.dispatchEvent(new CustomEvent('flotas:guardado-local'));
@@ -138,12 +300,13 @@
   function isRemote() {
     if (sessionStorage.getItem('flotas_forzar_local') === '1') return false;
     if (config.MODO === 'local') return false;
-    if (config.MODO === 'aplicacion_google') return true;
-    return /^https:\/\/(?:script\.google\.com\/macros\/s\/.+\/exec|[a-z0-9-]+\.supabase\.co\/functions\/v1\/.+)(?:\?|$)/i.test(String(config.DIRECCION_APLICACION || '').trim());
+    if (config.MODO === 'aplicacion_google') return urlHttpsValida(direccionAplicacionActual());
+    return urlHttpsValida(direccionAplicacionActual());
   }
 
   function backendLabel() {
-    return isRemote() ? 'Base de datos central' : 'Base de datos local';
+    const empresa = obtenerConexionEmpresa();
+    return isRemote() ? (empresa.nombre ? `Base de datos de ${empresa.nombre}` : 'Base de datos central') : 'Base de datos local';
   }
 
   async function getClientIp({force=false}={}) {
@@ -627,7 +790,8 @@
   }
 
   async function remoteRequest(action, payload) {
-    if (!config.DIRECCION_APLICACION) throw new Error('DIRECCION_APLICACION_NO_CONFIGURADA');
+    const direccionAplicacion = direccionAplicacionActual();
+    if (!direccionAplicacion) throw new Error('CONEXION_EMPRESA_REQUERIDA');
     const controller = new AbortController();
     const timeoutOperaciones=new Set(['operationsSummary','startOperation','finishOperation','editOperationAdmin','deleteOperationAdmin','startRoute','completeRoute','updateRouteStatus','uploadDriveFile','routeEvidenceImage','bulkImport']);
     const timeout=action==='connectionTrackingLive'
@@ -641,14 +805,12 @@
           : Number(config.TIEMPO_ESPERA_MILISEGUNDOS||30000);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const response = await fetch(config.DIRECCION_APLICACION, {
+      const response = await fetch(direccionAplicacion, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json;charset=utf-8',
           'Accept': 'application/json',
-          ...(config.SUPABASE_CLAVE_PUBLICA ? {
-            'apikey': config.SUPABASE_CLAVE_PUBLICA
-          } : {})
+          ...cabecerasPublicasPara(direccionAplicacion)
         },
         body: JSON.stringify(prepararSolicitudRemota(action, payload)),
         signal: controller.signal,
@@ -759,7 +921,7 @@
   async function localRequest(action, payload) {
     await Promise.resolve();
     switch (action) {
-      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.43', now:iso() };
+      case 'health': return { service:'Base de datos local del Sistema de Gestión de Flotas', version:'4.2.45', now:iso() };
       case 'status': return {
         connected:true, needsSetup:activeRows(localDb.users).length === 0, spreadsheetName:'Base local del navegador',
         rows:{ users:activeRows(localDb.users).length, vehicles:activeRows(localDb.vehicles).length,
@@ -1734,7 +1896,7 @@
       alerts:{nombre:'Alertas',estado:'OK',detalle:`${activeRows(localDb.alerts).length} registros`},
       history:{nombre:'Historiales',estado:'OK',detalle:`${activeRows(localDb.history).length} eventos operativos · ${activeRows(localDb.checkins).length} check-ins`}
     };
-    return{version:'4.2.43',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
+    return{version:'4.2.45',fecha:iso(),correcto:Object.values(modules).every(item=>item.estado==='OK'),modules};
   }
   function localRepairSystem(){
     const user=requireLocalUser();requireLocalPermission(user,'CONFIGURACION','ACTUALIZAR');
@@ -1797,7 +1959,7 @@
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.43',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'Oficina Virtual',version:'4.2.45',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
@@ -1864,6 +2026,13 @@
     setAuth,
     getClientIp,
     registerConnectionIp,
+    directorioEmpresasConfigurado,
+    conexionEmpresaRequerida: () => config.DIRECTORIO_EMPRESAS_OBLIGATORIO !== false,
+    getEmpresaConexion: obtenerConexionEmpresa,
+    resolverConexionEmpresa,
+    validarEmpresaActivaParaAcceso,
+    sincronizarConexionEmpresa,
+    borrarConexionEmpresa,
     cacheInfo: informacionCache,
     latestCacheUpdate: ultimaActualizacionCache,
     persistCache: persistirCacheAhora,
