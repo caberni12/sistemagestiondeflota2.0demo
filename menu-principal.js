@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.50';
+  const VERSION='4.3.1';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -47,6 +47,7 @@
   let secuenciaCambioModulo=0;
   let temporizadorAvisos=null;
   let avisosInicializados=false;
+  const idsVelocidadEnCola=new Set();let colaVelocidad=[],alertaVelocidadVisible=null;
   let idsNotificacionesConocidas=new Set();
   let idsAlertasConocidas=new Set();
   let idsAsignacionesMostradas=new Set();
@@ -254,6 +255,15 @@
   function fechaAviso(item){return fechaHoraVisible(item.FECHA_ENVIO||item.FECHA_HORA||item.CREADO_EN);}
   function puedeAvisos(modulo){if(!usuario)return false;const permisos=Array.isArray(usuario.PERMISOS)?usuario.PERMISOS:[];const rol=String(usuario.ROL_ID||usuario.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||permisos.includes('*:*')||permisos.includes(`${modulo}:LEER`);}
   function fechaOrdenAviso(item){return new Date(item.FECHA_ENVIO||item.FECHA_HORA||item.CREADO_EN||0).getTime();}
+  function esAlertaVelocidad(item){return String(item?.CATEGORIA||'').toUpperCase()==='VELOCIDAD';}
+  function mostrarSiguienteVelocidad(){
+    if(alertaVelocidadVisible||!colaVelocidad.length||document.hidden)return;
+    const item=colaVelocidad.shift(),nodo=document.createElement('section'),critica=Number(item.VELOCIDAD_KMH||0)>=120||String(item.NIVEL||'').toUpperCase().includes('CRÍT');
+    nodo.className=`alerta-velocidad-menu ${critica?'critica':'advertencia'}`;nodo.innerHTML=`<header><i>${critica?'!!':'!'}</i><div><small>${critica?'ALERTA CRÍTICA':'EXCESO DE VELOCIDAD'}</small><h3>${escapar(Number(item.VELOCIDAD_KMH||0).toFixed(1))} km/h</h3></div></header><p>${escapar(item.MENSAJE||item.TITULO||'Se detectó velocidad superior a 100 km/h.')}</p><div><b>${escapar(item.PATENTE||item.VEHICULO_ID||'Vehículo')}</b><span>${escapar(fechaAviso(item))}</span></div><footer><button type="button" data-velocidad-cerrar>Seguir trabajando</button><button type="button" data-velocidad-alertas>Ver alertas</button></footer>`;
+    document.body.append(nodo);alertaVelocidadVisible=nodo;const cerrar=()=>{if(alertaVelocidadVisible===nodo)alertaVelocidadVisible=null;nodo.remove();setTimeout(mostrarSiguienteVelocidad,180);};nodo.querySelector('[data-velocidad-cerrar]').addEventListener('click',cerrar);nodo.querySelector('[data-velocidad-alertas]').addEventListener('click',()=>{cerrar();abrirModulo('alerts');});setTimeout(cerrar,Math.max(1000,Number(item.DURACION_EMERGENTE_SEGUNDOS||10)*1000));
+  }
+  function encolarVelocidad(item){const id=String(item?.ID||'');if(!id||idsVelocidadEnCola.has(id))return;idsVelocidadEnCola.add(id);colaVelocidad.push(item);colaVelocidad.sort((a,b)=>fechaOrdenAviso(a)-fechaOrdenAviso(b));mostrarSiguienteVelocidad();}
+
   function mostrarToastAviso(item,tipo){if(!avisosEmergentesActivosMenu())return;const contenedor=$('#toastAvisosMenu'),nodo=document.createElement('article');nodo.className=`toast-aviso-menu ${tipo}`;nodo.innerHTML=`<i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(tipo==='alerta'?'Nueva alerta':'Nueva notificación')}</b><small>${escapar(item.TITULO||item.MENSAJE||'Existe un nuevo aviso pendiente.')}</small></div><button type="button" aria-label="Cerrar">×</button>`;contenedor.append(nodo);nodo.querySelector('button').addEventListener('click',()=>nodo.remove());setTimeout(()=>nodo.remove(),5200);}
   function esAlertaAsignacion(item){return ['RUTA_ASIGNADA','OPERACION_ASIGNADA','VEHICULO_CHECKIN_ASIGNADO'].includes(String(item?.CATEGORIA_EMERGENTE||'').toUpperCase())&&String(item?.ESTADO_RESPUESTA||'PENDIENTE').toUpperCase()==='PENDIENTE';}
   function anunciarAsignacionVoz(item){
@@ -312,8 +322,9 @@
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
       const nuevasAlertas=alerts.filter(item=>!idsAlertasConocidas.has(String(item.ID)));
       const nuevasAsignaciones=notifications.filter(esAlertaAsignacion).filter(item=>!idsAsignacionesMostradas.has(String(item.ID)));
+      const velocidadPendiente=alerts.filter(esAlertaVelocidad);(avisosInicializados?nuevasAlertas.filter(esAlertaVelocidad):velocidadPendiente.slice(-20)).forEach(encolarVelocidad);
       if(avisosInicializados){
-        [...nuevasAlertas.map(item=>({item,tipo:'alerta'})),...nuevasNotificaciones.filter(item=>!esAlertaAsignacion(item)).map(item=>({item,tipo:'notificacion'}))]
+        [...nuevasAlertas.filter(item=>!esAlertaVelocidad(item)).map(item=>({item,tipo:'alerta'})),...nuevasNotificaciones.filter(item=>!esAlertaAsignacion(item)).map(item=>({item,tipo:'notificacion'}))]
           .sort((a,b)=>fechaOrdenAviso(a.item)-fechaOrdenAviso(b.item)).slice(-3)
           .forEach(({item,tipo})=>mostrarToastAviso(item,tipo));
       }
@@ -340,7 +351,7 @@
     temporizadorAvisos=setTimeout(async()=>{
       temporizadorAvisos=null;
       await actualizarAvisos();
-      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:(window.CONFIGURACION_FLOTAS.INTERVALO_NOTIFICACIONES_MILISEGUNDOS||10000));
+      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:2000);
     },Math.max(100,Number(retraso||0)));
   }
   function iniciarAvisos(){if(temporizadorAvisos||consultaAvisosPendiente)return;programarAvisos(900);}

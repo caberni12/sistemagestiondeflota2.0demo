@@ -213,7 +213,7 @@
       title:'Documento', eyebrow:'DOCUMENTACIÓN', fields:[
         ['TIPO','Tipo','select',['SOAP','Revisión técnica','Permiso de circulación','Licencia de conducir','Certificado de gases','Seguro','Otro']],
         ['ASOCIADO_TIPO','Asociado a','select',['Conductor','Usuario','Vehículo','Empresa']],['CONDUCTOR_ASOCIADO_ID','Conductor asociado','driverSelect',false],
-        ['USUARIO_ASOCIADO_ID','Cuenta asociada','userSelect',false],['ASOCIADO_ID','ID asociado','text',false],['CORREO_ASOCIADO','Correo asociado','email',false],['IDENTIFICACION','RUT, patente o identificación','text',true],
+        ['VEHICULO_SELECTOR_ID','Vehículo asociado','vehicleSelect',false],['USUARIO_ASOCIADO_ID','Cuenta asociada','userSelect',false],['ASOCIADO_ID','ID asociado (automático)','text',false],['CORREO_ASOCIADO','Correo asociado (automático)','email',false],['IDENTIFICACION','RUT, patente o identificación','text',true],
         ['FECHA_EMISION','Fecha emisión','date',false],['FECHA_VENCIMIENTO','Fecha vencimiento','date',true],['ESTADO','Vigencia del documento','select',['Vigente','Por vencer','Vencido','Anulado']],
         ['ESTADO_REVISION','Estado de aprobación','text',false],['DIRECCION_ARCHIVO','Archivo adjunto seguro','url',false],['OBSERVACIONES','Observaciones','textarea',false]
       ]
@@ -221,8 +221,8 @@
     users: {
       title:'Usuario', eyebrow:'SEGURIDAD', fields:[
         ['NOMBRE','Nombre completo','text',true],['CORREO','Correo','email',true],['CONTRASENA','Contraseña','password',true],
-        ['ROL_ID','Rol','select',[['ROL-ADMIN','Administrador'],['ROL-SUPERVISOR','Operador'],['ROL-CONDUCTOR','Conductor']]],
-        ['ESTADO','Estado','select',['Activo','Inactivo','Bloqueado']],['TELEFONO','Teléfono','text',false]
+        ['ROL_ID','Rol','select',[['ROL-ADMIN','Administrador'],['ROL-GERENCIA','Gerencia'],['ROL-SUPERVISOR','Operador'],['ROL-CONDUCTOR','Conductor']]],
+        ['ESTADO','Estado','select',['Activo','Inactivo','Bloqueado']],['TELEFONO','Teléfono','text',false],['FECHA_NACIMIENTO','Fecha de nacimiento','date',false]
       ]
     },
     alerts: {
@@ -337,6 +337,7 @@
   function puedeReenviarAlertaAsignacion(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase());}
   function puedeAceptarAsignacionesAjenas(){return esAdministrador()||(String(currentUser?.ROL_ID||'').toUpperCase()==='ROL-SUPERVISOR'&&hasPermission('NOTIFICACIONES','ACEPTAR_ASIGNACIONES_AJENAS')&&hasPermission('NOTIFICACIONES','MARCAR_LEIDA'));}
   function esAdministrador(){const rol=String(currentUser?.ROL_ID||currentUser?.ROL_NOMBRE||'').trim().toUpperCase();return ['ROL-ADMIN','ADMINISTRADOR','ROL-GERENCIA','GERENCIA'].includes(rol)||(Array.isArray(currentUser?.PERMISOS)&&currentUser.PERMISOS.includes('*:*'));}
+  function puedeRevisarDocumentos(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').trim().toUpperCase());}
   function claveAvisosEmergentes(){return `flotas_avisos_emergentes_admin_v1_${String(currentUser?.ID||currentUser?.USUARIO_ID||'sin_usuario')}`;}
   function avisosEmergentesActivos(){
     if(!['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase()))return true;
@@ -752,8 +753,14 @@
     heartbeatTimer=setInterval(()=>sendHeartbeat(),config.INTERVALO_CONEXION_MILISEGUNDOS||20000);
     if(!embeddedMode){
       refreshNotificationBadge();
-      notificationTimer=setInterval(refreshNotificationBadge,config.INTERVALO_NOTIFICACIONES_MILISEGUNDOS||10000);
+      notificationTimer=setInterval(refreshNotificationBadge,2000);
     }
+    realtimeTimer=setInterval(()=>{
+      if(document.hidden||!currentUser||['gps','connections'].includes(currentSection))return;
+      if($('#modalBackdrop')?.classList.contains('open'))return;
+      const active=document.activeElement;if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
+      actualizarSeccionEnSegundoPlano(currentSection);
+    },2000);
     resumeTrackingIfAllowed();
   }
 
@@ -826,12 +833,23 @@
     });
   }
 
+  function fechaCumpleanosValida(value){
+    const raw=String(value||'').trim();if(!raw)return null;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?`${raw}T12:00:00`:raw);return Number.isNaN(d.getTime())?null:d;
+  }
+  function mostrarCumpleanosUsuario(){
+    const nacimiento=fechaCumpleanosValida(currentUser?.FECHA_NACIMIENTO);if(!nacimiento)return;
+    const hoy=new Date();if(hoy.getMonth()!==nacimiento.getMonth()||hoy.getDate()!==nacimiento.getDate())return;
+    const clave=`flotas_cumple_${currentUser.ID}_${hoy.getFullYear()}-${hoy.getMonth()+1}-${hoy.getDate()}`;if(sessionStorage.getItem(clave)==='1')return;sessionStorage.setItem(clave,'1');
+    const overlay=document.createElement('div');overlay.className='birthday-celebration';overlay.innerHTML=`<div class="birthday-balloons" aria-hidden="true">${Array.from({length:14},(_,i)=>`<i style="--i:${i}">🎈</i>`).join('')}</div><article><span>🎉</span><h2>¡Feliz Cumpleaños, ${esc(String(currentUser.NOMBRE||'').split(' ')[0]||'')}!</h2><p>Todo el equipo te desea una excelente jornada.</p><button class="btn primary" type="button">¡Gracias!</button></article>`;document.body.append(overlay);const cerrar=()=>overlay.remove();overlay.querySelector('button').addEventListener('click',cerrar);setTimeout(cerrar,10000);
+  }
+
   function showApp() {
     prepararEstadoGpsUsuarioActual();
     $('#authScreen').classList.add('hidden'); $('#appShell').classList.remove('hidden');
     $('#userName').textContent=currentUser.NOMBRE; $('#userRole').textContent=currentUser.ROL_NOMBRE || currentUser.ROL_ID; $('#userAvatar').textContent=initials(currentUser.NOMBRE);
     $('#backendName').textContent=api.backendLabel(); $('#backendDetail').textContent=api.isRemote()?'Sincronización automática del módulo abierto':'Información guardada en este dispositivo';
     if(currentCompany)applyBranding(currentCompany);
+    setTimeout(mostrarCumpleanosUsuario,350);
     setConnection(true, api.isRemote()?'Módulo listo · actualización silenciosa':'Base de datos local activa'); buildNav();
     if(appInicializada){
       if(embeddedMode)postParent({tipo:'flotas:modulo-listo',usuario:currentUser,seccion:currentSection,actualizadoEn:estadoSincronizacionModulos[currentSection]?.time||0});
@@ -1187,10 +1205,18 @@
   }
   async function abrirAsignacionDesdeCheckin(item){
     if(!item)return;
-    const prefill={CHECKIN_ID:item.CHECKIN_ID||'',CONDUCTOR_ID:item.CONDUCTOR_ID||item.DESTINATARIO_CONDUCTOR_ID||'',VEHICULO_ID:item.VEHICULO_ID||'',NOTIFICACION_ID:item.ID||''};
-    try{localStorage.setItem(pendingRoutePrefillKey,JSON.stringify(prefill));}catch(_){}
-    await navigateSection('routes');
-    if(!embeddedMode)setTimeout(()=>consumirPrefillRutaCheckin(),180);
+    try{
+      const checkinId=String(item.CHECKIN_ID||'').trim();
+      let checkin=checkinId?registroFormulario('checkins',checkinId):null;
+      if(checkinId&&(!checkin||!checkin.CONDUCTOR_ID||!checkin.VEHICULO_ID)){
+        try{const result=await api.request('get',{resource:'checkins',id:checkinId,cache:false});if(result?.row){checkin=result.row;guardarRegistro('checkins',checkin);}}catch(_){}
+      }
+      const prefill={CHECKIN_ID:checkinId||checkin?.ID||'',CONDUCTOR_ID:checkin?.CONDUCTOR_ID||item.CONDUCTOR_ID||item.DESTINATARIO_CONDUCTOR_ID||'',VEHICULO_ID:checkin?.VEHICULO_ID||item.VEHICULO_ID||'',NOTIFICACION_ID:item.ID||''};
+      if(!prefill.CHECKIN_ID||!prefill.CONDUCTOR_ID||!prefill.VEHICULO_ID)throw new Error('CHECKIN_DATOS_REQUERIDOS');
+      try{localStorage.setItem(pendingRoutePrefillKey,JSON.stringify(prefill));}catch(_){}
+      await navigateSection('routes');
+      if(!embeddedMode)setTimeout(()=>consumirPrefillRutaCheckin(),180);
+    }catch(error){toast('No se pudo precargar la ruta',translateError(error),'error');}
   }
   function consumirPrefillRutaCheckin(){
     if(currentSection!=='routes')return false;
@@ -1371,6 +1397,20 @@
     });
     addressSearchQueue=task;return task;
   }
+  function enlazarCalendarios(root=document){
+    $$('input[type="date"]',root).forEach(input=>{
+      if(input.dataset.calendarBound==='1')return;
+      input.dataset.calendarBound='1';
+      input.setAttribute('autocomplete','off');
+      const abrir=()=>{
+        if(input.disabled||input.readOnly)return;
+        try{if(typeof input.showPicker==='function')input.showPicker();}catch(_){}
+      };
+      input.addEventListener('click',abrir);
+      input.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();abrir();}});
+    });
+  }
+
   function bindAddressAutocomplete(root=document){
     $$('[data-address-autocomplete]',root).forEach(input=>{
       if(input.dataset.addressBound==='1')return;input.dataset.addressBound='1';input.setAttribute('autocomplete','off');input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');
@@ -1539,7 +1579,7 @@
   }
 
   function vehicleRows(v){return `<tr data-filter-date="${esc(v.PROXIMA_MANTENCION||v.ACTUALIZADO_EN||v.CREADO_EN||'')}" data-search-row="${esc(`${v.PATENTE} ${v.MARCA} ${v.MODELO} ${v.ESTADO}`.toLowerCase())}"><td><div class="entity"><i class="entity-icon">🚐</i><div><strong>${esc(v.MARCA||'Sin marca')} ${esc(v.MODELO||'')}</strong><span class="muted">${esc(v.ID)}</span></div></div></td><td><strong>${esc(v.PATENTE)}</strong></td><td>${esc(v.ANIO||'—')}</td><td>${number(v.KILOMETRAJE)} km</td><td>${status(v.ESTADO)}</td><td><code class="vehicle-qr-code">${esc(codigoQrVehiculo(v))}</code></td><td>${accionesVehiculo(v)}</td></tr>`;}
-  function driverRows(d){const whatsapp=d.TELEFONO?`<button class="btn whatsapp small" data-whatsapp-driver="${esc(d.ID)}" title="Enviar WhatsApp">◉ WhatsApp</button>`:'';const ocupacion=`<button class="btn soft small" type="button" data-driver-occupation="${esc(d.ID)}">◎ Ver ocupación</button>`;return `<tr data-filter-date="${esc(d.LICENCIA_VENCIMIENTO||d.ACTUALIZADO_EN||d.CREADO_EN||'')}" data-search-row="${esc(`${d.NOMBRE} ${d.RUT} ${d.ESTADO} ${d.TELEFONO||''}`.toLowerCase())}"><td><div class="entity"><span class="avatar">${initials(d.NOMBRE)}</span><div><strong>${esc(d.NOMBRE)}</strong><span class="muted">${esc(d.TELEFONO||'Sin teléfono')}</span></div></div></td><td>${esc(d.RUT)}</td><td>${esc(d.LICENCIA_CLASE||'—')}</td><td>${fmtDate(d.LICENCIA_VENCIMIENTO)}</td><td>${status(d.ESTADO)}</td><td>${esc(d.USUARIO_ID||'Sin asociar')}</td><td><div class="row-button-stack">${ocupacion}${whatsapp}${actions('drivers',d.ID)}</div></td></tr>`;}
+  function driverRows(d){const whatsapp=d.TELEFONO?`<button class="btn whatsapp small" data-whatsapp-driver="${esc(d.ID)}" title="Enviar WhatsApp">◉ WhatsApp</button>`:'';const ocupacion=`<button class="btn soft small" type="button" data-driver-occupation="${esc(d.ID)}">◎ Ver ocupación</button>`;const documentos=`<button class="btn soft small" type="button" data-driver-documents="${esc(d.ID)}">▤ Documentos</button>`;return `<tr data-filter-date="${esc(d.LICENCIA_VENCIMIENTO||d.ACTUALIZADO_EN||d.CREADO_EN||'')}" data-search-row="${esc(`${d.NOMBRE} ${d.RUT} ${d.ESTADO} ${d.TELEFONO||''}`.toLowerCase())}"><td><div class="entity"><span class="avatar">${initials(d.NOMBRE)}</span><div><strong>${esc(d.NOMBRE)}</strong><span class="muted">${esc(d.TELEFONO||'Sin teléfono')}</span></div></div></td><td>${esc(d.RUT)}</td><td>${esc(d.LICENCIA_CLASE||'—')}</td><td>${fmtDate(d.LICENCIA_VENCIMIENTO)}</td><td>${status(d.ESTADO)}</td><td>${esc(d.USUARIO_ID||'Sin asociar')}</td><td><div class="row-button-stack">${ocupacion}${documentos}${whatsapp}${actions('drivers',d.ID)}</div></td></tr>`;}
   function maintenanceRows(m){return `<tr data-filter-date="${esc(m.FECHA_PROGRAMADA||m.FECHA_REALIZADA||m.CREADO_EN||'')}" data-search-row="${esc(`${m.TITULO} ${m.VEHICULO_ID} ${m.ESTADO}`.toLowerCase())}"><td><strong>${esc(m.TITULO)}</strong><span class="muted">${esc(m.DESCRIPCION||'')}</span></td><td>${esc(m.VEHICULO_ID)}</td><td>${esc(m.TIPO)}</td><td>${fmtDate(m.FECHA_PROGRAMADA)}</td><td>$${number(m.COSTO)}</td><td>${status(m.ESTADO)}</td><td>${actions('maintenance',m.ID)}</td></tr>`;}
   function documentReviewState(d){
     const raw=String(d.ESTADO_REVISION||'').trim();
@@ -1554,8 +1594,8 @@
   }
   function documentRowActions(d){
     const buttons=[],review=documentReviewState(d),pending=!/^aprobado$/i.test(review)&&!/^rechazado$/i.test(review);
-    if(esAdministrador()&&pending&&hasPermission('DOCUMENTOS','APROBAR'))buttons.push(`<button class="btn primary small" type="button" data-approve-document="${esc(d.ID)}">✓ Aprobar</button>`);
-    if(esAdministrador()&&pending&&hasPermission('DOCUMENTOS','RECHAZAR'))buttons.push(`<button class="btn danger small" type="button" data-reject-document="${esc(d.ID)}">Rechazar</button>`);
+    if(puedeRevisarDocumentos()&&pending&&hasPermission('DOCUMENTOS','APROBAR'))buttons.push(`<button class="btn primary small" type="button" data-approve-document="${esc(d.ID)}">✓ Aprobar</button>`);
+    if(puedeRevisarDocumentos()&&pending&&hasPermission('DOCUMENTOS','RECHAZAR'))buttons.push(`<button class="btn danger small" type="button" data-reject-document="${esc(d.ID)}">Rechazar</button>`);
     const generic=actions('documents',d.ID);if(generic!=='—')buttons.push(generic);
     return buttons.length?`<div class="row-button-stack document-review-actions">${buttons.join('')}</div>`:'—';
   }
@@ -2124,13 +2164,13 @@
       actionButtons.push(`<button class="btn soft small" data-route-weather="${esc(route.ID)}">☁ Clima</button>`);
       if(puedeReenviarAlertaAsignacion())actionButtons.push(`<button class="btn soft small" data-resend-assignment="RUTA:${esc(route.ID)}">🔔 Reenviar</button>`);
       if(driverMap[route.CONDUCTOR_ID]?.TELEFONO)actionButtons.push(`<button class="btn whatsapp small" data-whatsapp-driver="${esc(route.CONDUCTOR_ID)}">WhatsApp</button>`);
-      return `<tr data-route-filter-state="${esc(claveEstadoRuta(route.ESTADO))}" data-filter-date="${esc(route.FECHA_ASIGNACION||route.CREADO_EN||'')}" data-search-row="${esc(`${route.ID} ${route.NOMBRE} ${route.CONDUCTOR_NOMBRE} ${route.VEHICULO_PATENTE} ${route.DESTINO} ${route.ESTADO}`.toLowerCase())}"><td><strong>${esc(route.ID)}</strong><span class="muted">${esc(route.NOMBRE||'Ruta')}</span></td><td class="route-options-cell"><div class="row-button-stack route-actions-horizontal">${actionButtons.join('')}</div></td><td>${esc(route.CONDUCTOR_NOMBRE||'Sin conductor')}</td><td>${esc(route.VEHICULO_PATENTE||'Sin vehículo')}</td><td>${traceDateMarkup(asignada)}</td><td>${traceDateMarkup(aceptada)}</td><td>${traceDateMarkup(iniciada)}</td><td>${traceDateMarkup(completada)}</td><td><span class="route-trace-duration">${total?esc(formatRouteElapsed(total)):'—'}</span></td><td>${status(route.ESTADO)}</td></tr>`;
+      return `<tr data-route-filter-state="${esc(claveEstadoRuta(route.ESTADO))}" data-filter-date="${esc(route.FECHA_ASIGNACION||route.CREADO_EN||'')}" data-search-row="${esc(`${route.ID} ${route.NOMBRE} ${route.CONDUCTOR_NOMBRE} ${route.VEHICULO_PATENTE} ${route.DESTINO} ${route.ESTADO}`.toLowerCase())}"><td><strong>${esc(route.ID)}</strong><span class="muted">${esc(route.NOMBRE||'Ruta')}</span></td><td class="route-options-cell"><div class="row-button-stack route-actions-horizontal">${actionButtons.join('')}</div></td><td>${esc(route.CONDUCTOR_NOMBRE||'Sin conductor')}</td><td>${esc(route.VEHICULO_PATENTE||'Sin vehículo')}</td><td><b>${number(Number(route.DISTANCIA_PLANIFICADA_KM||0).toFixed(1))}</b><small>km esperados</small></td><td><b>${number(Number(route.DISTANCIA_REAL_KM||0).toFixed(1))}</b><small>km GPS</small></td><td><b>${Number(route.DESVIACION_DISTANCIA_KM||0)>=0?'+':''}${number(Number(route.DESVIACION_DISTANCIA_KM||0).toFixed(1))} km</b><small>${number(Number(route.DESVIACION_DISTANCIA_PCT||0).toFixed(1))}%</small></td><td><b>${number(Number(route.VELOCIDAD_MAXIMA_KMH||0).toFixed(1))}</b><small>km/h máx.</small></td><td><b>${number(route.EXCESOS_VELOCIDAD_100||0)} / ${number(route.EXCESOS_VELOCIDAD_120||0)}</b><small>&gt;100 / ≥120</small></td><td><b>${number(Number(route.CONSUMO_COMBUSTIBLE_LITROS||0).toFixed(2))} L</b><small>${number(Number(route.RENDIMIENTO_KM_L||0).toFixed(2))} km/L · ${number(Number(route.CONSUMO_L_100KM||0).toFixed(2))} L/100 km</small></td><td>${traceDateMarkup(asignada)}</td><td>${traceDateMarkup(aceptada)}</td><td>${traceDateMarkup(iniciada)}</td><td>${traceDateMarkup(completada)}</td><td><span class="route-trace-duration">${total?esc(formatRouteElapsed(total)):'—'}</span></td><td>${status(route.ESTADO)}</td></tr>`;
     }).join('');
 
     const activeMarkup=active.length
       ? `<div class="active-route-selector" aria-label="Rutas activas">${active.map(route=>activeRouteChip(route,String(route.ID)===String(selectedActive?.ID))).join('')}</div><div class="active-route-detail" data-active-route-detail>${selectedActive?routeCard(selectedActive):''}</div>`
       : empty('➜','Sin rutas activas','Asigne una ruta para comenzar la planificación.',hasPermission('RUTAS','CREAR')?'<button class="btn primary" data-new-route>Asignar primera ruta</button>':'');
-    const traceTable=puedeVerTrazabilidadRutas()?`<article class="card route-trace-card"><div class="card-header"><div><h3>Trazabilidad de rutas</h3><p>Visible únicamente para Operador, Administrador y Gerencia. Fecha arriba y hora debajo.</p></div></div><div class="toolbar route-filter-toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar ruta, conductor o vehículo"></label>${selectorEstadosRuta(routes)}${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="routes">Exportar CSV</button>':''}</div><div data-filter-table class="route-trace-table">${table(['Ruta','Opciones','Conductor','Vehículo','Asignada','Aceptada','Iniciada','Completada','Tiempo total','Estado'],traceRows,'No existen rutas registradas.')}</div></article>`:'';
+    const traceTable=puedeVerTrazabilidadRutas()?`<article class="card route-trace-card"><div class="card-header"><div><h3>Trazabilidad de rutas</h3><p>Visible únicamente para Operador, Administrador y Gerencia. Fecha arriba y hora debajo.</p></div></div><div class="toolbar route-filter-toolbar"><label class="search-box"><span>⌕</span><input data-table-search placeholder="Buscar ruta, conductor o vehículo"></label>${selectorEstadosRuta(routes)}${puedeExportarFormato('csv')?'<button class="btn soft push" data-export="routes">Exportar CSV</button>':''}</div><div data-filter-table class="route-trace-table">${table(['Ruta','Opciones','Conductor','Vehículo','Km esperados','Km reales','Desvío','Vel. máxima','Alertas velocidad','Combustible / rendimiento','Asignada','Aceptada','Iniciada','Completada','Tiempo total','Estado'],traceRows,'No existen rutas registradas.')}</div></article>`:'';
 
     return heading('PLANIFICACIÓN OPERACIONAL','Asignación de rutas','Cree, supervise y cierre rutas vinculadas al conductor, vehículo y punto base.',actions)+
       prerequisites.join('')+
@@ -3521,6 +3561,7 @@
   }
 
   function bindSection() {
+    enlazarCalendarios($('#content')||document);
     $('[data-record-limit]')?.addEventListener('change',async event=>{
       const select=event.currentTarget,value=select.value;
       guardarLimiteRegistros(currentSection,value);
@@ -3597,6 +3638,7 @@
     $$('[data-user-permissions]').forEach(btn=>btn.addEventListener('click',()=>openUserPermissionsModal(btn.dataset.userPermissions)));
     $$('[data-whatsapp-driver]').forEach(btn=>btn.addEventListener('click',()=>openWhatsAppDriver(btn.dataset.whatsappDriver)));
     $$('[data-driver-occupation]').forEach(btn=>btn.addEventListener('click',()=>openDriverOccupationModal(btn.dataset.driverOccupation,btn)));
+    $$('[data-driver-documents]').forEach(btn=>btn.addEventListener('click',()=>openDriverDocumentsModal(btn.dataset.driverDocuments,btn)));
     $$('[data-voice-command]').forEach(btn=>btn.addEventListener('click',iniciarComandoVoz));
     $$('[data-speak-notifications]').forEach(btn=>btn.addEventListener('click',()=>leerNotificacionesVoz()));
     $$('[data-stop-voice]').forEach(btn=>btn.addEventListener('click',detenerVoz));
@@ -3673,9 +3715,9 @@
     }
     if(['operationDrivers','checkinDrivers','checkinAssignDrivers'].includes(kind))values=values.filter(row=>['DISPONIBLE','ACTIVO'].includes(String(row.ESTADO||'').toUpperCase())||String(row.ID)===selectedValue);
     const label=row=>{
-      if(kind==='users')return `${row.NOMBRE||'Usuario'} · ${row.CORREO||''}`;
-      if(['drivers','routeDrivers','notificationDrivers','operationDrivers','checkinDrivers','checkinAssignDrivers'].includes(kind))return `${row.NOMBRE||'Conductor'} · ${row.RUT||''}${kind==='checkinAssignDrivers'?` · ${row.USUARIO_ID?'Usuario vinculado':'Vinculación por correo al asignar'}`:''}`;
-      return `${row.PATENTE||'Vehículo'} · ${row.MARCA||''} ${row.MODELO||''}`;
+      if(kind==='users')return `${row.ID||'USR'} · ${row.NOMBRE||'Usuario'} · ${row.CORREO||''}`;
+      if(['drivers','routeDrivers','notificationDrivers','operationDrivers','checkinDrivers','checkinAssignDrivers'].includes(kind))return `${row.ID||'CON'} · ${row.NOMBRE||'Conductor'} · ${row.RUT||row.CORREO||''}${kind==='checkinAssignDrivers'?` · ${row.USUARIO_ID?'Usuario vinculado':'Vinculación por correo al asignar'}`:''}`;
+      return `${row.ID||'VEH'} · ${row.PATENTE||'Sin patente'} · ${row.MARCA||''} ${row.MODELO||''}`;
     };
     const emptyLabel=kind.toLowerCase().includes('driver')||kind==='drivers'?'No hay conductores disponibles':kind==='users'?'No hay usuarios disponibles':'No hay vehículos disponibles';
     return `<option value="">${values.length?placeholder:emptyLabel}</option>${values.map(row=>`<option value="${esc(row.ID)}" ${String(row.ID)===selectedValue?'selected':''}>${esc(label(row).trim())}</option>`).join('')}`;
@@ -3734,7 +3776,7 @@
     $('#modalEyebrow').textContent=definition.eyebrow;$('#modalTitle').textContent=`${record?'Editar':'Nuevo'} ${definition.title.toLowerCase()}`;
     const documentoPropio=resource==='documents'&&currentUser.ROL_ID==='ROL-CONDUCTOR';
     const documentoRequiereAprobacion=resource==='documents'&&!esAdministrador();
-    const camposAsociacionDocumento=new Set(['ASOCIADO_TIPO','CONDUCTOR_ASOCIADO_ID','USUARIO_ASOCIADO_ID','ASOCIADO_ID','CORREO_ASOCIADO']);
+    const camposAsociacionDocumento=new Set(['ASOCIADO_TIPO','CONDUCTOR_ASOCIADO_ID','VEHICULO_SELECTOR_ID','USUARIO_ASOCIADO_ID','ASOCIADO_ID','CORREO_ASOCIADO']);
     const controls=definition.fields.map(([name,label,type,option])=>{
       if(documentoPropio&&camposAsociacionDocumento.has(name))return '';
       const required=option===true&&!(record&&name==='CONTRASENA');const current=record?.[name]??'';let control='';
@@ -3746,42 +3788,48 @@
       }else if(resource==='documents'&&name==='DIRECCION_ARCHIVO')control=markupCargaArchivo({campo:'DIRECCION_ARCHIVO',url:current,record:record||{}});
       else if(type==='userSelect')control=selectorDinamico('users','users',name,current,false);
       else if(type==='driverSelect')control=selectorDinamico('drivers','drivers',name,current,false);
-      else if(type==='vehicleSelect')control=selectorDinamico('vehicles','vehicles',name,current,true);
+      else if(type==='vehicleSelect')control=selectorDinamico('vehicles','vehicles',name,current,required);
       else if(type==='textarea')control=`<textarea name="${name}" ${required?'required':''}>${esc(current)}</textarea>`;
-      else if(type==='date'){const value=current?fmtDate(current,false):'';control=`<input name="${name}" type="text" inputmode="numeric" maxlength="10" pattern="\\d{2}/\\d{2}/\\d{4}" placeholder="DD/MM/AAAA" value="${esc(value)}" ${required?'required':''}>`;}
-      else control=`<input name="${name}" type="${type}" value="${esc(current)}" ${required?'required':''}>`;
+      else if(type==='date'){const value=current?fechaInputIso(current):'';control=`<input name="${name}" type="date" value="${esc(value)}" data-calendar-auto ${required?'required':''}>`;}
+      else {const autoDoc=resource==='documents'&&['ASOCIADO_ID','CORREO_ASOCIADO'].includes(name);control=`<input name="${name}" type="${type}" value="${esc(current)}" ${required?'required':''} ${autoDoc?'readonly':''}>`; }
       const full=['DESCRIPCION','OBSERVACIONES','MENSAJE','DIRECCION_ARCHIVO'].includes(name)?'full':'';
       if(resource==='documents'&&name==='DIRECCION_ARCHIVO')return `<div class="field ${full}"><span>${label}</span>${control}</div>`;
       return `<label class="field ${full}"><span>${label}</span>${control}</label>`;
     }).join('');
     const avisoEstadoAutomatico=['drivers','vehicles'].includes(resource)?`<div class="tracking-notice active full"><i>⇄</i><div><b>Disponibilidad automática</b><span>Disponible, En ruta y En operación se calculan desde las rutas y operaciones activas. Puede editar los demás datos sin liberar manualmente al recurso.</span></div></div>`:'';
     const avisoDocumentoPropio=documentoPropio?`<div class="tracking-notice active full"><i>✓</i><div><b>Documento personal asociado automáticamente</b><span>Se vinculará con su cuenta ${esc(currentUser.CORREO||'')} y, cuando exista, con su registro de conductor. Quedará pendiente de aprobación administrativa.</span></div></div>`:'';
-    const avisoOperador=resource==='documents'&&currentUser.ROL_ID==='ROL-SUPERVISOR'&&!record?`<div class="tracking-notice active full"><i>○</i><div><b>Revisión administrativa obligatoria</b><span>Los documentos cargados por Operadores quedan pendientes hasta que un Administrador los apruebe.</span></div></div>`:'';
+    const avisoOperador=resource==='documents'&&currentUser.ROL_ID==='ROL-SUPERVISOR'&&!record?`<div class="tracking-notice active full"><i>○</i><div><b>Revisión administrativa obligatoria</b><span>Los documentos cargados por Operadores quedan pendientes hasta que un Operador, Administrador o Gerencia los apruebe.</span></div></div>`:'';
     const avisoAdmin=resource==='documents'&&esAdministrador()&&!record?`<div class="tracking-notice active full document-auto-approved"><i>✓</i><div><b>Aprobación automática</b><span>Los documentos cargados por Administración o Gerencia quedan aprobados inmediatamente.</span></div></div>`:'';
     const reviewPanel=resource==='documents'&&record?`<div class="document-review-panel full ${statusClass(documentReviewState(record))}"><div class="document-review-icon">${/^aprobado$/i.test(documentReviewState(record))?'✓':/^rechazado$/i.test(documentReviewState(record))?'×':'○'}</div><div><b>${esc(documentReviewState(record))}</b><span>${record.FECHA_REVISION?`Revisado el ${fmtDate(record.FECHA_REVISION,true)}${record.REVISADO_POR_CORREO?` por ${esc(record.REVISADO_POR_CORREO)}`:''}`:'Aún no existe una decisión administrativa.'}</span>${record.OBSERVACION_REVISION?`<small>${esc(record.OBSERVACION_REVISION)}</small>`:''}</div></div>`:'';
-    const approvalActions=resource==='documents'&&record&&esAdministrador()&&!/^aprobado$/i.test(documentReviewState(record))?`${hasPermission('DOCUMENTOS','APROBAR')?'<button class="btn primary" type="button" data-modal-approve-document>✓ Aprobar documento</button>':''}${hasPermission('DOCUMENTOS','RECHAZAR')?'<button class="btn danger" type="button" data-modal-reject-document>Rechazar</button>':''}`:'';
+    const approvalActions=resource==='documents'&&record&&puedeRevisarDocumentos()&&!/^aprobado$/i.test(documentReviewState(record))?`${hasPermission('DOCUMENTOS','APROBAR')?'<button class="btn primary" type="button" data-modal-approve-document>✓ Aprobar documento</button>':''}${hasPermission('DOCUMENTOS','RECHAZAR')?'<button class="btn danger" type="button" data-modal-reject-document>Rechazar</button>':''}`:'';
     $('#modalBody').innerHTML=`<form class="form-grid" id="resourceForm">${avisoEstadoAutomatico}${avisoDocumentoPropio}${avisoOperador}${avisoAdmin}${reviewPanel}${controls}<div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button>${approvalActions}<button class="btn primary" type="submit">Guardar registro</button></div></form>`;
     $('[data-cancel-modal]',$('#modalBody')).addEventListener('click',closeModal);
-    const resourceForm=$('#resourceForm');resourceForm.addEventListener('submit',event=>saveResource(event,resource,record?.ID));if(resource==='documents'){enlazarCargaArchivo(resourceForm,'documents');const reviewValue=record?documentReviewState(record):(esAdministrador()?'Aprobado':'Pendiente de revisión');if(resourceForm.elements.ESTADO_REVISION)resourceForm.elements.ESTADO_REVISION.value=reviewValue;resourceForm.querySelector('[data-modal-approve-document]')?.addEventListener('click',()=>reviewDocument(record.ID,'APROBAR',resourceForm.querySelector('[data-modal-approve-document]')));resourceForm.querySelector('[data-modal-reject-document]')?.addEventListener('click',()=>reviewDocument(record.ID,'RECHAZAR',resourceForm.querySelector('[data-modal-reject-document]')));}
+    const resourceForm=$('#resourceForm');enlazarCalendarios(resourceForm);resourceForm.addEventListener('submit',event=>saveResource(event,resource,record?.ID));if(resource==='documents'){enlazarCargaArchivo(resourceForm,'documents');const reviewValue=record?documentReviewState(record):(esAdministrador()?'Aprobado':'Pendiente de revisión');if(resourceForm.elements.ESTADO_REVISION)resourceForm.elements.ESTADO_REVISION.value=reviewValue;resourceForm.querySelector('[data-modal-approve-document]')?.addEventListener('click',()=>reviewDocument(record.ID,'APROBAR',resourceForm.querySelector('[data-modal-approve-document]')));resourceForm.querySelector('[data-modal-reject-document]')?.addEventListener('click',()=>reviewDocument(record.ID,'RECHAZAR',resourceForm.querySelector('[data-modal-reject-document]')));}
     if(resource==='documents'&&!documentoPropio){
       const aplicarAsociacion=()=>{
         const tipo=resourceForm.elements.ASOCIADO_TIPO?.value||'';
         const campoConductor=resourceForm.elements.CONDUCTOR_ASOCIADO_ID?.closest('.field');
+        const campoVehiculo=resourceForm.elements.VEHICULO_SELECTOR_ID?.closest('.field');
         const campoUsuario=resourceForm.elements.USUARIO_ASOCIADO_ID?.closest('.field');
         const campoId=resourceForm.elements.ASOCIADO_ID?.closest('.field');
         campoConductor?.classList.toggle('hidden',tipo!=='Conductor');
+        campoVehiculo?.classList.toggle('hidden',tipo!=='Vehículo');
         campoUsuario?.classList.toggle('hidden',tipo!=='Usuario');
-        campoId?.classList.toggle('hidden',['Conductor','Usuario'].includes(tipo));
+        campoId?.classList.toggle('hidden',['Conductor','Usuario','Vehículo'].includes(tipo));
         if(tipo==='Conductor'){
           const driver=registroFormulario('drivers',resourceForm.elements.CONDUCTOR_ASOCIADO_ID?.value);
-          if(driver){resourceForm.elements.ASOCIADO_ID.value=driver.ID;resourceForm.elements.CORREO_ASOCIADO.value=driver.CORREO||'';if(!resourceForm.elements.IDENTIFICACION.value)resourceForm.elements.IDENTIFICACION.value=driver.RUT||driver.CORREO||'';}
+          if(driver){resourceForm.elements.ASOCIADO_ID.value=driver.ID;resourceForm.elements.CORREO_ASOCIADO.value=driver.CORREO||'';resourceForm.elements.IDENTIFICACION.value=driver.RUT||driver.CORREO||driver.ID;}
+        }else if(tipo==='Vehículo'){
+          const vehicle=registroFormulario('vehicles',resourceForm.elements.VEHICULO_SELECTOR_ID?.value);
+          if(vehicle){resourceForm.elements.ASOCIADO_ID.value=vehicle.ID;resourceForm.elements.CORREO_ASOCIADO.value='';resourceForm.elements.IDENTIFICACION.value=vehicle.PATENTE||vehicle.ID;}
         }else if(tipo==='Usuario'){
           const user=registroFormulario('users',resourceForm.elements.USUARIO_ASOCIADO_ID?.value);
-          if(user){resourceForm.elements.ASOCIADO_ID.value=user.ID;resourceForm.elements.CORREO_ASOCIADO.value=user.CORREO||'';if(!resourceForm.elements.IDENTIFICACION.value)resourceForm.elements.IDENTIFICACION.value=user.CORREO||user.ID;}
+          if(user){resourceForm.elements.ASOCIADO_ID.value=user.ID;resourceForm.elements.CORREO_ASOCIADO.value=user.CORREO||'';resourceForm.elements.IDENTIFICACION.value=user.CORREO||user.ID;}
         }
       };
       resourceForm.elements.ASOCIADO_TIPO?.addEventListener('change',aplicarAsociacion);
       resourceForm.elements.CONDUCTOR_ASOCIADO_ID?.addEventListener('change',aplicarAsociacion);
+      resourceForm.elements.VEHICULO_SELECTOR_ID?.addEventListener('change',aplicarAsociacion);
       resourceForm.elements.USUARIO_ASOCIADO_ID?.addEventListener('change',aplicarAsociacion);
       setTimeout(aplicarAsociacion,0);
     }
@@ -3818,6 +3866,23 @@
   }
 
 
+  async function openDriverDocumentsModal(id,button){
+    if(!id)return;
+    await conCargaBoton(button,'Cargando…',async()=>{
+      try{
+        const result=await api.request('documentosConductor',{data:{CONDUCTOR_ID:id}}),driver=result.conductor||registroFormulario('drivers',id)||{},rows=result.rows||[];
+        const body=rows.length?rows.map(documentRows).join(''):`<tr><td colspan="7"><span class="muted">Este conductor aún no tiene documentos digitalizados.</span></td></tr>`;
+        $('#modalEyebrow').textContent='EXPEDIENTE DIGITAL';$('#modalTitle').textContent=driver.NOMBRE?`Documentos de ${driver.NOMBRE}`:'Documentos del conductor';
+        $('#modalBody').innerHTML=`<div class="form-grid"><div class="tracking-notice active full"><i>▤</i><div><b>${esc(driver.ID||id)} · ${esc(driver.NOMBRE||'Conductor')}</b><span>${esc(driver.RUT||driver.CORREO||'')} · ${number(rows.length)} documento(s) asociado(s)</span></div></div><div class="full">${table(['Documento','Asociación','Identificación','Vencimiento','Revisión','Adjunto','Acciones'],body,'Sin documentos digitalizados.')}</div><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cerrar</button>${hasPermission('DOCUMENTOS','CREAR')?'<button class="btn primary" type="button" data-driver-add-document>＋ Cargar documento</button>':''}</div></div>`;
+        openModal();$('[data-cancel-modal]',$('#modalBody')).addEventListener('click',closeModal);
+        $$('[data-view-document]',$('#modalBody')).forEach(btn=>btn.addEventListener('click',()=>abrirVisorDocumento(btn.dataset.viewDocument)));
+        $$('[data-approve-document]',$('#modalBody')).forEach(btn=>btn.addEventListener('click',()=>reviewDocument(btn.dataset.approveDocument,'APROBAR',btn)));
+        $$('[data-reject-document]',$('#modalBody')).forEach(btn=>btn.addEventListener('click',()=>reviewDocument(btn.dataset.rejectDocument,'RECHAZAR',btn)));
+        $('[data-driver-add-document]',$('#modalBody'))?.addEventListener('click',()=>{closeModal();openResourceModal('documents',{ASOCIADO_TIPO:'Conductor',CONDUCTOR_ASOCIADO_ID:id,ASOCIADO_ID:id,IDENTIFICACION:driver.RUT||driver.CORREO||id,CORREO_ASOCIADO:driver.CORREO||''});});
+      }catch(error){toast('No se pudieron abrir los documentos',translateError(error),'error');}
+    });
+  }
+
   async function openDriverOccupationModal(id,button){
     if(!id)return;
     await conCargaBoton(button,'Revisando…',async()=>{
@@ -3846,7 +3911,7 @@
         if(resource==='users'&&api.isRemote()&&(result?.persistenciaConfirmada!==true||!result?.row?.ID))throw new Error('USUARIO_NO_CONFIRMADO');
         if(result?.row?.ID)guardarRegistro(resource,result.row);
         invalidarListasFormulario(resource);cacheVistasModulo.delete(currentSection);closeModal();
-        if(resource==='documents'&&!id&&esAdministrador())toast('Documento aprobado','Quedó guardado y aprobado automáticamente.');else if(resource==='documents'&&!id&&['ROL-CONDUCTOR','ROL-SUPERVISOR'].includes(currentUser.ROL_ID))toast('Documento enviado','Quedó pendiente de aprobación por Administración o Gerencia.');
+        if(resource==='documents'&&!id&&esAdministrador())toast('Documento aprobado','Quedó guardado y aprobado automáticamente.');else if(resource==='documents'&&!id&&['ROL-CONDUCTOR','ROL-SUPERVISOR'].includes(currentUser.ROL_ID))toast('Documento enviado','Quedó pendiente de aprobación por Operador, Administración o Gerencia.');
         else if(resource==='users')toast(id?'Usuario actualizado':'Usuario creado',id?`${result.row.NOMBRE||result.row.CORREO||'La cuenta'} se actualizó correctamente.`:`${result.row.NOMBRE||result.row.CORREO||'La cuenta'} se creó correctamente.`);
         else toast('Registro guardado','La información quedó almacenada.');
         setSave('Datos guardados');await actualizarSeccionEnSegundoPlano(currentSection);
@@ -4122,17 +4187,21 @@
   }
   async function runAutomaticAlerts(button){try{const result=await api.request('runAutomaticAlerts',{force:true});invalidarListasFormulario('alerts','notifications');cacheVistasModulo.delete('alerts');cacheVistasModulo.delete('dashboard');toast('Revisión automática completada',`${Number(result.creadas||0)} alerta(s) nueva(s) detectadas.`);if(currentSection==='alerts')actualizarSeccionEnSegundoPlano('alerts');}catch(error){toast('No se pudo revisar',translateError(error),'error');}}
   function openRouteModal(prefill={}){
+    const routePrefill={...prefill};
     const base=configuracionPuntoOperacion();
     $('#modalEyebrow').textContent='PLANIFICACIÓN';$('#modalTitle').textContent='Asignar nueva ruta';
     const originDefault=base.configurada?base.direccion:'';
     const originLat=base.configurada?base.latitud:'';
     const originLng=base.configurada?base.longitud:'';
     const controlAlerta=['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())?`<label class="assignment-alert-switch full"><input type="checkbox" name="ENVIAR_ALERTA_ASIGNACION" value="SI" checked><i></i><span><b>Enviar alerta emergente</b><small>El conductor la recibirá individualmente. La voz respetará su preferencia personal.</small></span></label>`:'';
-    $('#modalBody').innerHTML=`<form class="form-grid" id="routeForm">${prefill.CHECKIN_ID?`<div class="module-diagnostic success full"><i>✓</i><div><b>Check-in ${esc(prefill.CHECKIN_ID)} listo</b><span>Conductor y vehículo fueron precargados desde la notificación.</span></div></div>`:''}<div class="operation-base-summary full"><i>➜</i><div><b>Asignación independiente del GPS</b><span>Puede crear la ruta desde cualquier lugar. La geocerca se validará únicamente cuando el conductor inicie o finalice una operación.</span></div></div><label class="field"><span>Conductor</span>${selectorDinamico('drivers','routeDrivers','CONDUCTOR_ID',prefill.CONDUCTOR_ID||'',true)}</label><label class="field"><span>Vehículo</span>${selectorDinamico('vehicles','routeVehicles','VEHICULO_ID',prefill.VEHICULO_ID||'')}</label><label class="field"><span>Nombre de la ruta</span><input name="NOMBRE" placeholder="Ej. Entrega sector norte"></label><label class="field"><span>Aplicación de navegación</span><select name="PROVEEDOR_NAVEGACION"><option>Google Maps</option><option>Waze</option></select></label><label class="field full"><span>Origen planificado</span><input name="ORIGEN" value="${esc(originDefault)}" required data-address-autocomplete data-lat-target="ORIGEN_LATITUD" data-lng-target="ORIGEN_LONGITUD" placeholder="Dirección de salida planificada"><small>${base.configurada?'Se completó con la base operacional, pero puede modificarlo para esta ruta.':'Ingrese el origen de esta asignación. Esto no configura la geocerca operacional.'}</small></label><label class="field"><span>Latitud origen</span><input name="ORIGEN_LATITUD" type="number" step="any" value="${esc(originLat)}" readonly placeholder="Opcional"></label><label class="field"><span>Longitud origen</span><input name="ORIGEN_LONGITUD" type="number" step="any" value="${esc(originLng)}" readonly placeholder="Opcional"></label><label class="field full"><span>Destino de la ruta</span><input name="DESTINO" required data-address-autocomplete data-lat-target="DESTINO_LATITUD" data-lng-target="DESTINO_LONGITUD" placeholder="Comience a escribir el destino"></label><label class="field"><span>Latitud destino</span><input name="DESTINO_LATITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Longitud destino</span><input name="DESTINO_LONGITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Prioridad</span><select name="PRIORIDAD"><option>Normal</option><option selected>Alta</option><option>Urgente</option></select></label><label class="field full"><span>Instrucciones al conductor</span><textarea name="INSTRUCCIONES" placeholder="Indicaciones, horarios, contacto o restricciones"></textarea></label>${controlAlerta}<div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Asignar y notificar</button></div></form>`;
+    $('#modalBody').innerHTML=`<form class="form-grid" id="routeForm">${routePrefill.CHECKIN_ID?`<div class="module-diagnostic success full"><i>✓</i><div><b>Check-in ${esc(routePrefill.CHECKIN_ID)} listo</b><span data-checkin-route-prefill-summary>Conductor y vehículo de esta inspección se cargarán automáticamente.</span></div></div><input type="hidden" name="CHECKIN_ID" value="${esc(routePrefill.CHECKIN_ID)}">`:''}<div class="operation-base-summary full"><i>➜</i><div><b>Asignación independiente del GPS</b><span>Puede crear la ruta desde cualquier lugar. La geocerca se validará únicamente cuando el conductor inicie o finalice una operación.</span></div></div><label class="field"><span>Conductor</span>${selectorDinamico('drivers','routeDrivers','CONDUCTOR_ID',routePrefill.CONDUCTOR_ID||'',true)}${routePrefill.CHECKIN_ID?'<small>Precargado desde la inspección; no necesita seleccionarlo nuevamente.</small>':''}</label><label class="field"><span>Vehículo</span>${selectorDinamico('vehicles','routeVehicles','VEHICULO_ID',routePrefill.VEHICULO_ID||'',true)}${routePrefill.CHECKIN_ID?'<small>Precargado desde el vehículo inspeccionado.</small>':''}</label><label class="field"><span>Nombre de la ruta</span><input name="NOMBRE" placeholder="Ej. Entrega sector norte"></label><label class="field"><span>Aplicación de navegación</span><select name="PROVEEDOR_NAVEGACION"><option>Google Maps</option><option>Waze</option></select></label><label class="field full"><span>Origen planificado</span><input name="ORIGEN" value="${esc(originDefault)}" required data-address-autocomplete data-lat-target="ORIGEN_LATITUD" data-lng-target="ORIGEN_LONGITUD" placeholder="Dirección de salida planificada"><small>${base.configurada?'Se completó con la base operacional, pero puede modificarlo para esta ruta.':'Ingrese el origen de esta asignación. Esto no configura la geocerca operacional.'}</small></label><label class="field"><span>Latitud origen</span><input name="ORIGEN_LATITUD" type="number" step="any" value="${esc(originLat)}" readonly placeholder="Opcional"></label><label class="field"><span>Longitud origen</span><input name="ORIGEN_LONGITUD" type="number" step="any" value="${esc(originLng)}" readonly placeholder="Opcional"></label><label class="field full"><span>Destino de la ruta</span><input name="DESTINO" required data-address-autocomplete data-lat-target="DESTINO_LATITUD" data-lng-target="DESTINO_LONGITUD" placeholder="Comience a escribir el destino"></label><label class="field"><span>Latitud destino</span><input name="DESTINO_LATITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Longitud destino</span><input name="DESTINO_LONGITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Prioridad</span><select name="PRIORIDAD"><option>Normal</option><option selected>Alta</option><option>Urgente</option></select></label><label class="field full"><span>Instrucciones al conductor</span><textarea name="INSTRUCCIONES" placeholder="Indicaciones, horarios, contacto o restricciones"></textarea></label>${controlAlerta}<div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Asignar y notificar</button></div></form>`;
     const token=openModal(),routeForm=$('#routeForm');bindAddressAutocomplete(routeForm);$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;
-    $('#routeForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());data.ENVIAR_ALERTA_ASIGNACION=form.elements.ENVIAR_ALERTA_ASIGNACION?.checked?'SI':'NO';await conCargaBoton(button,'Asignando…',async()=>{try{const result=await api.request('assignRoute',{data});if(prefill.NOTIFICACION_ID){try{await api.request('readNotification',{id:prefill.NOTIFICACION_ID,data:{NOTIFICACION_ID:prefill.NOTIFICACION_ID}});}catch(_){}}invalidarListasFormulario('routes','vehicles','documents','notifications');cacheVistasModulo.delete('routes');cacheVistasModulo.delete('documents');cacheVistasModulo.delete('dashboard');closeModal();const docPendiente=result.documentacionPersonal&&result.documentacionPersonal.COMPLETO===false;toast(docPendiente?'Ruta asignada · documentación pendiente':'Ruta asignada',docPendiente?'La ruta quedó activa y se avisó a Administración y Gerencia que falta documentación personal digital vigente.':result.notificada?'El conductor recibirá la tarjeta emergente; la voz sonará si la mantiene activada.':'La ruta quedó asignada sin aviso emergente.',docPendiente?'warning':'success');actualizarSeccionEnSegundoPlano('routes');}catch(error){toast('No se pudo asignar',translateError(error),'error');}});};
+    routeForm.onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());data.ENVIAR_ALERTA_ASIGNACION=form.elements.ENVIAR_ALERTA_ASIGNACION?.checked?'SI':'NO';if(routePrefill.CHECKIN_ID){data.CHECKIN_ID=routePrefill.CHECKIN_ID;if(String(data.CONDUCTOR_ID||'')!==String(routePrefill.CONDUCTOR_ID||'')||String(data.VEHICULO_ID||'')!==String(routePrefill.VEHICULO_ID||'')){toast('Inspección no coincide','La ruta debe conservar el conductor y el vehículo del check-in abierto.','error');return;}}await conCargaBoton(button,'Asignando…',async()=>{try{const result=await api.request('assignRoute',{data});if(routePrefill.NOTIFICACION_ID){try{await api.request('readNotification',{id:routePrefill.NOTIFICACION_ID,data:{NOTIFICACION_ID:routePrefill.NOTIFICACION_ID}});}catch(_){}}invalidarListasFormulario('routes','vehicles','documents','notifications');cacheVistasModulo.delete('routes');cacheVistasModulo.delete('documents');cacheVistasModulo.delete('dashboard');closeModal();const docPendiente=result.documentacionPersonal&&result.documentacionPersonal.COMPLETO===false;toast(docPendiente?'Ruta asignada · documentación pendiente':'Ruta asignada',docPendiente?'La ruta quedó activa y se avisó a Administración y Gerencia que falta documentación personal digital vigente.':result.notificada?'El conductor recibirá la tarjeta emergente; la voz sonará si la mantiene activada.':'La ruta quedó asignada sin aviso emergente.',docPendiente?'warning':'success');actualizarSeccionEnSegundoPlano('routes');}catch(error){toast('No se pudo asignar',translateError(error),'error');}});};
     prepararListasModal(token,['drivers','vehicles','checkins']);
-    Promise.all(['drivers','vehicles','checkins'].map(cargarListaFormulario)).then(()=>{if(token!==secuenciaModal)return;actualizarSelectoresModal(token);const driverSelect=routeForm.elements.CONDUCTOR_ID,vehicleSelect=routeForm.elements.VEHICULO_ID,applyPair=()=>{const driverId=driverSelect.value,valid=new Set(listaFormulario('checkins').filter(item=>item.CONDUCTOR_ID===driverId&&item.ESTADO_REVISION==='Aprobado'&&item.UTILIZADO!=='SI'&&new Date(item.VIGENTE_HASTA||0)>new Date()).map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));vehicleSelect.innerHTML=`<option value="">${vehicles.length?'Seleccione el vehículo con check-in listo':'El conductor aún no tiene check-in aprobado'}</option>${vehicles.map(item=>`<option value="${esc(item.ID)}">${esc(`${item.PATENTE||item.ID} · ${item.MARCA||''} ${item.MODELO||''}`.trim())}</option>`).join('')}`;vehicleSelect.disabled=!vehicles.length;if(vehicles.length===1)vehicleSelect.value=vehicles[0].ID;};driverSelect.addEventListener('change',applyPair);if(prefill.CONDUCTOR_ID){driverSelect.value=String(prefill.CONDUCTOR_ID);applyPair();if(prefill.VEHICULO_ID)vehicleSelect.value=String(prefill.VEHICULO_ID);}else if(driverSelect.options.length===2&&!driverSelect.value){driverSelect.selectedIndex=1;driverSelect.dispatchEvent(new Event('change'));}else applyPair();}).catch(()=>{});
+    Promise.all(['drivers','vehicles','checkins'].map(cargarListaFormulario)).then(()=>{if(token!==secuenciaModal)return;actualizarSelectoresModal(token);const driverSelect=routeForm.elements.CONDUCTOR_ID,vehicleSelect=routeForm.elements.VEHICULO_ID;const exactCheckin=routePrefill.CHECKIN_ID?listaFormulario('checkins').find(item=>String(item.ID)===String(routePrefill.CHECKIN_ID)):null;if(exactCheckin){routePrefill.CONDUCTOR_ID=String(exactCheckin.CONDUCTOR_ID||routePrefill.CONDUCTOR_ID||'');routePrefill.VEHICULO_ID=String(exactCheckin.VEHICULO_ID||routePrefill.VEHICULO_ID||'');}
+      const lockPrefill=()=>{const driver=listaFormulario('drivers').find(item=>String(item.ID)===String(routePrefill.CONDUCTOR_ID)),vehicle=listaFormulario('vehicles').find(item=>String(item.ID)===String(routePrefill.VEHICULO_ID));if(!routePrefill.CONDUCTOR_ID||!routePrefill.VEHICULO_ID)return false;driverSelect.innerHTML=`<option value="${esc(routePrefill.CONDUCTOR_ID)}">${esc(driver?`${driver.ID} · ${driver.NOMBRE||'Conductor'} · ${driver.RUT||driver.CORREO||''}`:routePrefill.CONDUCTOR_ID)}</option>`;vehicleSelect.innerHTML=`<option value="${esc(routePrefill.VEHICULO_ID)}">${esc(vehicle?`${vehicle.ID} · ${vehicle.PATENTE||'Sin patente'} · ${vehicle.MARCA||''} ${vehicle.MODELO||''}`.trim():routePrefill.VEHICULO_ID)}</option>`;driverSelect.value=routePrefill.CONDUCTOR_ID;vehicleSelect.value=routePrefill.VEHICULO_ID;driverSelect.dataset.selected=routePrefill.CONDUCTOR_ID;vehicleSelect.dataset.selected=routePrefill.VEHICULO_ID;driverSelect.dataset.checkinLocked='1';vehicleSelect.dataset.checkinLocked='1';const summary=$('[data-checkin-route-prefill-summary]',routeForm);if(summary)summary.textContent=`${driver?.NOMBRE||routePrefill.CONDUCTOR_ID} · ${vehicle?.PATENTE||routePrefill.VEHICULO_ID} quedaron precargados desde esta inspección.`;return true;};
+      if(routePrefill.CHECKIN_ID&&lockPrefill())return;
+      const applyPair=()=>{const driverId=driverSelect.value,valid=new Set(listaFormulario('checkins').filter(item=>item.CONDUCTOR_ID===driverId&&item.ESTADO_REVISION==='Aprobado'&&item.UTILIZADO!=='SI'&&new Date(item.VIGENTE_HASTA||0)>new Date()).map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));vehicleSelect.innerHTML=`<option value="">${vehicles.length?'Seleccione el vehículo con check-in listo':'El conductor aún no tiene check-in aprobado'}</option>${vehicles.map(item=>`<option value="${esc(item.ID)}">${esc(`${item.PATENTE||item.ID} · ${item.MARCA||''} ${item.MODELO||''}`.trim())}</option>`).join('')}`;vehicleSelect.disabled=!vehicles.length;if(vehicles.length===1)vehicleSelect.value=vehicles[0].ID;};driverSelect.addEventListener('change',applyPair);if(routePrefill.CONDUCTOR_ID){driverSelect.value=String(routePrefill.CONDUCTOR_ID);applyPair();if(routePrefill.VEHICULO_ID)vehicleSelect.value=String(routePrefill.VEHICULO_ID);}else if(driverSelect.options.length===2&&!driverSelect.value){driverSelect.selectedIndex=1;driverSelect.dispatchEvent(new Event('change'));}else applyPair();}).catch(error=>{if(routePrefill.CHECKIN_ID)toast('No se pudo precargar la inspección',translateError(error),'error');});
   }
   function guardarContextoSeguimientoRuta(contexto){routeTrackingContext=contexto&&contexto.activo!==false?{...contexto,USUARIO_ID:currentUser?.ID||contexto.USUARIO_ID||''}:null;try{if(routeTrackingContext)localStorage.setItem(routeTrackingKey,JSON.stringify(routeTrackingContext));else localStorage.removeItem(routeTrackingKey);}catch(_){}}
   function contextoSeguimientoRutaValido(){if(!routeTrackingContext||routeTrackingContext.activo===false)return false;const owner=String(routeTrackingContext.USUARIO_ID||'');if(owner&&currentUser?.ID&&owner!==String(currentUser.ID)){guardarContextoSeguimientoRuta(null);return false;}return Boolean(routeTrackingContext.RUTA_ID||routeTrackingContext.OPERACION_ID);}
