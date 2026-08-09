@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.2.46';
+  const VERSION='4.2.48';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -258,8 +258,8 @@
   function esAlertaAsignacion(item){return ['RUTA_ASIGNADA','OPERACION_ASIGNADA','VEHICULO_CHECKIN_ASIGNADO'].includes(String(item?.CATEGORIA_EMERGENTE||'').toUpperCase())&&String(item?.ESTADO_RESPUESTA||'PENDIENTE').toUpperCase()==='PENDIENTE';}
   function anunciarAsignacionVoz(item){
     if(!('speechSynthesis'in window)||!avisosEmergentesActivosMenu()||!vozAsignacionesActivaMenu())return;
-    const clase=String(item.CATEGORIA_EMERGENTE||'').startsWith('OPERACION')?'operación':'ruta';
-    const texto=`Nueva ${clase} asignada para ${item.DESTINATARIO_NOMBRE||'el conductor'}. ${item.NOMBRE_ASIGNACION||''}. Desde ${item.ORIGEN||'origen no informado'} hasta ${item.DESTINO||'destino no informado'}.`;
+    const categoria=String(item.CATEGORIA_EMERGENTE||'').toUpperCase(),titulo=categoria.startsWith('VEHICULO_CHECKIN')?'Vehículo asignado':categoria.startsWith('OPERACION')?'Nueva operación asignada':'Nueva ruta asignada';
+    const texto=`${titulo} para ${item.DESTINATARIO_NOMBRE||'el conductor'}. ${item.NOMBRE_ASIGNACION||''}. Desde ${item.ORIGEN||'origen no informado'} hasta ${item.DESTINO||'destino no informado'}.`;
     try{window.speechSynthesis.cancel();const voz=new SpeechSynthesisUtterance(texto);voz.lang='es-CL';voz.rate=1;window.speechSynthesis.speak(voz);}catch(_){ }
   }
   async function responderAlertaAsignacionMenu(item,respuesta,boton){
@@ -284,12 +284,12 @@
   function mostrarAlertaAsignacionMenu(item){
     if(!avisosEmergentesActivosMenu()||!item?.ID)return;
     alertaAsignacionVisible?.remove();
-    const clase=String(item.CATEGORIA_EMERGENTE||'').startsWith('OPERACION')?'operación':'ruta';
-    const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',`Nueva ${clase} asignada`);
+    const categoria=String(item.CATEGORIA_EMERGENTE||'').toUpperCase(),esVehiculo=categoria.startsWith('VEHICULO_CHECKIN'),clase=esVehiculo?'vehículo':categoria.startsWith('OPERACION')?'operación':'ruta',titulo=esVehiculo?'Vehículo asignado':`Nueva ${clase} asignada`;
+    const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',titulo);
     const distancia=item.DISTANCIA_KM==null||item.DISTANCIA_KM===''?'Distancia por calcular':`${escapar(item.DISTANCIA_KM)} km estimados`;
     const minutos=item.DURACION_MINUTOS==null||item.DURACION_MINUTOS===''?'Tiempo por calcular':`${escapar(item.DURACION_MINUTOS)} min estimados`;
     const etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Operador':'Aceptar';
-    nodo.innerHTML=`<header><i>${clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>Nueva ${clase} asignada</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
+    nodo.innerHTML=`<header><i>${esVehiculo?'▣':clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>${titulo}</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
     document.body.append(nodo);alertaAsignacionVisible=nodo;
     nodo.querySelectorAll('[data-respuesta]').forEach(boton=>boton.addEventListener('click',()=>responderAlertaAsignacionMenu(item,boton.dataset.respuesta,boton)));
     if(document.hidden)hacerPersistenteAlertaAsignacionMenu(nodo);

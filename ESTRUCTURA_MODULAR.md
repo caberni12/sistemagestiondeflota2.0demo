@@ -11,7 +11,7 @@
 ## Flujo preoperacional
 
 1. El conductor abre `checkin-vehicular.html`.
-2. Selecciona el vehículo y completa los 16 controles.
+2. Selecciona el vehículo y completa los 18 controles.
 3. El sistema evalúa la inspección.
 4. Si hay observaciones leves, Administrador o Supervisor revisa en `checkin-aprobaciones.html`.
 5. Una falla crítica bloquea la salida.

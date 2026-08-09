@@ -1,7 +1,7 @@
 (function(){
   'use strict';
 
-  const VERSION='4.2.46';
+  const VERSION='4.2.48';
   const MIME={
     csv:'text/csv;charset=utf-8',
     xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -130,7 +130,7 @@
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${rows}</sheetData>${sheet.headers.length?`<autoFilter ref="A1:${lastCol}${lastRow}"/>`:''}</worksheet>`;
   }
   async function xlsxDeHojas(sheets){
-    const JSZip=await cargarScript('jszip.min.js?v=4.2.46-ui5','JSZip'),zip=new JSZip();
+    const JSZip=await cargarScript('jszip.min.js?v=4.2.49-ui10','JSZip'),zip=new JSZip();
     const safeSheets=sheets.map((s,index)=>({...s,nombre:(s.nombre||`Hoja ${index+1}`).replace(/[\\/*?:\[\]]/g,' ').slice(0,31)||`Hoja ${index+1}`}));
     zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${safeSheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`);
     zip.folder('_rels').file('.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`);
