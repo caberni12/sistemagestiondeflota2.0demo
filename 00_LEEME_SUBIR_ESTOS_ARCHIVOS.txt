@@ -1,0 +1,7 @@
+SGF WEB 4.3.8 - PRODUCCION SEGURA PLANA
+
+Suba TODOS estos archivos juntos en la raíz del sitio. No se requieren subcarpetas.
+
+Protecciones: módulos directos vuelven al login; ticket efímero por pestaña; validación API antes de abrir módulos; modo local deshabilitado en producción; postMessage limitado al iframe/origen; identidad y permisos solo se aceptan desde la API; JavaScript de negocio empaquetado/ofuscado sin source maps.
+
+Nota: en un hosting estático el código que ejecuta el navegador nunca puede ser 100% secreto. La seguridad real está en la API, que valida sesión, rol, permisos y alcance.
