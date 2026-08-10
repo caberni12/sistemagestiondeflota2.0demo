@@ -3,6 +3,14 @@
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
   const VERSION='4.3.8';
+  const ORIGEN_MENSAJES=location.origin==='null'?'*':location.origin;
+  const CLAVE_TICKET_SHELL='sgf_shell_ticket_v1';
+  function crearTicketShell(){
+    try{const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
+    catch(_){return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;}
+  }
+  const ticketShell=crearTicketShell();
+  try{sessionStorage.setItem(CLAVE_TICKET_SHELL,ticketShell);}catch(_){ }
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -52,6 +60,7 @@
   let idsAlertasConocidas=new Set();
   let idsAsignacionesMostradas=new Set();
   let alertaAsignacionVisible=null;
+  let colaAsignacionesMenu=[];
   let estadoAvisos={notifications:[],alerts:[]};
   let cargandoModoOficina=false;
   let consultaAvisosPendiente=null;
@@ -160,7 +169,7 @@
           }
           marcoListo=false;
           moduloIframeActual=modulo[0];
-          marco.src=`${modulo[3]}?v=${VERSION}&recuperar=${Date.now()}`;
+          marco.src=`${modulo[3]}?v=${VERSION}&__sgf=${encodeURIComponent(ticketShell)}&recuperar=${Date.now()}`;
         }
       },7000);
       return;
@@ -169,7 +178,7 @@
     marcoListo=false;
     moduloIframeActual=modulo[0];
     const recarga=forzar?`&actualizar=${Date.now()}`:'';
-    marco.src=`${modulo[3]}?v=${VERSION}${recarga}`;
+    marco.src=`${modulo[3]}?v=${VERSION}&__sgf=${encodeURIComponent(ticketShell)}${recarga}`;
   }
 
   function aplicarUsuario(nuevoUsuario){
@@ -285,31 +294,40 @@
       alertaAsignacionVisible?.remove();alertaAsignacionVisible=null;
       estadoAvisos.notifications=(estadoAvisos.notifications||[]).filter(row=>String(row.ID)!==String(item.ID));
       await actualizarAvisos();
-      cambiarEstado(respuesta==='ACEPTADA'?'Asignación aceptada':'Aviso cerrado','listo');
+      cambiarEstado('Asignación aceptada','listo');
+      setTimeout(mostrarSiguienteAlertaAsignacionMenu,120);
     }catch(_){if(boton)boton.disabled=false;cambiarEstado('No se pudo confirmar la asignación','advertencia');}
   }
   function hacerPersistenteAlertaAsignacionMenu(nodo){
     if(!nodo||nodo.dataset.persistente==='1')return;
     nodo.dataset.persistente='1';
     nodo.classList.add('persistente');
-    nodo.querySelectorAll('[data-respuesta="CERRADA"]').forEach(boton=>boton.remove());
     const cuerpo=nodo.querySelector('.alerta-asignacion-cuerpo');
     if(cuerpo&&!cuerpo.querySelector('.alerta-asignacion-pendiente'))cuerpo.insertAdjacentHTML('beforeend','<p class="alerta-asignacion-pendiente">Aviso pendiente: permanecerá en la bandeja hasta que presione Aceptar.</p>');
   }
+  function mostrarSiguienteAlertaAsignacionMenu(){
+    if(alertaAsignacionVisible?.isConnected)return;
+    while(colaAsignacionesMenu.length){const siguiente=colaAsignacionesMenu.shift();if(siguiente?.ID){mostrarAlertaAsignacionMenu(siguiente);break;}}
+  }
   function mostrarAlertaAsignacionMenu(item){
     if(!avisosEmergentesActivosMenu()||!item?.ID)return;
-    alertaAsignacionVisible?.remove();
+    if(alertaAsignacionVisible?.isConnected){
+      const actual=String(alertaAsignacionVisible.dataset.assignmentId||'');
+      if(actual===String(item.ID))return;
+      if(!colaAsignacionesMenu.some(row=>String(row?.ID||'')===String(item.ID)))colaAsignacionesMenu.push(item);
+      return;
+    }
     const categoria=String(item.CATEGORIA_EMERGENTE||'').toUpperCase(),esVehiculo=categoria.startsWith('VEHICULO_CHECKIN'),clase=esVehiculo?'vehículo':categoria.startsWith('OPERACION')?'operación':'ruta',titulo=esVehiculo?'Vehículo asignado':`Nueva ${clase} asignada`;
-    const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',titulo);
+    const nodo=document.createElement('section');nodo.className='alerta-asignacion-menu';nodo.setAttribute('role','alertdialog');nodo.setAttribute('aria-label',titulo);nodo.dataset.assignmentId=String(item.ID);
     const distancia=item.DISTANCIA_KM==null||item.DISTANCIA_KM===''?'Distancia por calcular':`${escapar(item.DISTANCIA_KM)} km estimados`;
     const minutos=item.DURACION_MINUTOS==null||item.DURACION_MINUTOS===''?'Tiempo por calcular':`${escapar(item.DURACION_MINUTOS)} min estimados`;
     const etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Operador':'Aceptar';
-    nodo.innerHTML=`<header><i>${esVehiculo?'▣':clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>${titulo}</h2></div><button type="button" data-respuesta="CERRADA" aria-label="Cerrar aviso">×</button></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p></div><footer><button type="button" class="cerrar" data-respuesta="CERRADA">× Cerrar</button><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
+    nodo.innerHTML=`<header><i>${esVehiculo?'▣':clase==='ruta'?'➜':'⇄'}</i><div><span>AVISO PRIORITARIO</span><h2>${titulo}</h2></div></header><div class="alerta-asignacion-cuerpo"><h3>${escapar(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><dl><div><dt>Usuario</dt><dd>${escapar(item.DESTINATARIO_NOMBRE||usuario?.NOMBRE||'Conductor')}</dd></div><div><dt>Desde</dt><dd>${escapar(item.ORIGEN||'No informado')}</dd></div><div><dt>Hasta</dt><dd>${escapar(item.DESTINO||'No informado')}</dd></div></dl><p>${distancia} · ${minutos}</p><p class="alerta-asignacion-pendiente">La asignación permanecerá visible hasta que presione Aceptar.</p></div><footer class="accept-only"><button type="button" class="aceptar" data-respuesta="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
     document.body.append(nodo);alertaAsignacionVisible=nodo;
     nodo.querySelectorAll('[data-respuesta]').forEach(boton=>boton.addEventListener('click',()=>responderAlertaAsignacionMenu(item,boton.dataset.respuesta,boton)));
     if(document.hidden)hacerPersistenteAlertaAsignacionMenu(nodo);
     anunciarAsignacionVoz(item);
-    setTimeout(()=>{if(alertaAsignacionVisible===nodo&&nodo.dataset.persistente!=='1'&&!document.hidden){nodo.remove();alertaAsignacionVisible=null;}},15000);
+    // Sin cierre automático ni botón X: la tarjeta permanece hasta Aceptar.
   }
   function claveAvisoMenu(item,tipo){
     const normal=value=>String(value??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
@@ -471,12 +489,12 @@
     iniciarAvisos();
   }
   function enviar(mensaje){
-    try{marco.contentWindow?.postMessage(mensaje,'*');}catch(_){ }
+    try{marco.contentWindow?.postMessage(mensaje,ORIGEN_MENSAJES);}catch(_){ }
   }
   function enviarAutenticacionModulo(){
     const auth=api?.getAuth?.()||{};
     if(!auth.token||!auth.user)return false;
-    enviar({tipo:'flotas:autenticacion',auth:{token:auth.token,sessionId:auth.sessionId||'',user:auth.user,expiresAt:auth.expiresAt||''}});
+    enviar({tipo:'flotas:autenticacion',seccionAutorizada:seccionActual,auth:{token:auth.token,sessionId:auth.sessionId||'',user:auth.user,expiresAt:auth.expiresAt||''}});
     return true;
   }
   function confirmarModuloVisiblePorContenido(){
@@ -539,10 +557,10 @@
       const auth=api?.getAuth?.()||{};
       if(!auth.token){irAcceso('expirada');return false;}
 
-      // Se muestra el panel inmediatamente con el usuario guardado.
-      // Una caída temporal del servicio nunca devuelve al login.
-      if(auth.user)iniciarPanel(auth.user);
-      if(desdeModulo)cambiarEstado('Comprobando sesión');
+      // Seguridad Web: al abrir el panel por primera vez la sesión debe validarse
+      // con el servidor antes de cargar cualquier módulo. Un usuario almacenado
+      // en el navegador nunca es autoridad suficiente.
+      if(desdeModulo)cambiarEstado('Comprobando sesión segura');
 
       try{
         if(auth.user&&!desdeModulo)await esperar(350);
@@ -559,12 +577,14 @@
           if(invalida){api.setAuth({});irAcceso('expirada');return false;}
           return true;
         }
-        if(auth.user){
-          iniciarPanel(auth.user);
-          cambiarEstado('Conexión lenta · sesión conservada','advertencia');
+        // Si el panel ya había sido validado en esta carga, una caída de red
+        // temporal no destruye el trabajo en curso. En el primer acceso, en cambio,
+        // se falla de forma cerrada y no se abre ningún módulo sin validar servidor.
+        if(panelInicializado&&usuario){
+          cambiarEstado('Conexión interrumpida · sesión previamente validada','advertencia');
           return true;
         }
-        cambiarEstado('No fue posible validar · reintentando','advertencia');
+        cambiarEstado('No fue posible validar la sesión · reintentando','advertencia');
         setTimeout(()=>validarSesion(),5000);
         return false;
       }
@@ -573,30 +593,40 @@
   }
 
   window.addEventListener('message',event=>{
+    if(event.source!==marco.contentWindow)return;
     if(event.origin!==location.origin&&event.origin!=='null')return;
     const data=event.data||{};
     if(data.tipo==='flotas:modulo-listo'){
       marcoListo=true;
       moduloIframeActual=data.seccion||seccionActual;
-      if(data.usuario)aplicarUsuario(data.usuario);
+      // La identidad del usuario nunca se acepta desde un iframe.
+      // main.html solo confía en la respuesta de la API.
       $('#cargandoModulo').classList.add('oculto');
       cambiarEstado(data.actualizadoEn?'Módulo activo · memoria local':'Módulo activo','listo');
       aplicarTema();
       requestAnimationFrame(()=>requestAnimationFrame(()=>enviar({tipo:'flotas:modulo-visible',seccion:seccionActual})));
     }
-    if(data.tipo==='flotas:usuario-actualizado'&&data.usuario){
-      aplicarUsuario(data.usuario);
-      const moduloActual=modulos.get(seccionActual);
-      if(!moduloActual||!permitido(moduloActual[4])){
-        seccionActual='dashboard';
-        localStorage.setItem('flotas_modulo_actual_v1',seccionActual);
-        abrirModulo('dashboard',{forzar:true});
-      }
+    if(data.tipo==='flotas:usuario-actualizado'){
+      api.request('me',{cache:false}).then(resultado=>{
+        const fresco=resultado?.user||resultado?.usuario;if(!fresco)return;
+        const auth=api.getAuth();api.setAuth({...auth,user:fresco});aplicarUsuario(fresco);
+        const moduloActual=modulos.get(seccionActual);
+        if(!moduloActual||!permitido(moduloActual[4])){
+          seccionActual='dashboard';localStorage.setItem('flotas_modulo_actual_v1',seccionActual);abrirModulo('dashboard',{forzar:true});
+        }else enviarAutenticacionModulo();
+      }).catch(error=>{if(api.isAuthError?.(error)){api.setAuth({});irAcceso('expirada');}});
     }
     if(data.tipo==='flotas:navegar'&&modulos.has(data.seccion))abrirModulo(data.seccion);
     if(data.tipo==='flotas:actualizar-avisos')actualizarAvisos();
     if(data.tipo==='flotas:sesion-cerrada'){api.setAuth({});irAcceso('cerrada');}
     if(data.tipo==='flotas:autenticacion-requerida'){
+      const seccionSolicitada=String(data.seccion||'').trim();
+      if(seccionSolicitada){
+        const moduloSolicitado=modulos.get(seccionSolicitada);
+        if(seccionSolicitada!==seccionActual||!moduloSolicitado||!permitido(moduloSolicitado[4])){
+          api.setAuth({});irAcceso('modulo_no_autorizado');return;
+        }
+      }
       if(enviarAutenticacionModulo())return;
       validarSesion({desdeModulo:true}).then(valida=>{if(valida)enviarAutenticacionModulo();});
     }

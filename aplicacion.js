@@ -62,6 +62,7 @@
   let knownAlertIds = new Set();
   let knownAssignmentAlertIds = new Set();
   let assignmentAlertNode = null;
+  let assignmentAlertQueue = [];
   let nexoSpeedAlertNode = null;
   let gpsWatchId = null;
   let mediaStream = null;
@@ -148,6 +149,7 @@
   const hayEdicionUsuarioActiva = () => {
     if (Date.now() < bloqueoRefrescoVisualHasta) return true;
     if ($('#modalBackdrop')?.classList.contains('open')) return true;
+    if (assignmentAlertNode?.isConnected) return true;
     const content=$('#content');
     if(content?.dataset?.trabajoUsuario==='1')return true;
     if(content?.querySelector?.('[data-trabajo-usuario="1"]'))return true;
@@ -406,7 +408,8 @@
   }
   function postParent(message){
     if(!embeddedMode||window.parent===window)return;
-    try{window.parent.postMessage(message,'*');}catch(_){}
+    const targetOrigin=location.origin==='null'?'*':location.origin;
+    try{window.parent.postMessage(message,targetOrigin);}catch(_){}
   }
   function navigateSection(section){
     if(embeddedMode&&window.parent!==window){postParent({tipo:'flotas:navegar',seccion:section});return Promise.resolve(true);}
@@ -718,30 +721,39 @@
   function esAvisoAsignacion(item){return ['RUTA_ASIGNADA','RUTA_SIGUIENTE_DESTINO','OPERACION_ASIGNADA','VEHICULO_CHECKIN_ASIGNADO'].includes(String(item?.CATEGORIA_EMERGENTE||'').toUpperCase())&&String(item?.ESTADO_RESPUESTA||'PENDIENTE').toUpperCase()==='PENDIENTE';}
   async function responderAvisoAsignacionWeb(item,respuesta,button){
     if(!item?.ID)return;if(button)button.disabled=true;
-    try{const result=await api.request('respondAssignmentAlert',{id:item.ID,data:{NOTIFICACION_ID:item.ID,RESPUESTA:respuesta}});assignmentAlertNode?.remove();assignmentAlertNode=null;knownNotificationIds.delete(String(item.ID));invalidarListasFormulario('notifications','routes','operations');await refreshNotificationBadge();if(result?.RUTA_INICIADA===true||result?.rutaIniciada===true){const route=result.RUTA||result.ruta||{},seguimiento=result.SEGUIMIENTO||result.seguimiento||null;if(seguimiento)await activarSeguimientoRutaCliente(seguimiento);const siguiente=String(item.CATEGORIA_EMERGENTE||'').toUpperCase()==='RUTA_SIGUIENTE_DESTINO';toast(siguiente?'Siguiente destino aceptado':'Ruta aceptada e iniciada',siguiente?'Abriendo automáticamente la navegación al próximo punto.':'GPS activado. Abriendo la navegación planificada.');programarNavegacionRutaPlanificada(route);}else if(result?.POSPUESTA===true||result?.pospuesta===true)toast('Siguiente destino pendiente','La tarjeta se cerró, pero el destino continúa disponible en la campanita para retomarlo.');else toast(respuesta==='ACEPTADA'?'Asignación aceptada':'Aviso cerrado','La respuesta quedó confirmada en el sistema.');}
+    try{const result=await api.request('respondAssignmentAlert',{id:item.ID,data:{NOTIFICACION_ID:item.ID,RESPUESTA:respuesta}});assignmentAlertNode?.remove();assignmentAlertNode=null;knownNotificationIds.delete(String(item.ID));invalidarListasFormulario('notifications','routes','operations');await refreshNotificationBadge();if(result?.RUTA_INICIADA===true||result?.rutaIniciada===true){const route=result.RUTA||result.ruta||{},seguimiento=result.SEGUIMIENTO||result.seguimiento||null;if(seguimiento)await activarSeguimientoRutaCliente(seguimiento);const siguiente=String(item.CATEGORIA_EMERGENTE||'').toUpperCase()==='RUTA_SIGUIENTE_DESTINO';toast(siguiente?'Siguiente destino aceptado':'Ruta aceptada e iniciada',siguiente?'Abriendo automáticamente la navegación al próximo punto.':'GPS activado. Abriendo la navegación planificada.');programarNavegacionRutaPlanificada(route);}else if(result?.POSPUESTA===true||result?.pospuesta===true)toast('Siguiente destino pendiente','La tarjeta se cerró, pero el destino continúa disponible en la campanita para retomarlo.');else toast(respuesta==='ACEPTADA'?'Asignación aceptada':'Aviso cerrado','La respuesta quedó confirmada en el sistema.');setTimeout(mostrarSiguienteAvisoAsignacionWeb,120);}
     catch(error){if(button)button.disabled=false;toast('No se pudo confirmar',translateError(error),'error');}
   }
   function hacerPersistenteAvisoAsignacion(node){
     if(!node||node.dataset.persistente==='1')return;
     node.dataset.persistente='1';
     node.classList.add('assignment-alert-persistent');
-    $$('[data-assignment-response="CERRADA"]',node).forEach(button=>button.remove());
     const footer=$('footer',node);if(footer)footer.classList.add('accept-only');
     const cuerpo=$('.assignment-alert-body',node);if(cuerpo&&!$('[data-assignment-pending]',cuerpo)){
       const aviso=document.createElement('p');aviso.dataset.assignmentPending='1';aviso.className='assignment-alert-pending';aviso.textContent='Aviso pendiente: permanecerá en la bandeja hasta que presione Aceptar.';cuerpo.append(aviso);
     }
   }
+  function mostrarSiguienteAvisoAsignacionWeb(){
+    if(assignmentAlertNode?.isConnected)return;
+    while(assignmentAlertQueue.length){const siguiente=assignmentAlertQueue.shift();if(siguiente?.ID){showAssignmentAlert(siguiente);break;}}
+  }
   function showAssignmentAlert(item){
     if(embeddedMode||!avisosEmergentesActivos()||!item?.ID)return;
+    if(assignmentAlertNode?.isConnected){
+      const actual=String(assignmentAlertNode.dataset.assignmentId||'');
+      if(actual===String(item.ID))return;
+      if(!assignmentAlertQueue.some(row=>String(row?.ID||'')===String(item.ID)))assignmentAlertQueue.push(item);
+      return;
+    }
     const recibidaFuera=document.hidden;
-    assignmentAlertNode?.remove();const categoria=String(item.CATEGORIA_EMERGENTE||'').toUpperCase(),esSiguiente=categoria==='RUTA_SIGUIENTE_DESTINO',clase=categoria.startsWith('VEHICULO_CHECKIN')?'vehículo para check-in':categoria.startsWith('OPERACION')?'operación':'ruta',encabezado=esSiguiente?'Llegaste al punto · siguiente destino':categoria.startsWith('VEHICULO_CHECKIN')?'Vehículo asignado':`Nueva ${clase} asignada`;
-    const node=document.createElement('section');node.className='assignment-alert-card';node.setAttribute('role','alertdialog');
+    const categoria=String(item.CATEGORIA_EMERGENTE||'').toUpperCase(),esSiguiente=categoria==='RUTA_SIGUIENTE_DESTINO',clase=categoria.startsWith('VEHICULO_CHECKIN')?'vehículo para check-in':categoria.startsWith('OPERACION')?'operación':'ruta',encabezado=esSiguiente?'Llegaste al punto · siguiente destino':categoria.startsWith('VEHICULO_CHECKIN')?'Vehículo asignado':`Nueva ${clase} asignada`;
+    const node=document.createElement('section');node.className='assignment-alert-card';node.setAttribute('role','alertdialog');node.dataset.assignmentId=String(item.ID);
     const etiquetaAceptar=esSiguiente?'Aceptar y continuar':esAdministrador()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenas()?'Aceptar como Operador':'Aceptar';
-    node.innerHTML=`<header><i>${clase==='ruta'?'➜':clase==='operación'?'⇄':'▣'}</i><div><span>AVISO PRIORITARIO</span><h2>${encabezado}</h2></div><button type="button" data-assignment-response="CERRADA" aria-label="Cerrar">×</button></header><div class="assignment-alert-body"><h3>${esc(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><div><span>Usuario</span><b>${esc(item.DESTINATARIO_NOMBRE||currentUser?.NOMBRE||'Conductor')}</b></div><div><span>Desde</span><b>${esc(item.ORIGEN||'No informado')}</b></div><div><span>Hasta</span><b>${esc(item.DESTINO||'No informado')}</b></div>${clase==='ruta'?`<div><span>Navegación</span><b>${esc(item.PROVEEDOR_NAVEGACION||'Google Maps')}</b></div>`:''}<p>${categoria.startsWith('VEHICULO_CHECKIN')?'Retire la llave y complete el check-in antes de iniciar la ruta.':`${item.DISTANCIA_KM==null?'Distancia por calcular':`${esc(item.DISTANCIA_KM)} km estimados`} · ${item.DURACION_MINUTOS==null?'Tiempo por calcular':`${esc(item.DURACION_MINUTOS)} min estimados`}`}</p></div><footer><button class="danger" data-assignment-response="CERRADA">${esSiguiente?'× Ahora no':'× Cerrar'}</button><button class="primary" data-assignment-response="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
+    node.innerHTML=`<header><i>${clase==='ruta'?'➜':clase==='operación'?'⇄':'▣'}</i><div><span>AVISO PRIORITARIO</span><h2>${encabezado}</h2></div></header><div class="assignment-alert-body"><h3>${esc(item.NOMBRE_ASIGNACION||item.TITULO||'Nueva asignación')}</h3><div><span>Usuario</span><b>${esc(item.DESTINATARIO_NOMBRE||currentUser?.NOMBRE||'Conductor')}</b></div><div><span>Desde</span><b>${esc(item.ORIGEN||'No informado')}</b></div><div><span>Hasta</span><b>${esc(item.DESTINO||'No informado')}</b></div>${clase==='ruta'?`<div><span>Navegación</span><b>${esc(item.PROVEEDOR_NAVEGACION||'Google Maps')}</b></div>`:''}<p>${categoria.startsWith('VEHICULO_CHECKIN')?'Retire la llave y complete el check-in antes de iniciar la ruta.':`${item.DISTANCIA_KM==null?'Distancia por calcular':`${esc(item.DISTANCIA_KM)} km estimados`} · ${item.DURACION_MINUTOS==null?'Tiempo por calcular':`${esc(item.DURACION_MINUTOS)} min estimados`}`}</p><p class="assignment-alert-pending" data-assignment-pending="1">La asignación permanecerá visible hasta que presione Aceptar.</p></div><footer class="accept-only"><button class="primary" data-assignment-response="ACEPTADA">✓ ${etiquetaAceptar}</button></footer>`;
     document.body.append(node);assignmentAlertNode=node;$$('[data-assignment-response]',node).forEach(button=>button.onclick=()=>conCargaBoton(button,button.dataset.assignmentResponse==='ACEPTADA'?'Aceptando…':'Cerrando…',()=>responderAvisoAsignacionWeb(item,button.dataset.assignmentResponse,button)));
     if(recibidaFuera)hacerPersistenteAvisoAsignacion(node);
     if(vozAsignacionesActiva())hablar(`${encabezado} para ${item.DESTINATARIO_NOMBRE||'el conductor'}. ${item.NOMBRE_ASIGNACION||''}. Desde ${item.ORIGEN||'origen no informado'} hasta ${item.DESTINO||'destino no informado'}.`);
-    setTimeout(()=>{if(assignmentAlertNode===node&&node.dataset.persistente!=='1'&&!document.hidden){node.remove();assignmentAlertNode=null;}},15000);
+    // Sin cierre automático ni botón X: la tarjeta permanece hasta Aceptar.
   }
   function claveVisualAviso(item,tipo){
     const normal=value=>String(value??'').trim().toUpperCase().replace(/\s+/g,' ');
@@ -859,11 +871,19 @@
     const savedAuth = api.getAuth();
     hideAuthCards();
 
-    // En modo iframe, main.html es el único validador de la sesión.
-    // El módulo reutiliza el usuario guardado y comienza sin una segunda espera de red.
+    // En producción segura el módulo no confía en una sesión almacenada por sí solo.
+    // Debe estar dentro del shell protegido y recibir la identidad validada desde main.html.
     if (embeddedMode) {
+      if (config.PRODUCCION_SEGURA === true) {
+        if (!window.__SGF_MODULO_SEGURO__?.valido) {
+          postParent({tipo:'flotas:autenticacion-requerida',codigo:'MODULO_NO_AUTORIZADO',seccion:initialSection});
+          return;
+        }
+        postParent({tipo:'flotas:autenticacion-requerida',codigo:'VALIDAR_SESION_PADRE',seccion:initialSection});
+        return;
+      }
       if (!savedAuth.token || !savedAuth.user) {
-        postParent({tipo:'flotas:autenticacion-requerida'});
+        postParent({tipo:'flotas:autenticacion-requerida',seccion:initialSection});
         return;
       }
       currentUser = savedAuth.user;
@@ -1933,7 +1953,7 @@
   }
 
   function checkinVisualState(row) {
-    if(row.UTILIZADO==='SI')return 'Utilizado';
+    if(row.ESTADO_REVISION==='Aprobado'&&new Date(row.VIGENTE_HASTA||0).getTime()>Date.now())return 'Vigente 24 h';
     if(row.ESTADO_REVISION==='Aprobado'&&new Date(row.VIGENTE_HASTA||0).getTime()<=Date.now())return 'Expirado';
     return row.ESTADO_REVISION||row.RESULTADO||'Sin estado';
   }
@@ -4556,7 +4576,7 @@
       if(routePrefill.CHECKIN_ID&&lockPrefill())return;
       let secuenciaPareja=0;
       const applyPair=async()=>{const request=++secuenciaPareja,driverId=String(driverSelect.value||''),hint=$('[data-route-vehicle-auto]',routeForm);vehicleSelect.disabled=false;if(!driverId){vehicleSelect.innerHTML='<option value="">Seleccione primero el conductor</option>';if(hint)hint.textContent='Al seleccionar conductor se cargará automáticamente su vehículo asignado.';return;}
-        const checkinsValidos=listaFormulario('checkins').filter(item=>String(item.CONDUCTOR_ID||'')===driverId&&item.ESTADO_REVISION==='Aprobado'&&item.UTILIZADO!=='SI'&&new Date(item.VIGENTE_HASTA||0)>new Date()),valid=new Set(checkinsValidos.map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));
+        const checkinsValidos=listaFormulario('checkins').filter(item=>String(item.CONDUCTOR_ID||'')===driverId&&item.ESTADO_REVISION==='Aprobado'&&new Date(item.VIGENTE_HASTA||0)>new Date()),valid=new Set(checkinsValidos.map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));
         let asignadoId='';try{const result=await api.request('currentCheckinAssignment',{data:{CONDUCTOR_ID:driverId},cache:false});asignadoId=String(result?.vehiculo?.ID||result?.VEHICULO?.ID||result?.asignacion?.VEHICULO_ID||'');}catch(_){asignadoId='';}
         if(request!==secuenciaPareja||String(driverSelect.value||'')!==driverId)return;
         const asignado=vehicles.find(item=>String(item.ID)===asignadoId);
@@ -4841,7 +4861,7 @@
   }
   function checkinDetailMarkup(row) {
     const vehicle=registroFormulario('vehicles',row.VEHICULO_ID),driver=registroFormulario('drivers',row.CONDUCTOR_ID),items=parseCheckinItems(row),control=puedeVerTrazabilidadRutas(),state=String(row.ESTADO_REVISION||'');
-    const pending=control&&['Pendiente','Bloqueado'].includes(state)&&row.UTILIZADO!=='SI',ready=control&&state==='Aprobado'&&row.UTILIZADO!=='SI';
+    const pending=control&&['Pendiente','Bloqueado'].includes(state)&&row.UTILIZADO!=='SI',ready=control&&state==='Aprobado'&&new Date(row.VIGENTE_HASTA||0).getTime()>Date.now();
     const actions=`${pending?`<button class="btn danger" type="button" data-review-checkin-inspection="${esc(row.ID)}">Revisar · Aprobar o Anular</button>`:''}${ready?`<button class="btn primary" type="button" data-assign-route-from-checkin="${esc(row.ID)}">➜ Asignar ruta ahora</button>`:''}<button class="btn soft" type="button" data-cancel-modal>Cerrar</button>`;
     return `<div class="checkin-detail"><div class="info-grid"><div class="info-item"><span>Check-in</span><b>${esc(row.ID)}</b></div><div class="info-item"><span>Estado</span><b>${status(checkinVisualState(row))}</b></div><div class="info-item"><span>Vehículo</span><b>${esc(vehicle?.PATENTE||row.VEHICULO_ID)}</b></div><div class="info-item"><span>Conductor</span><b>${esc(driver?.NOMBRE||row.CONDUCTOR_ID)}</b></div><div class="info-item"><span>Fecha</span><b>${fmtDate(row.FECHA_HORA,true)}</b></div><div class="info-item"><span>Vigencia</span><b>${fmtDate(row.VIGENTE_HASTA,true)}</b></div><div class="info-item"><span>Kilometraje</span><b>${number(row.KILOMETRAJE)} km</b></div><div class="info-item"><span>Combustible/carga</span><b>${esc(row.NIVEL_COMBUSTIBLE||'—')}</b></div></div><div class="checkin-detail-list">${items.map(item=>`<article class="${item.respuesta==='FALLA'?'failed':''}"><i>${item.respuesta==='OK'?'✓':item.respuesta==='NA'?'—':'!'}</i><div><b>${esc(item.item)}</b><span>${esc(item.categoria)} · ${item.critico?'Crítico':'Complementario'}</span>${item.observacion?`<small>${esc(item.observacion)}</small>`:''}</div>${status(item.respuesta)}</article>`).join('')}</div>${row.OBSERVACIONES?`<div class="checkin-comment"><b>Observaciones generales</b><p>${esc(row.OBSERVACIONES)}</p></div>`:''}${row.COMENTARIO_REVISION?`<div class="checkin-comment"><b>Comentario de revisión</b><p>${esc(row.COMENTARIO_REVISION)}</p></div>`:''}<div class="form-actions">${actions}</div></div>`;
   }
@@ -5435,7 +5455,7 @@
   window.addEventListener('flotas:qr-nativo-error',event=>{liberarSolicitudQrNativo();const mensaje=String(event?.detail?.mensaje||'No se pudo leer el código QR.');toast('Lector QR nativo',mensaje,'error');});
 
   function logout(){const cierre=api.request('logout',{data:{SESION_CLIENTE_ID:clientSessionId}}).catch(()=>{});forceLogout();return cierre;}
-  function forceLogout(){limpiarAmbienteCumpleanos();cleanupSection();stopRealtimeServices();stopCamera();guardarContextoSeguimientoRuta(null);stopTracking({remember:false,silent:true});ultimaPosicionConocida=null;ultimaPosicionConfiableNavegador=null;ultimaUbicacionEnviada=null;gpsPendingPosition=null;currentUser=null;appInicializada=false;connectionTrackedUserId='';connectionTrackedPositionKey='';connectionTrackingServerLoaded=false;connectionTrackingSavePending=false;connectionTrackedVisibility=null;notificationSnapshotReady=false;knownNotificationIds=new Set();knownAlertIds=new Set();knownAssignmentAlertIds=new Set();assignmentAlertNode?.remove();assignmentAlertNode=null;nexoSpeedAlertNode?.remove();nexoSpeedAlertNode=null;notificationCenterState={notifications:[],alerts:[]};precargaIniciada=false;modulosSincronizadosSesion.clear();actualizacionesModuloPendientes.clear();cacheVistasModulo.clear();invalidarListasFormulario();api.setAuth({});postParent({tipo:'flotas:sesion-cerrada'});$('#appShell').classList.add('hidden');if(embeddedMode)return;$('#authScreen').classList.remove('hidden');checkSystem();}
+  function forceLogout(){limpiarAmbienteCumpleanos();cleanupSection();stopRealtimeServices();stopCamera();guardarContextoSeguimientoRuta(null);stopTracking({remember:false,silent:true});ultimaPosicionConocida=null;ultimaPosicionConfiableNavegador=null;ultimaUbicacionEnviada=null;gpsPendingPosition=null;currentUser=null;appInicializada=false;connectionTrackedUserId='';connectionTrackedPositionKey='';connectionTrackingServerLoaded=false;connectionTrackingSavePending=false;connectionTrackedVisibility=null;notificationSnapshotReady=false;knownNotificationIds=new Set();knownAlertIds=new Set();knownAssignmentAlertIds=new Set();assignmentAlertNode?.remove();assignmentAlertNode=null;assignmentAlertQueue=[];nexoSpeedAlertNode?.remove();nexoSpeedAlertNode=null;notificationCenterState={notifications:[],alerts:[]};precargaIniciada=false;modulosSincronizadosSesion.clear();actualizacionesModuloPendientes.clear();cacheVistasModulo.clear();invalidarListasFormulario();api.setAuth({});postParent({tipo:'flotas:sesion-cerrada'});$('#appShell').classList.add('hidden');if(embeddedMode)return;$('#authScreen').classList.remove('hidden');checkSystem();}
   function showProfile(){openInfoModal('Mi perfil',[['Nombre',currentUser.NOMBRE],['Correo',currentUser.CORREO],['Rol',currentUser.ROL_NOMBRE],['Estado',currentUser.ESTADO],['Último acceso',fmtDate(currentUser.ULTIMO_ACCESO,true)]]);}
   function openInfoModal(title,items){$('#modalEyebrow').textContent='INFORMACIÓN';$('#modalTitle').textContent=title;$('#modalBody').innerHTML=`<div class="info-grid">${items.map(([a,b])=>`<div class="info-item"><span>${a}</span><b>${esc(b||'—')}</b></div>`).join('')}</div>`;openModal();}
   function openPasswordModal(){$('#modalEyebrow').textContent='SEGURIDAD';$('#modalTitle').textContent='Cambiar contraseña';$('#modalBody').innerHTML=`<form class="form-grid" id="passwordForm"><label class="field full"><span>Contraseña actual</span><input name="contrasenaActual" type="password" required></label><label class="field full"><span>Nueva contraseña</span><input name="nuevaContrasena" type="password" required placeholder="Letras, números o símbolos"></label><p class="helper full">Puede elegir cualquier combinación. La contraseña distingue mayúsculas y minúsculas.</p><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Cambiar contraseña</button></div></form>`;openModal();$('[data-cancel-modal]').onclick=closeModal;$('#passwordForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form);await conCargaBoton(button,'Actualizando…',async()=>{try{await api.request('changePassword',Object.fromEntries(new FormData(form).entries()));invalidarListasFormulario('users');closeModal();toast('Contraseña actualizada');}catch(error){toast('No se pudo cambiar',translateError(error),'error');}});};}
@@ -5468,11 +5488,15 @@
     document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal();closeQr();$('#profileMenu').classList.remove('open');}});
     window.addEventListener('message',event=>{
       if(!embeddedMode)return;
+      if(event.source!==window.parent)return;
       if(event.origin!==location.origin&&event.origin!=='null')return;
       const data=event.data||{};
       if(data.tipo==='flotas:autenticacion'){
         const auth=data.auth||{};
-        if(!auth.token||!auth.user){postParent({tipo:'flotas:autenticacion-requerida',codigo:'AUTENTICACION_REQUERIDA'});return;}
+        if(config.PRODUCCION_SEGURA===true&&String(data.seccionAutorizada||'')!==String(initialSection)){
+          postParent({tipo:'flotas:autenticacion-requerida',codigo:'MODULO_NO_AUTORIZADO',seccion:initialSection});return;
+        }
+        if(!auth.token||!auth.user){postParent({tipo:'flotas:autenticacion-requerida',codigo:'AUTENTICACION_REQUERIDA',seccion:initialSection});return;}
         const versionAnterior=Number(currentUser?.VERSION_PERMISOS||0),rolAnterior=String(currentUser?.ROL_ID||'').toUpperCase(),modoAnterior=String(currentUser?.MODO_PERMISOS||'ROL').toUpperCase();
         api.setAuth(auth);
         currentUser=auth.user;

@@ -5,7 +5,9 @@
 window.CONFIGURACION_FLOTAS = Object.freeze({
   VERSION: '4.3.8',
   GPS_AUTOMATICO_OBLIGATORIO: true,
-  MODO: 'supabase',
+  MODO: 'produccion',
+  PRODUCCION_SEGURA: true,
+  PERMITIR_MODO_LOCAL: false,
   MODO_MODULAR: true,
   DIRECCION_APLICACION: '',
   DIRECTORIO_EMPRESAS_URL: 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec',
