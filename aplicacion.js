@@ -361,7 +361,7 @@
   function puedeDesconectarUsuariosConectados(){return esAdministrador()&&hasPermission('CONEXIONES','DESCONECTAR_USUARIO');}
   function puedeAdministrarPuntoOperacion(){return hasPermission('CONFIGURACION','GESTIONAR_PUNTO_BASE')&&['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||''));}
   function puedeCierreExcepcional(){return hasPermission('OPERACIONES','CIERRE_EXCEPCIONAL')&&['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||''));}
-  function puedeReenviarAlertaAsignacion(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase());}
+  function puedeReenviarAlertaAsignacion(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())&&hasPermission('NOTIFICACIONES','ENVIAR');}
   function puedeAceptarAsignacionesAjenas(){return esAdministrador()||(String(currentUser?.ROL_ID||'').toUpperCase()==='ROL-SUPERVISOR'&&hasPermission('NOTIFICACIONES','ACEPTAR_ASIGNACIONES_AJENAS')&&hasPermission('NOTIFICACIONES','MARCAR_LEIDA'));}
   function esAdministrador(){const rol=String(currentUser?.ROL_ID||currentUser?.ROL_NOMBRE||'').trim().toUpperCase();return ['ROL-ADMIN','ADMINISTRADOR','ROL-GERENCIA','GERENCIA'].includes(rol)||(Array.isArray(currentUser?.PERMISOS)&&currentUser.PERMISOS.includes('*:*'));}
   function puedeRevisarDocumentos(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').trim().toUpperCase());}
@@ -893,10 +893,10 @@
     prepararEstadoGpsUsuarioActual();
     $('#authScreen').classList.add('hidden'); $('#appShell').classList.remove('hidden');
     $('#userName').textContent=currentUser.NOMBRE; $('#userRole').textContent=currentUser.ROL_NOMBRE || currentUser.ROL_ID; $('#userAvatar').textContent=initials(currentUser.NOMBRE);
-    $('#backendName').textContent=api.backendLabel(); $('#backendDetail').textContent=api.isRemote()?'Sincronización automática del módulo abierto':'Información guardada en este dispositivo';
+    $('#backendName').textContent=api.backendLabel(); $('#backendDetail').textContent=api.isRemote()?'Actualización manual del módulo · sesión sincronizada':'Información guardada en este dispositivo';
     if(currentCompany)applyBranding(currentCompany);
     setTimeout(mostrarCumpleanosUsuario,350);
-    setConnection(true, api.isRemote()?'Módulo listo · actualización silenciosa':'Base de datos local activa'); buildNav();
+    setConnection(true, api.isRemote()?'Módulo listo · actualización manual':'Base de datos local activa'); buildNav();
     if(appInicializada){
       if(embeddedMode)postParent({tipo:'flotas:modulo-listo',usuario:currentUser,seccion:currentSection,actualizadoEn:estadoSincronizacionModulos[currentSection]?.time||0});
       return;
@@ -1192,7 +1192,7 @@
   }
   function stopRouteClocks(){if(routeClockInterval){clearInterval(routeClockInterval);routeClockInterval=null;}}
   function startRouteClocks(){stopRouteClocks();updateRouteClocks();if($('[data-route-clock].running'))routeClockInterval=setInterval(updateRouteClocks,1000);}
-  function puedeVerLineaTiempoRuta(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase());}
+  function puedeVerLineaTiempoRuta(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())&&hasPermission('RUTAS','LEER');}
   function routeTimelineMarkup(route){
     if(!puedeVerLineaTiempoRuta())return'';
     const events=Array.isArray(route?.LINEA_TIEMPO)?route.LINEA_TIEMPO:[],kpi=route?.KPI_TRAZABILIDAD||{},byEvent=Object.fromEntries(events.map(event=>[String(event.EVENTO||'').toUpperCase(),event]));
@@ -1206,7 +1206,7 @@
   }
 
   function puedeVerTrazabilidadRutas(){
-    return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase());
+    return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())&&hasPermission('RUTAS','LEER');
   }
   function routeTraceEvent(route,eventName){
     const events=Array.isArray(route?.LINEA_TIEMPO)?route.LINEA_TIEMPO:[];
@@ -1766,7 +1766,7 @@
     const actionHtml=actions('users',u.ID),baseActions=actionHtml==='—'?(permissionButton?`<div class="row-actions">${permissionButton}</div>`:'—'):actionHtml.replace('</div>',permissionButton+'</div>');
     return `<tr class="user-row" data-filter-date="${esc(u.ULTIMO_ACCESO||u.ACTUALIZADO_EN||u.CREADO_EN||'')}" data-search-row="${esc(`${u.NOMBRE} ${u.CORREO} ${u.ROL_ID} ${mode}`.toLowerCase())}"><td data-label="Usuario" class="user-main-cell"><div class="entity"><span class="avatar">${initials(u.NOMBRE)}</span><strong>${esc(u.NOMBRE)}</strong></div></td><td data-label="Correo" class="user-email-cell">${esc(u.CORREO)}</td><td data-label="Rol">${esc(u.ROL_NOMBRE||u.ROL_ID)}</td><td data-label="Permisos" class="user-permission-cell"><span class="user-permission-summary ${admin?'full':'custom'}"><b>${esc(mode)}</b><small>${admin?'Todos los permisos activos':u.MODO_PERMISOS==='PERSONALIZADO'?`${personalizados.length} permiso(s) marcados`:'Permisos heredados del rol'}</small></span></td><td data-label="Último acceso">${fmtDate(u.ULTIMO_ACCESO,true)}</td><td data-label="Estado">${status(u.ESTADO)}</td><td data-label="Acciones" class="user-actions-cell">${baseActions}</td></tr>`;
   }
-  function actions(resource,id){const module=resourcePermission[resource];const buttons=[];if(hasPermission(module,'ACTUALIZAR'))buttons.push(`<button data-edit="${resource}:${id}" title="Editar">✎</button>`);const canDelete=resource==='users'?hasPermission('USUARIOS','DESACTIVAR'):resource==='documents'?puedeEliminarDocumentosPorRol():hasPermission(module,'ELIMINAR');if(canDelete)buttons.push(`<button data-delete="${resource}:${id}" title="${resource==='users'?'Desactivar':resource==='documents'?'Eliminar documento':'Eliminar'}">×</button>`);return buttons.length?`<div class="row-actions">${buttons.join('')}</div>`:'—';}
+  function actions(resource,id){const module=resourcePermission[resource];const buttons=[];if(hasPermission(module,'ACTUALIZAR'))buttons.push(`<button data-edit="${resource}:${id}" title="Editar">✎</button>`);const canDelete=resource==='users'?hasPermission('USUARIOS','DESACTIVAR'):resource==='documents'?(puedeEliminarDocumentosPorRol()&&hasPermission('DOCUMENTOS','ELIMINAR')):hasPermission(module,'ELIMINAR');if(canDelete)buttons.push(`<button data-delete="${resource}:${id}" title="${resource==='users'?'Desactivar':resource==='documents'?'Eliminar documento':'Eliminar'}">×</button>`);return buttons.length?`<div class="row-actions">${buttons.join('')}</div>`:'—';}
 
   function puedeImprimirQrVehiculo(){return hasPermission('VEHICULOS','IMPRIMIR_QR');}
   function codigoQrVehiculo(vehicle){const patente=String(vehicle?.PATENTE||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');return String(vehicle?.QR_CODIGO||`VEH-${patente}`).trim().toUpperCase();}
@@ -4159,7 +4159,7 @@
 
   async function deleteRecord(value,button){
     const [resource,id]=value.split(':');
-    if(resource==='documents'&&!puedeEliminarDocumentosPorRol())return toast('Acceso restringido','Solo Operador, Administrador o Gerencia pueden eliminar documentos.','error');
+    if(resource==='documents'&&(!puedeEliminarDocumentosPorRol()||!hasPermission('DOCUMENTOS','ELIMINAR')))return toast('Acceso restringido','Este usuario no tiene permiso para eliminar documentos.','error');
     const pregunta=resource==='users'?'¿Desactivar este usuario? Se cerrarán sus sesiones y conservará la trazabilidad.':resource==='documents'?'¿Eliminar este documento? El registro quedará eliminado y, cuando corresponda, también se retirará su archivo privado del almacenamiento.':'¿Eliminar este registro? Quedará desactivado en la base de datos.';
     if(!confirm(pregunta))return;
     await conCargaBoton(button,'Eliminando…',async()=>{
@@ -4278,7 +4278,7 @@
     form.querySelectorAll('input[name="PERMISOS"]').forEach(input=>input.addEventListener('change',()=>{
       input.dataset.valorBooleano=input.checked?'true':'false';input.setAttribute('aria-checked',input.checked?'true':'false');
     }));
-    form.onsubmit=async event=>{event.preventDefault();const button=$('button[type="submit"]',form),mode=form.elements.MODO_PERMISOS.value,permissions=[...form.querySelectorAll('input[name="PERMISOS"]:checked')].map(input=>input.value);await conCargaBoton(button,'Guardando y verificando…',async()=>{try{const result=await api.request('saveUserPermissions',{data:{USUARIO_ID:userId,MODO_PERMISOS:mode,PERMISOS:permissions,INICIALIZAR_DESDE_ROL:mode==='PERSONALIZADO'&&modoOriginal!=='PERSONALIZADO'?'SI':'NO'}});if(api.isRemote()&&result.persistenciaConfirmada!==true)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');api.invalidate({actions:['me','dashboard'],resources:['users','audit']});let confirmed=result.row;const verification=await api.request('get',{resource:'users',id:userId,force:true,cache:false});if(verification?.row)confirmed=verification.row;if(!confirmed?.ID)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');guardarRegistro('users',confirmed);cacheVistasModulo.delete('users');if(currentUser.ID===userId){currentUser=confirmed;const auth=api.getAuth();api.setAuth({...auth,user:confirmed});postParent({tipo:'flotas:modulo-listo',usuario:confirmed,seccion:currentSection});}$('#modalBody').innerHTML=permissionMatrixMarkup(confirmed);const total=Object.values(normalizarMatrizPermisosUsuario(confirmed,'MATRIZ_PERMISOS')).filter(Boolean).length;toast('Permisos guardados y visibles',`${total} checkbox activos (true). Los demás permanecen vacíos (false). Versión ${number(confirmed.VERSION_PERMISOS||0)}.`);await actualizarSeccionEnSegundoPlano('users');setTimeout(()=>closeModal(),450);}catch(error){toast('No se pudieron confirmar los permisos',translateError(error),'error');}});};
+    form.onsubmit=async event=>{event.preventDefault();const button=$('button[type="submit"]',form),mode=form.elements.MODO_PERMISOS.value,permissions=[...form.querySelectorAll('input[name="PERMISOS"]:checked')].map(input=>input.value);await conCargaBoton(button,'Guardando y verificando…',async()=>{try{const result=await api.request('saveUserPermissions',{data:{USUARIO_ID:userId,MODO_PERMISOS:mode,PERMISOS:permissions,INICIALIZAR_DESDE_ROL:'NO'}});if(api.isRemote()&&result.persistenciaConfirmada!==true)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');api.invalidate({actions:['me','dashboard'],resources:['users','audit']});let confirmed=result.row;const verification=await api.request('get',{resource:'users',id:userId,force:true,cache:false});if(verification?.row)confirmed=verification.row;if(!confirmed?.ID)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');guardarRegistro('users',confirmed);cacheVistasModulo.delete('users');if(currentUser.ID===userId){currentUser=confirmed;const auth=api.getAuth();api.setAuth({...auth,user:confirmed});postParent({tipo:'flotas:modulo-listo',usuario:confirmed,seccion:currentSection});}$('#modalBody').innerHTML=permissionMatrixMarkup(confirmed);const total=Object.values(normalizarMatrizPermisosUsuario(confirmed,'MATRIZ_PERMISOS')).filter(Boolean).length;toast('Permisos guardados y visibles',`${total} checkbox activos (true). Los demás permanecen vacíos (false). Versión ${number(confirmed.VERSION_PERMISOS||0)}.`);await actualizarSeccionEnSegundoPlano('users');setTimeout(()=>closeModal(),450);}catch(error){toast('No se pudieron confirmar los permisos',translateError(error),'error');}});};
   }
 
 
@@ -5329,9 +5329,16 @@
       if(data.tipo==='flotas:autenticacion'){
         const auth=data.auth||{};
         if(!auth.token||!auth.user){postParent({tipo:'flotas:autenticacion-requerida',codigo:'AUTENTICACION_REQUERIDA'});return;}
+        const versionAnterior=Number(currentUser?.VERSION_PERMISOS||0),rolAnterior=String(currentUser?.ROL_ID||'').toUpperCase(),modoAnterior=String(currentUser?.MODO_PERMISOS||'ROL').toUpperCase();
         api.setAuth(auth);
         currentUser=auth.user;
         showApp();
+        const permisosCambiaron=versionAnterior!==Number(currentUser?.VERSION_PERMISOS||0)||rolAnterior!==String(currentUser?.ROL_ID||'').toUpperCase()||modoAnterior!==String(currentUser?.MODO_PERMISOS||'ROL').toUpperCase();
+        if(permisosCambiaron&&appInicializada){
+          buildNav();
+          if(!hayInteraccionVisualActiva()){cacheVistasModulo.delete(currentSection);setTimeout(()=>go(currentSection),30);}
+          else toast('Permisos actualizados','Los nuevos permisos ya están activos. Los controles se ajustarán al terminar la edición actual.','info');
+        }
         return;
       }
       if(data.tipo==='flotas:cerrar-sesion'&&currentUser)logout();

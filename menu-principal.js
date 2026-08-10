@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.6';
+  const VERSION='4.3.7';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -55,6 +55,7 @@
   let estadoAvisos={notifications:[],alerts:[]};
   let cargandoModoOficina=false;
   let consultaAvisosPendiente=null;
+  let sincronizacionPermisosPendiente=null;
   let firmaAvisosRenderizada='';
   let consultaOficinaPendiente=null;
   let oficinaConsultadaEn=0;
@@ -322,11 +323,43 @@
 
   function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Operador':'Aceptar asignación',mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ ${etiquetaAceptar}</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
+  function estadoPermisosRespuesta(respuesta){
+    const estado=respuesta?.permissionState||respuesta?.estadoPermisos||null;if(!estado)return null;
+    return{
+      userId:String(estado.userId||estado.USUARIO_ID||''),
+      versionPermisos:Number(estado.versionPermisos??estado.VERSION_PERMISOS??0),
+      rolId:String(estado.rolId||estado.ROL_ID||'').trim().toUpperCase(),
+      modoPermisos:String(estado.modoPermisos||estado.MODO_PERMISOS||'ROL').trim().toUpperCase()
+    };
+  }
+  async function sincronizarPermisosSesion(respuesta){
+    if(!usuario)return false;const estado=estadoPermisosRespuesta(respuesta);if(!estado||!estado.userId||estado.userId!==String(usuario.ID||usuario.USUARIO_ID||''))return false;
+    const versionActual=Number(usuario.VERSION_PERMISOS||0),rolActual=String(usuario.ROL_ID||'').trim().toUpperCase(),modoActual=String(usuario.MODO_PERMISOS||'ROL').trim().toUpperCase();
+    if(versionActual===estado.versionPermisos&&rolActual===estado.rolId&&modoActual===estado.modoPermisos)return false;
+    if(sincronizacionPermisosPendiente)return sincronizacionPermisosPendiente;
+    sincronizacionPermisosPendiente=(async()=>{
+      try{
+        api.invalidate({actions:['me','dashboard'],resources:['users']});
+        const resultado=await api.request('me',{cache:false});const fresco=resultado?.user||resultado?.usuario;if(!fresco?.ID)return false;
+        const auth=api.getAuth();api.setAuth({...auth,user:fresco});aplicarUsuario(fresco);enviarAutenticacionModulo();
+        const moduloActual=modulos.get(seccionActual);
+        if(!moduloActual||!permitido(moduloActual[4])){seccionActual='dashboard';localStorage.setItem('flotas_modulo_actual_v1',seccionActual);abrirModulo('dashboard',{forzar:true});}
+        else cambiarEstado('Permisos actualizados','listo');
+        return true;
+      }catch(error){console.warn('No fue posible sincronizar permisos de sesión',error);return false;}
+      finally{sincronizacionPermisosPendiente=null;}
+    })();
+    return sincronizacionPermisosPendiente;
+  }
   async function actualizarAvisos(){
     if(!usuario)return;
     if(consultaAvisosPendiente)return consultaAvisosPendiente;
     consultaAvisosPendiente=(async()=>{
-      const pendientes=(puedeAvisos('NOTIFICACIONES')||puedeAvisos('ALERTAS'))?await api.request('pendingNotices',{cache:false}):{};
+      // Esta consulta liviana también transporta VERSION_PERMISOS. Se ejecuta aunque
+      // la sesión almacenada todavía no tenga permisos de Notificaciones/Alertas, para
+      // que una autorización recién otorgada se aplique sin cambiar de perfil.
+      const pendientes=await api.request('pendingNotices',{cache:false});
+      await sincronizarPermisosSesion(pendientes);
       const notifications=puedeAvisos('NOTIFICACIONES')?deduplicarAvisosMenu((pendientes.notifications||pendientes.notificaciones||[]).filter(item=>item.LEIDA!=='SI'),'notificacion'):[];
       const alerts=puedeAvisos('ALERTAS')?deduplicarAvisosMenu((pendientes.alerts||pendientes.alertas||[]).filter(item=>item.LEIDA!=='SI'),'alerta'):[];
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
