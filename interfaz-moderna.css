@@ -767,3 +767,40 @@ html.tema-oscuro-inicial body.modo-modulo-iframe :where(.content,.card,.metric-c
 .module-auto-refresh-switch b{font-size:12px;color:inherit}.module-auto-refresh-switch small{font-size:10px;color:var(--muted,#445);margin-top:3px}
 [data-theme="dark"] .module-auto-refresh-switch,.tema-oscuro .module-auto-refresh-switch{background:var(--surface,#142421);border-color:var(--border,#34504a)}
 @media(max-width:720px){.module-query-controls{align-items:stretch}.module-query-options{width:100%;justify-content:space-between;margin-left:0}.module-auto-refresh-switch{flex:1;min-width:190px}}
+
+/* 4.3.4 · Carga múltiple de documentos */
+.document-batch-form{align-items:start}
+.document-batch-picker input[type="file"]{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.document-batch-summary{padding:10px 12px;border:1px solid var(--border,#d8e0df);border-radius:10px;background:var(--surface,#fff);color:var(--text,#111);font-weight:700}
+.document-batch-list{display:grid;gap:10px}
+.document-batch-empty{min-height:84px;border:1px dashed var(--border,#cfd8d6);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted,#42504f);background:var(--surface,#fff)}
+.document-batch-row{border:1px solid var(--border,#d8e0df);border-radius:12px;background:var(--surface,#fff);padding:12px;display:grid;gap:10px}
+.document-batch-file{display:flex;align-items:center;gap:10px;min-width:0}
+.document-batch-file>i{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:rgba(18,111,83,.10);color:var(--primary,#126f53);font-style:normal;font-weight:800;flex:0 0 auto}
+.document-batch-file>div{display:grid;gap:2px;min-width:0;flex:1}
+.document-batch-file b,.document-batch-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.document-batch-file b{color:var(--text,#111)}
+.document-batch-file span{color:var(--muted,#3d4a48);font-size:.82rem}
+.document-batch-fields{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:9px}
+.document-batch-progress{display:flex;align-items:center;gap:8px;font-size:.86rem;color:var(--muted,#42504f)}
+.document-batch-progress i{font-style:normal;width:18px;height:18px;display:grid;place-items:center}
+.document-batch-progress.loading i{border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sgf-spin .75s linear infinite;font-size:0}
+.document-batch-progress.ready{color:#16764c}.document-batch-progress.error{color:#b42318}
+@keyframes sgf-spin{to{transform:rotate(360deg)}}
+[data-theme="dark"] .document-batch-summary,[data-theme="dark"] .document-batch-empty,[data-theme="dark"] .document-batch-row{background:var(--surface,#15201f);color:var(--text,#f5f7f7)}
+@media(max-width:900px){.document-batch-fields{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.document-batch-fields{grid-template-columns:1fr}.document-batch-file{align-items:flex-start}.document-batch-file .btn{flex:0 0 auto}}
+
+
+/* === 4.3.5 · Ambiente festivo de cumpleaños durante todo el día === */
+.birthday-day-decor{position:fixed;inset:0;z-index:10035;pointer-events:none;overflow:hidden}
+.birthday-day-garland{position:absolute;top:8px;left:50%;transform:translateX(-50%);max-width:calc(100vw - 36px);padding:7px 15px;border-radius:999px;background:rgba(255,255,255,.88);box-shadow:0 6px 22px rgba(15,23,42,.14);font-size:20px;letter-spacing:4px;white-space:nowrap;backdrop-filter:blur(8px)}
+.birthday-day-chip{position:absolute;right:18px;bottom:18px;padding:9px 14px;border-radius:14px;background:rgba(255,255,255,.92);color:#512b00;border:1px solid rgba(217,119,6,.3);box-shadow:0 10px 28px rgba(15,23,42,.18);font-weight:900;font-size:13px;backdrop-filter:blur(8px)}
+.birthday-day-confetti i{position:absolute;font-style:normal;font-size:22px;opacity:.72;animation:flotasCumpleFlotar calc(5s + (var(--i) % 5)*.7s) ease-in-out infinite;animation-delay:calc(var(--i)*-.37s)}
+.birthday-day-confetti i:nth-child(odd){left:calc(8px + (var(--i) % 3)*26px);top:calc(74px + (var(--i))*4.7%)}
+.birthday-day-confetti i:nth-child(even){right:calc(8px + (var(--i) % 3)*26px);top:calc(66px + (var(--i))*4.5%)}
+body.birthday-day :where(.topbar,.section-heading,.heading){box-shadow:inset 0 -2px 0 rgba(245,158,11,.34)}
+@keyframes flotasCumpleFlotar{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-12px) rotate(8deg)}}
+[data-theme="dark"] .birthday-day-garland,[data-theme="dark"] .birthday-day-chip{background:rgba(16,25,22,.92);color:#fff7ed;border-color:rgba(245,158,11,.35)}
+@media(max-width:700px){.birthday-day-garland{font-size:16px;letter-spacing:2px;top:5px}.birthday-day-chip{right:10px;bottom:10px;max-width:calc(100vw - 20px);font-size:12px}.birthday-day-confetti i{font-size:18px}}
+@media(prefers-reduced-motion:reduce){.birthday-day-confetti i{animation:none}}
