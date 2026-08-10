@@ -133,6 +133,44 @@
   const routeTrackingKey = 'flotas_ruta_seguimiento_activa_v1';
   const pendingRoutePrefillKey = 'flotas_ruta_prefill_checkin_v1';
   const pendingRouteCheckinKey = 'flotas_ruta_checkin_pendiente_v1';
+  // 4.3.3: refresco VISUAL opcional. Por defecto inicia DESACTIVADO
+  // en cada nueva sesión. Si el usuario lo activa, refresca solo el
+  // módulo visible cada 60 segundos y nunca interrumpe trabajo en curso.
+  const INTERVALO_REFRESCO_VISUAL_MS = 60_000;
+  const actualizacionAutomaticaModulo = new Map();
+  let bloqueoRefrescoVisualHasta = 0;
+  let accionesInterfazEnCurso = 0;
+  const claveActualizacionAutomatica = section => { const token=String(api?.getAuth?.()?.token||'sin-sesion'); return `flotas_auto_refresh_v433_${token.length}_${token.slice(-10)}_${section}`; };
+  const actualizacionAutomaticaActiva = (section=currentSection) => {
+    if(actualizacionAutomaticaModulo.has(section))return actualizacionAutomaticaModulo.get(section)===true;
+    let activo=false;
+    try{activo=sessionStorage.getItem(claveActualizacionAutomatica(section))==='1';}catch(_){}
+    actualizacionAutomaticaModulo.set(section,activo);
+    return activo;
+  };
+  const bloquearRefrescoVisualTemporal = (milisegundos=8000) => { bloqueoRefrescoVisualHasta = Math.max(bloqueoRefrescoVisualHasta, Date.now()+Math.max(500,Number(milisegundos)||0)); };
+  const hayEdicionUsuarioActiva = () => {
+    if (Date.now() < bloqueoRefrescoVisualHasta) return true;
+    if ($('#modalBackdrop')?.classList.contains('open')) return true;
+    const content=$('#content');
+    if(content?.dataset?.trabajoUsuario==='1')return true;
+    if(content?.querySelector?.('[data-trabajo-usuario="1"]'))return true;
+    const active=document.activeElement;
+    if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return true;
+    return Boolean($('#content form:focus-within')||$('#content [contenteditable="true"]:focus'));
+  };
+  const hayInteraccionVisualActiva = () => accionesInterfazEnCurso>0 || hayEdicionUsuarioActiva();
+  const marcarTrabajoUsuario = event => {
+    const target=event?.target;
+    if(!target?.matches?.('input,textarea,select,[contenteditable="true"]'))return;
+    if(target.matches('[data-auto-refresh-switch],[data-record-limit]'))return;
+    const form=target.closest?.('form');
+    if(form)form.dataset.trabajoUsuario='1';
+    else {
+      const content=$('#content');
+      if(content)content.dataset.trabajoUsuario='1';
+    }
+  };
   function leerJsonLocal(clave){try{return JSON.parse(localStorage.getItem(clave)||'null');}catch(_){return null;}}
   let routeTrackingContext = leerJsonLocal(routeTrackingKey);
   const gpsTrackingModeKey = 'flotas_seguimiento_modo_v1';
@@ -517,11 +555,19 @@
   }
 
   async function conCargaBoton(button, text, action) {
-    if (!button) return action();
+    if (!button) {
+      accionesInterfazEnCurso++;
+      try { return await action(); }
+      finally { accionesInterfazEnCurso=Math.max(0,accionesInterfazEnCurso-1); }
+    }
     const finalizar = activarCargaBoton(button, text);
     if (!finalizar) return;
+    accionesInterfazEnCurso++;
     try { return await action(); }
-    finally { finalizar(); }
+    finally {
+      accionesInterfazEnCurso=Math.max(0,accionesInterfazEnCurso-1);
+      finalizar();
+    }
   }
 
   function guardarListaFormulario(resource, rows = []) {
@@ -757,10 +803,9 @@
     }
     realtimeTimer=setInterval(()=>{
       if(document.hidden||!currentUser||['gps','connections'].includes(currentSection))return;
-      if($('#modalBackdrop')?.classList.contains('open'))return;
-      const active=document.activeElement;if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
-      actualizarSeccionEnSegundoPlano(currentSection);
-    },2000);
+      if(!actualizacionAutomaticaActiva(currentSection)||hayInteraccionVisualActiva())return;
+      actualizarSeccionEnSegundoPlano(currentSection,{automatico:true});
+    },INTERVALO_REFRESCO_VISUAL_MS);
     resumeTrackingIfAllowed();
   }
 
@@ -911,17 +956,20 @@
   }
 
   function textoActualizacionSeccion(section) {
+    if(!actualizacionAutomaticaActiva(section))return 'Actualización automática pausada · use Actualizar cuando lo necesite';
     const saved = estadoSincronizacionModulos[section];
     if (!saved?.time) return 'Actualización automática del módulo en curso';
     const date = new Date(saved.time);
     if (Number.isNaN(date.getTime())) return 'Actualización automática por módulo activa';
-    return `Última sincronización: ${fmtDate(date,true)} · datos vigentes en esta sesión`;
+    return `Última sincronización: ${fmtDate(date,true)} · automático cada 1 minuto`;
   }
 
   function decorarModuloConSincronizacion(html, section) {
     const hasSync = /data-sync|data-refresh-locations/.test(html);
     const button = hasSync ? '' : '<button class="btn soft small" type="button" data-sync>↻ Actualizar este módulo</button>';
-    return `<div class="module-query-controls"><div class="module-cache-status" data-module-cache-status><div><i></i><span>${esc(textoActualizacionSeccion(section))}</span></div>${button}</div>${selectorLimiteRegistros(section)}</div>${html}`;
+    const checked=actualizacionAutomaticaActiva(section)?'checked':'';
+    const switcher=['gps','connections'].includes(section)?'':`<label class="module-auto-refresh-switch" title="Puede pausar el refresco visual sin detener GPS, alertas ni notificaciones"><input type="checkbox" data-auto-refresh-switch ${checked}><i></i><span><b>Actualización automática</b><small>${checked?'Cada 1 minuto':'Manual'}</small></span></label>`;
+    return `<div class="module-query-controls"><div class="module-cache-status" data-module-cache-status><div><i></i><span>${esc(textoActualizacionSeccion(section))}</span></div>${button}</div><div class="module-query-options">${switcher}${selectorLimiteRegistros(section)}</div></div>${html}`;
   }
 
   function actualizarEstadoSincronizacionVisible(text, mode='') {
@@ -991,8 +1039,9 @@
     return true;
   }
 
-  function actualizarSeccionEnSegundoPlano(section) {
+  function actualizarSeccionEnSegundoPlano(section,opciones={}) {
     if(!currentUser||!renderers[section])return Promise.resolve(false);
+    if(opciones.automatico&&(!actualizacionAutomaticaActiva(section)||hayInteraccionVisualActiva()))return Promise.resolve(false);
     if(actualizacionesModuloPendientes.has(section))return actualizacionesModuloPendientes.get(section);
     const task=(async()=>{
       try{
@@ -1214,6 +1263,7 @@
       const prefill={CHECKIN_ID:checkinId||checkin?.ID||'',CONDUCTOR_ID:checkin?.CONDUCTOR_ID||item.CONDUCTOR_ID||item.DESTINATARIO_CONDUCTOR_ID||'',VEHICULO_ID:checkin?.VEHICULO_ID||item.VEHICULO_ID||'',NOTIFICACION_ID:item.ID||''};
       if(!prefill.CHECKIN_ID||!prefill.CONDUCTOR_ID||!prefill.VEHICULO_ID)throw new Error('CHECKIN_DATOS_REQUERIDOS');
       try{localStorage.setItem(pendingRoutePrefillKey,JSON.stringify(prefill));}catch(_){}
+      bloquearRefrescoVisualTemporal(12000);
       await navigateSection('routes');
       if(!embeddedMode)setTimeout(()=>consumirPrefillRutaCheckin(),180);
     }catch(error){toast('No se pudo precargar la ruta',translateError(error),'error');}
@@ -3356,6 +3406,10 @@
 
   async function sincronizarSistema(button) {
     if (sincronizacionPendiente) return sincronizacionPendiente;
+    if (hayEdicionUsuarioActiva()) {
+      toast('Actualización pospuesta','Hay información en edición o una acción abierta. Guarde o cancele primero para no perder lo que está haciendo.','warning');
+      return false;
+    }
     const section = currentSection;
     const ejecutar = async () => {
       setSave(`Actualizando ${labels[section]||'módulo'}…`,'saving');
@@ -3562,6 +3616,25 @@
 
   function bindSection() {
     enlazarCalendarios($('#content')||document);
+    const contentActual=$('#content');
+    if(contentActual){
+      if(contentActual.dataset.proteccionRefrescoEnlazada!=='1'){
+        contentActual.addEventListener('input',marcarTrabajoUsuario);
+        contentActual.addEventListener('change',marcarTrabajoUsuario);
+        contentActual.dataset.proteccionRefrescoEnlazada='1';
+      }
+      $$('form',contentActual).forEach(form=>{
+        form.addEventListener('reset',()=>setTimeout(()=>{delete form.dataset.trabajoUsuario;},0),{once:true});
+      });
+    }
+    $('[data-auto-refresh-switch]')?.addEventListener('change',event=>{
+      const activo=Boolean(event.currentTarget.checked);
+      actualizacionAutomaticaModulo.set(currentSection,activo);try{sessionStorage.setItem(claveActualizacionAutomatica(currentSection),activo?'1':'0');}catch(_){}
+      const small=$('small',event.currentTarget.closest('.module-auto-refresh-switch'));if(small)small.textContent=activo?'Cada 1 minuto':'Manual';
+      actualizarEstadoSincronizacionVisible(textoActualizacionSeccion(currentSection));
+      if(activo&&!hayInteraccionVisualActiva())actualizarSeccionEnSegundoPlano(currentSection);
+      else if(!activo)toast('Actualización automática pausada','Puede revisar y trabajar la tabla sin que cambie. Use ↻ Actualizar cuando lo necesite.');
+    });
     $('[data-record-limit]')?.addEventListener('change',async event=>{
       const select=event.currentTarget,value=select.value;
       guardarLimiteRegistros(currentSection,value);
@@ -4194,14 +4267,22 @@
     const originLat=base.configurada?base.latitud:'';
     const originLng=base.configurada?base.longitud:'';
     const controlAlerta=['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())?`<label class="assignment-alert-switch full"><input type="checkbox" name="ENVIAR_ALERTA_ASIGNACION" value="SI" checked><i></i><span><b>Enviar alerta emergente</b><small>El conductor la recibirá individualmente. La voz respetará su preferencia personal.</small></span></label>`:'';
-    $('#modalBody').innerHTML=`<form class="form-grid" id="routeForm">${routePrefill.CHECKIN_ID?`<div class="module-diagnostic success full"><i>✓</i><div><b>Check-in ${esc(routePrefill.CHECKIN_ID)} listo</b><span data-checkin-route-prefill-summary>Conductor y vehículo de esta inspección se cargarán automáticamente.</span></div></div><input type="hidden" name="CHECKIN_ID" value="${esc(routePrefill.CHECKIN_ID)}">`:''}<div class="operation-base-summary full"><i>➜</i><div><b>Asignación independiente del GPS</b><span>Puede crear la ruta desde cualquier lugar. La geocerca se validará únicamente cuando el conductor inicie o finalice una operación.</span></div></div><label class="field"><span>Conductor</span>${selectorDinamico('drivers','routeDrivers','CONDUCTOR_ID',routePrefill.CONDUCTOR_ID||'',true)}${routePrefill.CHECKIN_ID?'<small>Precargado desde la inspección; no necesita seleccionarlo nuevamente.</small>':''}</label><label class="field"><span>Vehículo</span>${selectorDinamico('vehicles','routeVehicles','VEHICULO_ID',routePrefill.VEHICULO_ID||'',true)}${routePrefill.CHECKIN_ID?'<small>Precargado desde el vehículo inspeccionado.</small>':''}</label><label class="field"><span>Nombre de la ruta</span><input name="NOMBRE" placeholder="Ej. Entrega sector norte"></label><label class="field"><span>Aplicación de navegación</span><select name="PROVEEDOR_NAVEGACION"><option>Google Maps</option><option>Waze</option></select></label><label class="field full"><span>Origen planificado</span><input name="ORIGEN" value="${esc(originDefault)}" required data-address-autocomplete data-lat-target="ORIGEN_LATITUD" data-lng-target="ORIGEN_LONGITUD" placeholder="Dirección de salida planificada"><small>${base.configurada?'Se completó con la base operacional, pero puede modificarlo para esta ruta.':'Ingrese el origen de esta asignación. Esto no configura la geocerca operacional.'}</small></label><label class="field"><span>Latitud origen</span><input name="ORIGEN_LATITUD" type="number" step="any" value="${esc(originLat)}" readonly placeholder="Opcional"></label><label class="field"><span>Longitud origen</span><input name="ORIGEN_LONGITUD" type="number" step="any" value="${esc(originLng)}" readonly placeholder="Opcional"></label><label class="field full"><span>Destino de la ruta</span><input name="DESTINO" required data-address-autocomplete data-lat-target="DESTINO_LATITUD" data-lng-target="DESTINO_LONGITUD" placeholder="Comience a escribir el destino"></label><label class="field"><span>Latitud destino</span><input name="DESTINO_LATITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Longitud destino</span><input name="DESTINO_LONGITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Prioridad</span><select name="PRIORIDAD"><option>Normal</option><option selected>Alta</option><option>Urgente</option></select></label><label class="field full"><span>Instrucciones al conductor</span><textarea name="INSTRUCCIONES" placeholder="Indicaciones, horarios, contacto o restricciones"></textarea></label>${controlAlerta}<div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Asignar y notificar</button></div></form>`;
-    const token=openModal(),routeForm=$('#routeForm');bindAddressAutocomplete(routeForm);$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;
+    $('#modalBody').innerHTML=`<form class="form-grid" id="routeForm">${routePrefill.CHECKIN_ID?`<div class="module-diagnostic success full"><i>✓</i><div><b>Check-in ${esc(routePrefill.CHECKIN_ID)} listo</b><span data-checkin-route-prefill-summary>Conductor y vehículo de esta inspección se cargarán automáticamente.</span></div></div><input type="hidden" name="CHECKIN_ID" value="${esc(routePrefill.CHECKIN_ID)}">`:''}<div class="operation-base-summary full"><i>➜</i><div><b>Asignación independiente del GPS</b><span>Puede crear la ruta desde cualquier lugar. La geocerca se validará únicamente cuando el conductor inicie o finalice una operación.</span></div></div><label class="field"><span>Conductor</span>${selectorDinamico('drivers','routeDrivers','CONDUCTOR_ID',routePrefill.CONDUCTOR_ID||'',true)}${routePrefill.CHECKIN_ID?'<small>Precargado desde la inspección; no necesita seleccionarlo nuevamente.</small>':''}</label><label class="field"><span>Vehículo</span>${selectorDinamico('vehicles','routeVehicles','VEHICULO_ID',routePrefill.VEHICULO_ID||'',true)}<small data-route-vehicle-auto>${routePrefill.CHECKIN_ID?'Precargado desde el vehículo inspeccionado.':'Al seleccionar conductor se cargará automáticamente su vehículo asignado.'}</small></label><label class="field"><span>Nombre de la ruta</span><input name="NOMBRE" placeholder="Ej. Entrega sector norte"></label><label class="field"><span>Aplicación de navegación</span><select name="PROVEEDOR_NAVEGACION"><option>Google Maps</option><option>Waze</option></select></label><label class="field full"><span>Origen planificado</span><input name="ORIGEN" value="${esc(originDefault)}" required data-address-autocomplete data-lat-target="ORIGEN_LATITUD" data-lng-target="ORIGEN_LONGITUD" placeholder="Dirección de salida planificada"><small>${base.configurada?'Se completó con la base operacional, pero puede modificarlo para esta ruta.':'Ingrese el origen de esta asignación. Esto no configura la geocerca operacional.'}</small></label><label class="field"><span>Latitud origen</span><input name="ORIGEN_LATITUD" type="number" step="any" value="${esc(originLat)}" readonly placeholder="Opcional"></label><label class="field"><span>Longitud origen</span><input name="ORIGEN_LONGITUD" type="number" step="any" value="${esc(originLng)}" readonly placeholder="Opcional"></label><label class="field full"><span>Destino de la ruta</span><input name="DESTINO" required data-address-autocomplete data-lat-target="DESTINO_LATITUD" data-lng-target="DESTINO_LONGITUD" placeholder="Comience a escribir el destino"></label><label class="field"><span>Latitud destino</span><input name="DESTINO_LATITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Longitud destino</span><input name="DESTINO_LONGITUD" type="number" step="any" readonly placeholder="Opcional"></label><label class="field"><span>Prioridad</span><select name="PRIORIDAD"><option>Normal</option><option selected>Alta</option><option>Urgente</option></select></label><label class="field full"><span>Instrucciones al conductor</span><textarea name="INSTRUCCIONES" placeholder="Indicaciones, horarios, contacto o restricciones"></textarea></label>${controlAlerta}<div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Asignar y notificar</button></div></form>`;
+    const token=openModal(),routeForm=$('#routeForm');bloqueoRefrescoVisualHasta=0;bindAddressAutocomplete(routeForm);$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;
     routeForm.onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());data.ENVIAR_ALERTA_ASIGNACION=form.elements.ENVIAR_ALERTA_ASIGNACION?.checked?'SI':'NO';if(routePrefill.CHECKIN_ID){data.CHECKIN_ID=routePrefill.CHECKIN_ID;if(String(data.CONDUCTOR_ID||'')!==String(routePrefill.CONDUCTOR_ID||'')||String(data.VEHICULO_ID||'')!==String(routePrefill.VEHICULO_ID||'')){toast('Inspección no coincide','La ruta debe conservar el conductor y el vehículo del check-in abierto.','error');return;}}await conCargaBoton(button,'Asignando…',async()=>{try{const result=await api.request('assignRoute',{data});if(routePrefill.NOTIFICACION_ID){try{await api.request('readNotification',{id:routePrefill.NOTIFICACION_ID,data:{NOTIFICACION_ID:routePrefill.NOTIFICACION_ID}});}catch(_){}}invalidarListasFormulario('routes','vehicles','documents','notifications');cacheVistasModulo.delete('routes');cacheVistasModulo.delete('documents');cacheVistasModulo.delete('dashboard');closeModal();const docPendiente=result.documentacionPersonal&&result.documentacionPersonal.COMPLETO===false;toast(docPendiente?'Ruta asignada · documentación pendiente':'Ruta asignada',docPendiente?'La ruta quedó activa y se avisó a Administración y Gerencia que falta documentación personal digital vigente.':result.notificada?'El conductor recibirá la tarjeta emergente; la voz sonará si la mantiene activada.':'La ruta quedó asignada sin aviso emergente.',docPendiente?'warning':'success');actualizarSeccionEnSegundoPlano('routes');}catch(error){toast('No se pudo asignar',translateError(error),'error');}});};
     prepararListasModal(token,['drivers','vehicles','checkins']);
     Promise.all(['drivers','vehicles','checkins'].map(cargarListaFormulario)).then(()=>{if(token!==secuenciaModal)return;actualizarSelectoresModal(token);const driverSelect=routeForm.elements.CONDUCTOR_ID,vehicleSelect=routeForm.elements.VEHICULO_ID;const exactCheckin=routePrefill.CHECKIN_ID?listaFormulario('checkins').find(item=>String(item.ID)===String(routePrefill.CHECKIN_ID)):null;if(exactCheckin){routePrefill.CONDUCTOR_ID=String(exactCheckin.CONDUCTOR_ID||routePrefill.CONDUCTOR_ID||'');routePrefill.VEHICULO_ID=String(exactCheckin.VEHICULO_ID||routePrefill.VEHICULO_ID||'');}
       const lockPrefill=()=>{const driver=listaFormulario('drivers').find(item=>String(item.ID)===String(routePrefill.CONDUCTOR_ID)),vehicle=listaFormulario('vehicles').find(item=>String(item.ID)===String(routePrefill.VEHICULO_ID));if(!routePrefill.CONDUCTOR_ID||!routePrefill.VEHICULO_ID)return false;driverSelect.innerHTML=`<option value="${esc(routePrefill.CONDUCTOR_ID)}">${esc(driver?`${driver.ID} · ${driver.NOMBRE||'Conductor'} · ${driver.RUT||driver.CORREO||''}`:routePrefill.CONDUCTOR_ID)}</option>`;vehicleSelect.innerHTML=`<option value="${esc(routePrefill.VEHICULO_ID)}">${esc(vehicle?`${vehicle.ID} · ${vehicle.PATENTE||'Sin patente'} · ${vehicle.MARCA||''} ${vehicle.MODELO||''}`.trim():routePrefill.VEHICULO_ID)}</option>`;driverSelect.value=routePrefill.CONDUCTOR_ID;vehicleSelect.value=routePrefill.VEHICULO_ID;driverSelect.dataset.selected=routePrefill.CONDUCTOR_ID;vehicleSelect.dataset.selected=routePrefill.VEHICULO_ID;driverSelect.dataset.checkinLocked='1';vehicleSelect.dataset.checkinLocked='1';const summary=$('[data-checkin-route-prefill-summary]',routeForm);if(summary)summary.textContent=`${driver?.NOMBRE||routePrefill.CONDUCTOR_ID} · ${vehicle?.PATENTE||routePrefill.VEHICULO_ID} quedaron precargados desde esta inspección.`;return true;};
       if(routePrefill.CHECKIN_ID&&lockPrefill())return;
-      const applyPair=()=>{const driverId=driverSelect.value,valid=new Set(listaFormulario('checkins').filter(item=>item.CONDUCTOR_ID===driverId&&item.ESTADO_REVISION==='Aprobado'&&item.UTILIZADO!=='SI'&&new Date(item.VIGENTE_HASTA||0)>new Date()).map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));vehicleSelect.innerHTML=`<option value="">${vehicles.length?'Seleccione el vehículo con check-in listo':'El conductor aún no tiene check-in aprobado'}</option>${vehicles.map(item=>`<option value="${esc(item.ID)}">${esc(`${item.PATENTE||item.ID} · ${item.MARCA||''} ${item.MODELO||''}`.trim())}</option>`).join('')}`;vehicleSelect.disabled=!vehicles.length;if(vehicles.length===1)vehicleSelect.value=vehicles[0].ID;};driverSelect.addEventListener('change',applyPair);if(routePrefill.CONDUCTOR_ID){driverSelect.value=String(routePrefill.CONDUCTOR_ID);applyPair();if(routePrefill.VEHICULO_ID)vehicleSelect.value=String(routePrefill.VEHICULO_ID);}else if(driverSelect.options.length===2&&!driverSelect.value){driverSelect.selectedIndex=1;driverSelect.dispatchEvent(new Event('change'));}else applyPair();}).catch(error=>{if(routePrefill.CHECKIN_ID)toast('No se pudo precargar la inspección',translateError(error),'error');});
+      let secuenciaPareja=0;
+      const applyPair=async()=>{const request=++secuenciaPareja,driverId=String(driverSelect.value||''),hint=$('[data-route-vehicle-auto]',routeForm);vehicleSelect.disabled=false;if(!driverId){vehicleSelect.innerHTML='<option value="">Seleccione primero el conductor</option>';if(hint)hint.textContent='Al seleccionar conductor se cargará automáticamente su vehículo asignado.';return;}
+        const checkinsValidos=listaFormulario('checkins').filter(item=>String(item.CONDUCTOR_ID||'')===driverId&&item.ESTADO_REVISION==='Aprobado'&&item.UTILIZADO!=='SI'&&new Date(item.VIGENTE_HASTA||0)>new Date()),valid=new Set(checkinsValidos.map(item=>String(item.VEHICULO_ID||''))),vehicles=listaFormulario('vehicles').filter(item=>valid.has(String(item.ID)));
+        let asignadoId='';try{const result=await api.request('currentCheckinAssignment',{data:{CONDUCTOR_ID:driverId},cache:false});asignadoId=String(result?.vehiculo?.ID||result?.VEHICULO?.ID||result?.asignacion?.VEHICULO_ID||'');}catch(_){asignadoId='';}
+        if(request!==secuenciaPareja||String(driverSelect.value||'')!==driverId)return;
+        const asignado=vehicles.find(item=>String(item.ID)===asignadoId);
+        if(asignado){vehicleSelect.innerHTML=`<option value="${esc(asignado.ID)}">${esc(`${asignado.ID} · ${asignado.PATENTE||'Sin patente'} · ${asignado.MARCA||''} ${asignado.MODELO||''}`.trim())}</option>`;vehicleSelect.value=String(asignado.ID);if(hint)hint.textContent=`Vehículo asignado cargado automáticamente: ${asignado.PATENTE||asignado.ID}.`;return;}
+        vehicleSelect.innerHTML=`<option value="">${vehicles.length?'Seleccione el vehículo con check-in listo':'El conductor no tiene vehículo con check-in aprobado vigente'}</option>${vehicles.map(item=>`<option value="${esc(item.ID)}">${esc(`${item.ID} · ${item.PATENTE||'Sin patente'} · ${item.MARCA||''} ${item.MODELO||''}`.trim())}</option>`).join('')}`;if(vehicles.length===1){vehicleSelect.value=vehicles[0].ID;if(hint)hint.textContent=`Vehículo del check-in cargado automáticamente: ${vehicles[0].PATENTE||vehicles[0].ID}.`;}else if(hint)hint.textContent=vehicles.length?'No se encontró una asignación operacional única; seleccione entre los check-ins vigentes.':'Asigne un vehículo y complete su check-in antes de crear la ruta.';};
+      driverSelect.addEventListener('change',()=>{bloquearRefrescoVisualTemporal(5000);applyPair();});if(routePrefill.CONDUCTOR_ID){driverSelect.value=String(routePrefill.CONDUCTOR_ID);applyPair().then(()=>{if(routePrefill.VEHICULO_ID)vehicleSelect.value=String(routePrefill.VEHICULO_ID);});}else if(driverSelect.options.length===2&&!driverSelect.value){driverSelect.selectedIndex=1;driverSelect.dispatchEvent(new Event('change'));}else applyPair();}).catch(error=>{if(routePrefill.CHECKIN_ID)toast('No se pudo precargar la inspección',translateError(error),'error');});
   }
   function guardarContextoSeguimientoRuta(contexto){routeTrackingContext=contexto&&contexto.activo!==false?{...contexto,USUARIO_ID:currentUser?.ID||contexto.USUARIO_ID||''}:null;try{if(routeTrackingContext)localStorage.setItem(routeTrackingKey,JSON.stringify(routeTrackingContext));else localStorage.removeItem(routeTrackingKey);}catch(_){}}
   function contextoSeguimientoRutaValido(){if(!routeTrackingContext||routeTrackingContext.activo===false)return false;const owner=String(routeTrackingContext.USUARIO_ID||'');if(owner&&currentUser?.ID&&owner!==String(currentUser.ID)){guardarContextoSeguimientoRuta(null);return false;}return Boolean(routeTrackingContext.RUTA_ID||routeTrackingContext.OPERACION_ID);}
