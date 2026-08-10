@@ -1375,7 +1375,7 @@
     const actions=[];
     if(hasPermission('RUTAS','NAVEGAR'))actions.push(`<a class="btn soft small" href="${esc(navigationUrl(item))}" target="_blank" rel="noopener">Navegar</a>`);
     if(id&&state==='Asignada'&&canStart)actions.push(`<button class="btn primary small" type="button" data-route-state="${esc(id)}:En curso">Iniciar ruta</button>`);
-    if(id&&state==='En curso'&&canComplete){if(rutaListaParaCompletar(item))actions.push(`<button class="btn primary small" type="button" data-route-state="${esc(id)}:Completada">Completar ruta</button>`);else actions.push('<button class="btn soft small" type="button" disabled title="Debe completar todos los destinos de la secuencia">Destinos pendientes</button>');}
+    if(id&&['Asignada','En curso'].includes(state)&&canComplete)actions.push(`<button class="btn primary small" type="button" data-route-state="${esc(id)}:Completada" title="Disponible siempre. Si finaliza antes del destino, el sistema registrará auditoría y alertará a los roles autorizados.">Completar ruta</button>`);
     if(id&&['Asignada','En curso'].includes(state)&&canCancel)actions.push(`<button class="btn danger small" type="button" data-route-state="${esc(id)}:Cancelada">Cancelar</button>`);
     if(id&&canEvidence)actions.push(`<button class="btn soft small" type="button" data-route-evidence="${esc(id)}">📷 Respaldo</button>`);
     if(id)actions.push(`<button class="btn soft small" type="button" data-route-weather="${esc(id)}">☁ Clima de la ruta</button>`);
@@ -2294,7 +2294,7 @@
       const actionButtons=[];
       if(['Asignada','En curso'].includes(route.ESTADO)&&hasPermission('RUTAS','NAVEGAR'))actionButtons.push(`<a class="btn soft small" href="${esc(navigationUrl(route))}" target="_blank" rel="noopener">Navegar</a>`);
       if(route.ESTADO==='Asignada'&&hasPermission('RUTAS','INICIAR'))actionButtons.push(`<button class="btn primary small" data-route-state="${esc(route.ID)}:En curso">Iniciar</button>`);
-      if(route.ESTADO==='En curso'&&hasPermission('RUTAS','COMPLETAR')){if(rutaListaParaCompletar(route))actionButtons.push(`<button class="btn primary small" data-route-state="${esc(route.ID)}:Completada">Finalizar</button>`);else actionButtons.push('<button class="btn soft small" disabled title="Complete primero la secuencia de destinos">Destinos pendientes</button>');}
+      if(['Asignada','En curso'].includes(route.ESTADO)&&hasPermission('RUTAS','COMPLETAR'))actionButtons.push(`<button class="btn primary small" data-route-state="${esc(route.ID)}:Completada" title="Disponible siempre. Un cierre antes del destino queda auditado y genera alertas.">Completar ruta</button>`);
       if(['Asignada','En curso'].includes(route.ESTADO)&&hasPermission('RUTAS','CANCELAR'))actionButtons.push(`<button class="btn danger small" data-route-state="${esc(route.ID)}:Cancelada">Anular</button>`);
       if(hasPermission('RUTAS','CARGAR_EVIDENCIA'))actionButtons.push(`<button class="btn soft small" data-route-evidence="${esc(route.ID)}">📷 Respaldo</button>`);
       actionButtons.push(`<button class="btn soft small" data-route-weather="${esc(route.ID)}">☁ Clima</button>`);
@@ -4619,7 +4619,12 @@
     return {...result,row,seguimiento};
   }
   async function completarRutaConSeguimiento(id){
-    const payload={id,RUTA_ID:id,ESTADO:'Completada',data:{RUTA_ID:id,ESTADO:'Completada'}};
+    const cierre=ultimaPosicionConocida&&Number.isFinite(Number(ultimaPosicionConocida.latitud))&&Number.isFinite(Number(ultimaPosicionConocida.longitud))?{
+      CIERRE_LATITUD:Number(ultimaPosicionConocida.latitud),CIERRE_LONGITUD:Number(ultimaPosicionConocida.longitud),
+      CIERRE_PRECISION:Number(ultimaPosicionConocida.precision||0),CIERRE_FECHA:ultimaPosicionConocida.fecha?new Date(ultimaPosicionConocida.fecha).toISOString():new Date().toISOString(),
+      CIERRE_DIRECCION:ultimaPosicionConocida.direccion||'',CIERRE_FUENTE:ultimaPosicionConocida.fuente||'WEB'
+    }:{};
+    const payload={id,RUTA_ID:id,ESTADO:'Completada',data:{RUTA_ID:id,ESTADO:'Completada',...cierre}};
     let result=await solicitarAccionRutaCompatible('COMPLETAR',payload);
     result=await confirmarEstadoRutaServidor(id,'Completada',result);
     detenerSeguimientoRutaCliente(id);
@@ -4639,10 +4644,11 @@
       invalidarListasFormulario('routes','notifications','checkins','operations');
       cacheVistasModulo.delete(currentSection);cacheVistasModulo.delete('dashboard');
       const completada=String(result?.row?.ESTADO||state)==='Completada';
-      toast(state==='En curso'?'Ruta iniciada':completada?'Ruta completada':'Ruta actualizada',
+      const cierreAnticipado=Boolean(result?.CIERRE_ANTICIPADO||result?.cierreAnticipado);
+      toast(state==='En curso'?'Ruta iniciada':completada?(cierreAnticipado?'Ruta completada anticipadamente':'Ruta completada'):'Ruta actualizada',
         state==='En curso'
           ? `GPS en tiempo real activado · check-in ${result.seguimiento?.CHECKIN_ID||'vigente'}${result.operacionVinculada?' · operación vinculada':''}.`
-          : completada?'La ruta quedó completada, el seguimiento de esta ruta fue detenido y la notificación quedó programada.':`Nuevo estado: ${state}.`);
+          : completada?(cierreAnticipado?`La ruta fue cerrada antes de confirmar el destino. Quedó registrada en auditoría y se generaron ${number(result.ALERTAS_GENERADAS||result.alertasGeneradas||0)} alerta(s) para Administración, Gerencia y Operadores autorizados.${result.DISTANCIA_RESTANTE_METROS!==null&&result.DISTANCIA_RESTANTE_METROS!==undefined?` Distancia restante: ${number(result.DISTANCIA_RESTANTE_METROS)} m.`:''}`:'La ruta quedó completada, el seguimiento de esta ruta fue detenido y la notificación quedó programada.'):`Nuevo estado: ${state}.`);
       actualizarSeccionEnSegundoPlano(currentSection);
       if(state==='En curso')programarNavegacionRutaPlanificada(result.row||{ID:id});
     }catch(error){
