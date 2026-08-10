@@ -10,7 +10,7 @@
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
     changePassword:'cambiarContrasena', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
     assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', routeWeather:'climaRuta', sendNotification:'enviarNotificacion',
-    readNotification:'marcarNotificacionLeida', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
+    readNotification:'marcarNotificacionLeida', pendingNotices:'avisosPendientes', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
     officeQuickStatus:'estadoRapidoOficinaVirtual', officeTasks:'pendientesOficinaVirtual',
@@ -1003,6 +1003,7 @@
       case 'backupTable': return localBackupTable(payload);
       case 'sendNotification': return localSendNotification(payload);
       case 'readNotification': return localReadNotification(payload);
+      case 'pendingNotices': return localPendingNotices(payload);
       case 'assignmentAlerts': return localAssignmentAlerts(payload);
       case 'respondAssignmentAlert': return localRespondAssignmentAlert(payload);
       case 'resendAssignmentAlert': return localResendAssignmentAlert(payload);
@@ -1681,7 +1682,7 @@
     saveLocal();return{row:route,seguimiento:{activo:false,RUTA_ID:route.ID,OPERACION_ID:route.OPERACION_ID||'',VEHICULO_ID:route.VEHICULO_ID||'',CONDUCTOR_ID:route.CONDUCTOR_ID||''},notificacionAdministradores:state==='Completada'};
   }
   function localCreateNotification(data){
-    const unique=String(data.CLAVE_UNICA||'').trim(),recipient=String(data.DESTINATARIO_USUARIO_ID||'');if(unique){const existing=activeRows(localDb.notifications).find(row=>String(row.CLAVE_UNICA||'')===unique&&String(row.DESTINATARIO_USUARIO_ID||'')===recipient);if(existing)return existing;}
+    const recipient=String(data.DESTINATARIO_USUARIO_ID||''),driverRecipient=String(data.DESTINATARIO_CONDUCTOR_ID||''),requestId=String(data.SOLICITUD_CLIENTE_ID||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,120),normal=value=>String(value??'').trim().toUpperCase().replace(/\s+/g,' '),fingerprint=value=>{let h=2166136261;for(const ch of normal(value)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return(h>>>0).toString(36).toUpperCase();},bucket=Math.floor(Date.now()/10000),unique=String(data.CLAVE_UNICA||'').trim()||(requestId?`NOT-REQ-${requestId}-${fingerprint(`${recipient}|${driverRecipient}`)}`:`NOT-AUTO-${fingerprint([recipient,driverRecipient,data.TIPO,data.CATEGORIA_EMERGENTE,data.RUTA_ID,data.OPERACION_ID,data.TITULO,data.MENSAJE].join('|'))}-${bucket}`);if(unique){const existing=activeRows(localDb.notifications).find(row=>String(row.CLAVE_UNICA||'')===unique&&String(row.DESTINATARIO_USUARIO_ID||'')===recipient);if(existing)return existing;}
     const now=iso(),row={ID:id('NOT'),DESTINATARIO_USUARIO_ID:recipient,DESTINATARIO_CONDUCTOR_ID:data.DESTINATARIO_CONDUCTOR_ID||'',TITULO:data.TITULO,MENSAJE:data.MENSAJE,TIPO:data.TIPO||'Información',PRIORIDAD:data.PRIORIDAD||'Normal',RUTA_ID:data.RUTA_ID||'',OPERACION_ID:data.OPERACION_ID||'',CHECKIN_ID:data.CHECKIN_ID||'',CONDUCTOR_ID:data.CONDUCTOR_ID||'',VEHICULO_ID:data.VEHICULO_ID||'',CLAVE_UNICA:unique,CATEGORIA_EMERGENTE:data.CATEGORIA_EMERGENTE||'',ACCION_DESTINO:data.ACCION_DESTINO||'',ACCION_ETIQUETA:data.ACCION_ETIQUETA||'',PROVEEDOR_NAVEGACION:data.PROVEEDOR_NAVEGACION||'',NOMBRE_ASIGNACION:data.NOMBRE_ASIGNACION||'',DESTINATARIO_NOMBRE:data.DESTINATARIO_NOMBRE||'',ASIGNADO_POR_NOMBRE:data.ASIGNADO_POR_NOMBRE||'',ORIGEN:data.ORIGEN||'',DESTINO:data.DESTINO||'',DISTANCIA_KM:data.DISTANCIA_KM??'',DURACION_MINUTOS:data.DURACION_MINUTOS??'',ESTADO_RESPUESTA:data.ESTADO_RESPUESTA||'',FECHA_RESPUESTA:'',RESPONDIDO_POR:'',LEIDA:'NO',FECHA_ENVIO:now,FECHA_LECTURA:'',LEIDA_POR:'',CREADO_POR:data.CREADO_POR||'',CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.notifications.push(row);return row;
   }
   function localNotifyRoles(roleIds,data){
@@ -1699,6 +1700,16 @@
     if(!driverId&&!userId)throw new Error('DESTINATARIO_REQUERIDO');const row=localCreateNotification({...data,DESTINATARIO_CONDUCTOR_ID:driverId,DESTINATARIO_USUARIO_ID:userId,CREADO_POR:user.ID});
     audit(user,'ENVIAR','NOTIFICACIONES',row.TITULO,row.ID);saveLocal();return{row};
   }
+  function localPendingNotices(){
+    const user=requireLocalUser(),driver=activeRows(localDb.drivers).find(row=>String(row.USUARIO_ID||'')===String(user.ID||''));
+    const normal=value=>String(value??'').trim().toUpperCase().replace(/\s+/g,' ');
+    const fecha=item=>new Date(item.FECHA_HORA||item.FECHA_ENVIO||item.CREADO_EN||0).getTime()||0;
+    const dedupe=(rows,tipo)=>{const mapa=new Map();rows.forEach(item=>{const unica=normal(item.CLAVE_UNICA);const receptor=normal(tipo==='A'?item.USUARIO_ID:item.DESTINATARIO_USUARIO_ID);const key=unica?`${tipo}|${receptor}|${unica}`:[tipo,receptor,normal(item.TIPO),normal(item.CATEGORIA||item.CATEGORIA_EMERGENTE),normal(item.MODULO),normal(item.REGISTRO_ID||item.RUTA_ID||item.OPERACION_ID),normal(item.TITULO),normal(item.MENSAJE)].join('|');const current=mapa.get(key);if(!current||fecha(item)>fecha(current))mapa.set(key,item);});return [...mapa.values()].sort((a,b)=>fecha(b)-fecha(a));};
+    const notifications=dedupe(activeRows(localDb.notifications).filter(row=>String(row.LEIDA||'NO').toUpperCase()!=='SI').filter(row=>{const uid=String(row.DESTINATARIO_USUARIO_ID||'').trim(),did=String(row.DESTINATARIO_CONDUCTOR_ID||'').trim();return (!uid&&!did)||uid===String(user.ID)||Boolean(driver&&did===String(driver.ID));}),'N');
+    const alerts=dedupe(activeRows(localDb.alerts).filter(row=>String(row.LEIDA||'NO').toUpperCase()!=='SI').filter(row=>{const uid=String(row.USUARIO_ID||'').trim();return !uid||uid===String(user.ID); }),'A');
+    return {notifications,alerts,notificaciones:notifications,alertas:alerts,unreadNotifications:notifications.length,unreadAlerts:alerts.length,total:notifications.length+alerts.length};
+  }
+
   function localReadNotification(payload){
     const user=requireLocalUser(),row=find('notifications',payload.id||payload.NOTIFICACION_ID);requireLocalPermission(user,'NOTIFICACIONES','ACTUALIZAR');
     if(!row)throw new Error('NOTIFICACION_NO_ENCONTRADA');if(!localFilterRows('notifications',[row],user).length)throw new Error('PERMISO_DENEGADO');

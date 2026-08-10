@@ -755,18 +755,9 @@ html.tema-oscuro-inicial body.modo-modulo-iframe :where(.content,.card,.metric-c
 @media(max-width:700px){.alerta-velocidad-menu{right:16px;top:72px}.birthday-celebration article{padding:24px 18px}}
 
 
-/* 4.3.3 · Control de actualización automática por módulo */
+/* 4.3.6 · Módulos con actualización exclusivamente manual */
 .module-query-options{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
-.module-auto-refresh-switch{display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:5px 10px;border:1px solid var(--border,#d9e1e3);border-radius:12px;background:var(--surface,#fff);cursor:pointer;user-select:none;-webkit-user-select:none}
-.module-auto-refresh-switch input{position:absolute;opacity:0;pointer-events:none}
-.module-auto-refresh-switch>i{position:relative;display:inline-block;width:38px;height:22px;border-radius:999px;background:#cbd5d8;transition:background .18s ease;flex:0 0 auto}
-.module-auto-refresh-switch>i::after{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.22);transition:transform .18s ease}
-.module-auto-refresh-switch input:checked+i{background:#16856f}
-.module-auto-refresh-switch input:checked+i::after{transform:translateX(16px)}
-.module-auto-refresh-switch span{display:flex;flex-direction:column;line-height:1.05;color:var(--text,#111)}
-.module-auto-refresh-switch b{font-size:12px;color:inherit}.module-auto-refresh-switch small{font-size:10px;color:var(--muted,#445);margin-top:3px}
-[data-theme="dark"] .module-auto-refresh-switch,.tema-oscuro .module-auto-refresh-switch{background:var(--surface,#142421);border-color:var(--border,#34504a)}
-@media(max-width:720px){.module-query-controls{align-items:stretch}.module-query-options{width:100%;justify-content:space-between;margin-left:0}.module-auto-refresh-switch{flex:1;min-width:190px}}
+@media(max-width:720px){.module-query-controls{align-items:stretch}.module-query-options{width:100%;justify-content:flex-end;margin-left:0}}
 
 /* 4.3.4 · Carga múltiple de documentos */
 .document-batch-form{align-items:start}

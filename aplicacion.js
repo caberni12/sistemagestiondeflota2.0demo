@@ -52,7 +52,6 @@
   let connectionTrackingGeneration = 0;
   let connectionTrackedVisibility = null;
   const filtrosConexiones = { FECHA_DESDE:'', FECHA_HASTA:'', USUARIO_ID:'', CONDUCTOR_ID:'', ESTADO:'TODOS', GPS:'TODOS', VEHICULO_ID:'', DISPOSITIVO_ID:'', TIPO_RED:'', PLATAFORMA:'', PRECISION_MAXIMA:'', BUSCAR:'' };
-  let realtimeTimer = null;
   let heartbeatTimer = null;
   let notificationTimer = null;
   let routeClockInterval = null;
@@ -133,21 +132,11 @@
   const routeTrackingKey = 'flotas_ruta_seguimiento_activa_v1';
   const pendingRoutePrefillKey = 'flotas_ruta_prefill_checkin_v1';
   const pendingRouteCheckinKey = 'flotas_ruta_checkin_pendiente_v1';
-  // 4.3.3: refresco VISUAL opcional. Por defecto inicia DESACTIVADO
-  // en cada nueva sesión. Si el usuario lo activa, refresca solo el
-  // módulo visible cada 60 segundos y nunca interrumpe trabajo en curso.
-  const INTERVALO_REFRESCO_VISUAL_MS = 60_000;
-  const actualizacionAutomaticaModulo = new Map();
+  // 4.3.6: los módulos trabajan únicamente con actualización manual.
+  // No existe temporizador de refresco visual. GPS, alertas y notificaciones
+  // conservan sus ciclos independientes y no reconstruyen el módulo abierto.
   let bloqueoRefrescoVisualHasta = 0;
   let accionesInterfazEnCurso = 0;
-  const claveActualizacionAutomatica = section => { const token=String(api?.getAuth?.()?.token||'sin-sesion'); return `flotas_auto_refresh_v433_${token.length}_${token.slice(-10)}_${section}`; };
-  const actualizacionAutomaticaActiva = (section=currentSection) => {
-    if(actualizacionAutomaticaModulo.has(section))return actualizacionAutomaticaModulo.get(section)===true;
-    let activo=false;
-    try{activo=sessionStorage.getItem(claveActualizacionAutomatica(section))==='1';}catch(_){}
-    actualizacionAutomaticaModulo.set(section,activo);
-    return activo;
-  };
   const bloquearRefrescoVisualTemporal = (milisegundos=8000) => { bloqueoRefrescoVisualHasta = Math.max(bloqueoRefrescoVisualHasta, Date.now()+Math.max(500,Number(milisegundos)||0)); };
   const hayEdicionUsuarioActiva = () => {
     if (Date.now() < bloqueoRefrescoVisualHasta) return true;
@@ -163,7 +152,7 @@
   const marcarTrabajoUsuario = event => {
     const target=event?.target;
     if(!target?.matches?.('input,textarea,select,[contenteditable="true"]'))return;
-    if(target.matches('[data-auto-refresh-switch],[data-record-limit]'))return;
+    if(target.matches('[data-record-limit]'))return;
     const form=target.closest?.('form');
     if(form)form.dataset.trabajoUsuario='1';
     else {
@@ -754,13 +743,9 @@
     if(embeddedMode){postParent({tipo:'flotas:actualizar-avisos'});return;}
     try{
       const canNotifications=hasPermission('NOTIFICACIONES','LEER'),canAlerts=hasPermission('ALERTAS','LEER');
-      const [notificationResult,assignmentResult,alertResult]=await Promise.all([
-        canNotifications?api.request('list',{resource:'notifications',cache:false}):Promise.resolve({rows:[]}),
-        canNotifications?api.request('assignmentAlerts',{limit:puedeAceptarAsignacionesAjenas()?150:20,cache:false}):Promise.resolve({rows:[]}),
-        canAlerts?api.request('list',{resource:'alerts',cache:false}):Promise.resolve({rows:[]})
-      ]);
-      const notifications=deduplicarAvisos([...(notificationResult.rows||[]),...(assignmentResult.rows||[])].filter(row=>row.LEIDA!=='SI'),'notification').sort((a,b)=>alertItemDate(b)-alertItemDate(a));
-      const alerts=deduplicarAvisos((alertResult.rows||[]).filter(row=>row.LEIDA!=='SI'),'alert').sort((a,b)=>alertItemDate(b)-alertItemDate(a));
+      const pendientes=(canNotifications||canAlerts)?await api.request('pendingNotices',{cache:false}):{};
+      const notifications=canNotifications?deduplicarAvisos((pendientes.notifications||pendientes.notificaciones||[]).filter(row=>row.LEIDA!=='SI'),'notification').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      const alerts=canAlerts?deduplicarAvisos((pendientes.alerts||pendientes.alertas||[]).filter(row=>row.LEIDA!=='SI'),'alert').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
       notificationCenterState={notifications,alerts};
       const newNotifications=notifications.filter(row=>!knownNotificationIds.has(String(row.ID)));
       const newAlerts=alerts.filter(row=>!knownAlertIds.has(String(row.ID)));
@@ -790,8 +775,8 @@
     openModal();$('[data-assignment-voice-toggle]',$('#modalBody'))?.addEventListener('change',event=>{const activa=event.target.checked;if(!guardarVozAsignaciones(activa)){event.target.checked=!activa;toast('No se pudo guardar','La preferencia de voz no pudo guardarse en este navegador.','error');return;}toast(activa?'Voz activada':'Voz silenciada',activa?'Las nuevas asignaciones también se anunciarán por voz.':'Las alertas visuales y pendientes continuarán funcionando.');});$$('[data-center-nav]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{closeModal();navigateSection(button.dataset.centerNav);}));$$('[data-read-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readNotification(button.dataset.readNotification))));$$('[data-accept-assignment]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Aceptando…',()=>responderAvisoAsignacionWeb({ID:button.dataset.acceptAssignment},'ACEPTADA',button))));$$('[data-checkin-route-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{const item=notifications.find(row=>String(row.ID)===String(button.dataset.checkinRouteNotification));if(item?.CHECKIN_ID)openCheckinDetailModal(item.CHECKIN_ID,{notificacion:item});}));$$('[data-read-alert]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readAlert(button.dataset.readAlert))));
   }
   function stopRealtimeServices(){
-    [heartbeatTimer,notificationTimer,realtimeTimer].forEach(timer=>{if(timer)clearInterval(timer);});
-    heartbeatTimer=null;notificationTimer=null;realtimeTimer=null;
+    [heartbeatTimer,notificationTimer].forEach(timer=>{if(timer)clearInterval(timer);});
+    heartbeatTimer=null;notificationTimer=null;
   }
   function startRealtimeServices(){
     stopRealtimeServices();updateBattery();
@@ -800,13 +785,9 @@
     heartbeatTimer=setInterval(()=>sendHeartbeat(),config.INTERVALO_CONEXION_MILISEGUNDOS||20000);
     if(!embeddedMode){
       refreshNotificationBadge();
-      notificationTimer=setInterval(refreshNotificationBadge,2000);
+      // Ciclo exclusivo de campanita/avisos; no recarga ni reconstruye el módulo abierto.
+      notificationTimer=setInterval(refreshNotificationBadge,5000);
     }
-    realtimeTimer=setInterval(()=>{
-      if(document.hidden||!currentUser||['gps','connections'].includes(currentSection))return;
-      if(!actualizacionAutomaticaActiva(currentSection)||hayInteraccionVisualActiva())return;
-      actualizarSeccionEnSegundoPlano(currentSection,{automatico:true});
-    },INTERVALO_REFRESCO_VISUAL_MS);
     resumeTrackingIfAllowed();
   }
 
@@ -976,20 +957,17 @@
   }
 
   function textoActualizacionSeccion(section) {
-    if(!actualizacionAutomaticaActiva(section))return 'Actualización automática pausada · use Actualizar cuando lo necesite';
     const saved = estadoSincronizacionModulos[section];
-    if (!saved?.time) return 'Actualización automática del módulo en curso';
+    if (!saved?.time) return 'Actualización manual · use ↻ Actualizar cuando lo necesite';
     const date = new Date(saved.time);
-    if (Number.isNaN(date.getTime())) return 'Actualización automática por módulo activa';
-    return `Última sincronización: ${fmtDate(date,true)} · automático cada 1 minuto`;
+    if (Number.isNaN(date.getTime())) return 'Actualización manual';
+    return `Última sincronización: ${fmtDate(date,true)} · actualización manual`;
   }
 
   function decorarModuloConSincronizacion(html, section) {
     const hasSync = /data-sync|data-refresh-locations/.test(html);
     const button = hasSync ? '' : '<button class="btn soft small" type="button" data-sync>↻ Actualizar este módulo</button>';
-    const checked=actualizacionAutomaticaActiva(section)?'checked':'';
-    const switcher=['gps','connections'].includes(section)?'':`<label class="module-auto-refresh-switch" title="Puede pausar el refresco visual sin detener GPS, alertas ni notificaciones"><input type="checkbox" data-auto-refresh-switch ${checked}><i></i><span><b>Actualización automática</b><small>${checked?'Cada 1 minuto':'Manual'}</small></span></label>`;
-    return `<div class="module-query-controls"><div class="module-cache-status" data-module-cache-status><div><i></i><span>${esc(textoActualizacionSeccion(section))}</span></div>${button}</div><div class="module-query-options">${switcher}${selectorLimiteRegistros(section)}</div></div>${html}`;
+    return `<div class="module-query-controls"><div class="module-cache-status" data-module-cache-status><div><i></i><span>${esc(textoActualizacionSeccion(section))}</span></div>${button}</div><div class="module-query-options">${selectorLimiteRegistros(section)}</div></div>${html}`;
   }
 
   function actualizarEstadoSincronizacionVisible(text, mode='') {
@@ -1061,7 +1039,6 @@
 
   function actualizarSeccionEnSegundoPlano(section,opciones={}) {
     if(!currentUser||!renderers[section])return Promise.resolve(false);
-    if(opciones.automatico&&(!actualizacionAutomaticaActiva(section)||hayInteraccionVisualActiva()))return Promise.resolve(false);
     if(actualizacionesModuloPendientes.has(section))return actualizacionesModuloPendientes.get(section);
     const task=(async()=>{
       try{
@@ -3647,14 +3624,6 @@
         form.addEventListener('reset',()=>setTimeout(()=>{delete form.dataset.trabajoUsuario;},0),{once:true});
       });
     }
-    $('[data-auto-refresh-switch]')?.addEventListener('change',event=>{
-      const activo=Boolean(event.currentTarget.checked);
-      actualizacionAutomaticaModulo.set(currentSection,activo);try{sessionStorage.setItem(claveActualizacionAutomatica(currentSection),activo?'1':'0');}catch(_){}
-      const small=$('small',event.currentTarget.closest('.module-auto-refresh-switch'));if(small)small.textContent=activo?'Cada 1 minuto':'Manual';
-      actualizarEstadoSincronizacionVisible(textoActualizacionSeccion(currentSection));
-      if(activo&&!hayInteraccionVisualActiva())actualizarSeccionEnSegundoPlano(currentSection);
-      else if(!activo)toast('Actualización automática pausada','Puede revisar y trabajar la tabla sin que cambie. Use ↻ Actualizar cuando lo necesite.');
-    });
     $('[data-record-limit]')?.addEventListener('change',async event=>{
       const select=event.currentTarget,value=select.value;
       guardarLimiteRegistros(currentSection,value);
@@ -4581,7 +4550,7 @@
     $('#modalEyebrow').textContent='COMUNICACIONES';$('#modalTitle').textContent='Enviar notificación';
     $('#modalBody').innerHTML=`<form class="form-grid" id="notificationForm"><label class="field full"><span>Conductor destinatario</span>${selectorDinamico('drivers','notificationDrivers','DESTINATARIO_CONDUCTOR_ID','',true)}</label><label class="field"><span>Tipo</span><select name="TIPO"><option>Información</option><option>Ruta</option><option>Operación</option><option>Seguridad</option><option>Documento</option></select></label><label class="field"><span>Prioridad</span><select name="PRIORIDAD"><option>Baja</option><option selected>Normal</option><option>Alta</option><option>Urgente</option></select></label><label class="field full"><span>Título</span><div class="voice-field"><input name="TITULO" required><button type="button" class="voice-field-button" data-dictate-field="TITULO" title="Dictar título">🎙</button></div></label><label class="field full"><span>Mensaje</span><div class="voice-field"><textarea name="MENSAJE" required></textarea><button type="button" class="voice-field-button" data-dictate-field="MENSAJE" title="Dictar mensaje">🎙</button></div></label><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Enviar notificación</button></div></form>`;
     const token=openModal();$$('[data-dictate-field]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>dictarEnCampo($('#notificationForm').elements[button.dataset.dictateField],button)));$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;
-    $('#notificationForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());await conCargaBoton(button,'Enviando…',async()=>{try{await api.request('sendNotification',{data});invalidarListasFormulario('notifications');cacheVistasModulo.delete('notifications');cacheVistasModulo.delete('dashboard');closeModal();toast('Notificación enviada','El mensaje aparecerá en la cuenta del conductor.');actualizarSeccionEnSegundoPlano('notifications');}catch(error){toast('No se pudo enviar',translateError(error),'error');}});};
+    $('#notificationForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form),data=Object.fromEntries(new FormData(form).entries());data.SOLICITUD_CLIENTE_ID=crearSolicitudClienteCheckin();await conCargaBoton(button,'Enviando…',async()=>{try{await api.request('sendNotification',{data});invalidarListasFormulario('notifications');cacheVistasModulo.delete('notifications');cacheVistasModulo.delete('dashboard');closeModal();toast('Notificación enviada','El mensaje aparecerá una sola vez en la cuenta del conductor.');actualizarSeccionEnSegundoPlano('notifications');}catch(error){toast('No se pudo enviar',translateError(error),'error');}});};
     prepararListasModal(token,['drivers']);
   }
   function openConnectionsNoticeModal(usuarioPreseleccionado=''){

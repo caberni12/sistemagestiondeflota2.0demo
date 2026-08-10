@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.3';
+  const VERSION='4.3.6';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -306,19 +306,29 @@
     anunciarAsignacionVoz(item);
     setTimeout(()=>{if(alertaAsignacionVisible===nodo&&nodo.dataset.persistente!=='1'&&!document.hidden){nodo.remove();alertaAsignacionVisible=null;}},15000);
   }
+  function claveAvisoMenu(item,tipo){
+    const normal=value=>String(value??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+    const destinatario=normal(item.DESTINATARIO_USUARIO_ID||item.USUARIO_ID||'');
+    const clave=normal(item.CLAVE_UNICA||'');
+    if(clave)return `${tipo}|${destinatario}|${clave}`;
+    const fecha=fechaOrdenAviso(item),ventana=fecha?Math.floor(fecha/15000):0;
+    return [tipo,destinatario,item.DESTINATARIO_CONDUCTOR_ID,item.TIPO,item.CATEGORIA,item.CATEGORIA_EMERGENTE,item.MODULO,item.REGISTRO_ID,item.RUTA_ID,item.OPERACION_ID,item.CHECKIN_ID,item.TITULO,item.MENSAJE,ventana].map(normal).join('|');
+  }
+  function deduplicarAvisosMenu(rows,tipo){
+    const mapa=new Map();
+    (rows||[]).forEach(item=>{const key=claveAvisoMenu(item,tipo),actual=mapa.get(key);if(!actual||fechaOrdenAviso(item)>fechaOrdenAviso(actual))mapa.set(key,item);});
+    return [...mapa.values()];
+  }
+
   function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Operador':'Aceptar asignación',mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ ${etiquetaAceptar}</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
   async function actualizarAvisos(){
     if(!usuario)return;
     if(consultaAvisosPendiente)return consultaAvisosPendiente;
     consultaAvisosPendiente=(async()=>{
-    const consultas=[];
-      if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'notifications',action:'list',payload:{resource:'notifications',cache:false}});
-      if(puedeAvisos('NOTIFICACIONES'))consultas.push({key:'assignments',action:'assignmentAlerts',payload:{limit:puedeAceptarAsignacionesAjenasMenu()?150:20,cache:false}});
-      if(puedeAvisos('ALERTAS'))consultas.push({key:'alerts',action:'list',payload:{resource:'alerts',cache:false}});
-      const lote=consultas.length?await api.requestBatch(consultas,{force:true}):{};
-      const notifications=[...new Map([...(lote.notifications?.rows||[]),...(lote.assignments?.rows||[])].filter(item=>item.LEIDA!=='SI').map(item=>[String(item.ID),item])).values()];
-      const alerts=(lote.alerts?.rows||[]).filter(item=>item.LEIDA!=='SI');
+      const pendientes=(puedeAvisos('NOTIFICACIONES')||puedeAvisos('ALERTAS'))?await api.request('pendingNotices',{cache:false}):{};
+      const notifications=puedeAvisos('NOTIFICACIONES')?deduplicarAvisosMenu((pendientes.notifications||pendientes.notificaciones||[]).filter(item=>item.LEIDA!=='SI'),'notificacion'):[];
+      const alerts=puedeAvisos('ALERTAS')?deduplicarAvisosMenu((pendientes.alerts||pendientes.alertas||[]).filter(item=>item.LEIDA!=='SI'),'alerta'):[];
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
       const nuevasAlertas=alerts.filter(item=>!idsAlertasConocidas.has(String(item.ID)));
       const nuevasAsignaciones=notifications.filter(esAlertaAsignacion).filter(item=>!idsAsignacionesMostradas.has(String(item.ID)));
@@ -351,7 +361,9 @@
     temporizadorAvisos=setTimeout(async()=>{
       temporizadorAvisos=null;
       await actualizarAvisos();
-      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:2000);
+      // Ciclo independiente de la campanita: nunca reconstruye el módulo abierto.
+      // Mantiene pendientes no leídos y reduce tráfico respecto del antiguo sondeo de 2 s.
+      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:5000);
     },Math.max(100,Number(retraso||0)));
   }
   function iniciarAvisos(){if(temporizadorAvisos||consultaAvisosPendiente)return;programarAvisos(900);}
