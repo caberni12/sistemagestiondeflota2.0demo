@@ -1028,7 +1028,7 @@
       case 'officeUploadDocument': throw new Error('CARGA_DOCUMENTAL_REQUIERE_CONEXION_CENTRAL');
       case 'officeReportFailure': return localOfficeReportFailure(payload);
       case 'officeGenerateReport': return localOfficeGenerateReport(payload);
-      case 'officeIncidents': return {rows:activeRows(localDb.alerts).filter(row=>row.TIPO==='Oficina Virtual'),total:activeRows(localDb.alerts).filter(row=>row.TIPO==='Oficina Virtual').length};
+      case 'officeIncidents': return {rows:activeRows(localDb.alerts).filter(row=>row.TIPO==='NEXO IA'),total:activeRows(localDb.alerts).filter(row=>row.TIPO==='NEXO IA').length};
       case 'officeResolveIncident': return localOfficeResolveIncident(payload);
       case 'changePassword': return localChangePassword(payload);
       case 'saveUserPermissions': return localSaveUserPermissions(payload);
@@ -1065,8 +1065,8 @@
     const user=requireLocalUser();if(!['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(user.ROL_ID))throw new Error('PERMISO_DENEGADO');requireLocalPermission(user,'DOCUMENTOS',decision==='APROBAR'?'APROBAR':'RECHAZAR');const data=payload.data||payload,row=find('documents',data.DOCUMENTO_ID||data.ID||payload.id);if(!row)throw new Error('DOCUMENTO_NO_ENCONTRADO');const observation=String(data.OBSERVACION_REVISION||'').trim();if(decision==='RECHAZAR'&&observation.length<5)throw new Error('MOTIVO_RECHAZO_REQUERIDO');Object.assign(row,{ESTADO_REVISION:decision==='APROBAR'?'Aprobado':'Rechazado',REVISADO_POR_USUARIO_ID:user.ID,REVISADO_POR_CORREO:user.CORREO,FECHA_REVISION:iso(),OBSERVACION_REVISION:observation||(decision==='APROBAR'?'Documento aprobado por Administración o Gerencia.':''),ACTUALIZADO_EN:iso()});audit(user,decision==='APROBAR'?'APROBAR_DOCUMENTO':'RECHAZAR_DOCUMENTO','DOCUMENTOS',row.ESTADO_REVISION,row.ID);saveLocal();return{row:cleanRow(row),persistenciaConfirmada:true};
   }
 
-  function localOfficeReportFailure(payload={}){const user=requireLocalUser(),d=payload.data||payload,now=iso(),row={ID:id('ALT'),TIPO:'Oficina Virtual',NIVEL:d.SEVERIDAD||'Advertencia',TITULO:d.TITULO||'Falla informada',MENSAJE:d.DESCRIPCION||d.MENSAJE||'',MODULO:d.MODULO||'GENERAL',REGISTRO_ID:user.ID,CLAVE_UNICA:id('OV-LOCAL'),LEIDA:'NO',USUARIO_ID:user.ID,FECHA_HORA:now,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.alerts.push(row);audit(user,'INFORMAR_FALLA','OFICINA_VIRTUAL',row.TITULO,row.ID);saveLocal();return{row,registrada:true,administradoresInformados:false};}
-  function localOfficeGenerateReport(){const user=requireLocalUser(),report={tipo:'SALUD_SISTEMA',generadoEn:iso(),generadoPor:publicUser(user),diagnostico:localDiagnoseSystem(),estadoOficina:localOfficeQuickStatus(),incidentes:activeRows(localDb.alerts).filter(row=>row.TIPO==='Oficina Virtual')};return{row:{ID:id('OVR'),TITULO:'Reporte local de salud',FECHA_HORA:iso()},reporte:report,resumen:'Reporte generado en modo local.'};}
+  function localOfficeReportFailure(payload={}){const user=requireLocalUser(),d=payload.data||payload,now=iso(),row={ID:id('ALT'),TIPO:'NEXO IA',NIVEL:d.SEVERIDAD||'Advertencia',TITULO:d.TITULO||'Falla informada',MENSAJE:d.DESCRIPCION||d.MENSAJE||'',MODULO:d.MODULO||'GENERAL',REGISTRO_ID:user.ID,CLAVE_UNICA:id('OV-LOCAL'),LEIDA:'NO',USUARIO_ID:user.ID,FECHA_HORA:now,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.alerts.push(row);audit(user,'INFORMAR_FALLA','OFICINA_VIRTUAL',row.TITULO,row.ID);saveLocal();return{row,registrada:true,administradoresInformados:false};}
+  function localOfficeGenerateReport(){const user=requireLocalUser(),report={tipo:'SALUD_SISTEMA',generadoEn:iso(),generadoPor:publicUser(user),diagnostico:localDiagnoseSystem(),estadoOficina:localOfficeQuickStatus(),incidentes:activeRows(localDb.alerts).filter(row=>row.TIPO==='NEXO IA')};return{row:{ID:id('OVR'),TITULO:'Reporte local de salud',FECHA_HORA:iso()},reporte:report,resumen:'Reporte generado en modo local.'};}
   function localOfficeResolveIncident(payload={}){const user=requireLocalUser();if(!isAdmin(user))throw new Error('SOLO_ADMINISTRADOR');const idValue=payload.data?.ID||payload.id,row=activeRows(localDb.alerts).find(item=>item.ID===idValue);if(!row)throw new Error('REGISTRO_NO_ENCONTRADO');row.LEIDA='SI';row.FECHA_LECTURA=iso();row.LEIDA_POR=user.ID;row.ACTUALIZADO_EN=iso();saveLocal();return{row:cleanRow(row)};}
 
   function currentLocalUser() {
@@ -2041,17 +2041,17 @@
       const key=`OV-TAREA-${task.id}-${user.ID}`,message=`${task.detalle} Abre ${task.modulo} para resolverlo.`;
       active.add(key);
       let row=activeRows(localDb.notifications).find(item=>item.CLAVE_UNICA===key&&item.DESTINATARIO_USUARIO_ID===user.ID);
-      if(!row){row={ID:id('NOT'),DESTINATARIO_USUARIO_ID:user.ID,DESTINATARIO_CONDUCTOR_ID:driver?.ID||'',TITULO:task.titulo,MENSAJE:message,TIPO:'Oficina Virtual',PRIORIDAD:task.prioridad,RUTA_ID:task.rutaId||'',CLAVE_UNICA:key,LEIDA:'NO',FECHA_ENVIO:now,CREADO_POR:'SISTEMA',CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.notifications.push(row);created++;return;}
+      if(!row){row={ID:id('NOT'),DESTINATARIO_USUARIO_ID:user.ID,DESTINATARIO_CONDUCTOR_ID:driver?.ID||'',TITULO:task.titulo,MENSAJE:message,TIPO:'NEXO IA',PRIORIDAD:task.prioridad,RUTA_ID:task.rutaId||'',CLAVE_UNICA:key,LEIDA:'NO',FECHA_ENVIO:now,CREADO_POR:'SISTEMA',CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.notifications.push(row);created++;return;}
       const changed=row.TITULO!==task.titulo||row.MENSAJE!==message||row.PRIORIDAD!==task.prioridad;
       if(changed){Object.assign(row,{TITULO:task.titulo,MENSAJE:message,PRIORIDAD:task.prioridad,LEIDA:'NO',FECHA_LECTURA:'',LEIDA_POR:'',ACTUALIZADO_EN:now});updated++;}
     });
-    activeRows(localDb.notifications).filter(row=>row.CREADO_POR==='SISTEMA'&&row.TIPO==='Oficina Virtual'&&row.DESTINATARIO_USUARIO_ID===user.ID&&!active.has(row.CLAVE_UNICA)&&row.LEIDA!=='SI').forEach(row=>{Object.assign(row,{LEIDA:'SI',FECHA_LECTURA:now,LEIDA_POR:'SISTEMA',ACTUALIZADO_EN:now});closed++;});
+    activeRows(localDb.notifications).filter(row=>row.CREADO_POR==='SISTEMA'&&row.TIPO==='NEXO IA'&&row.DESTINATARIO_USUARIO_ID===user.ID&&!active.has(row.CLAVE_UNICA)&&row.LEIDA!=='SI').forEach(row=>{Object.assign(row,{LEIDA:'SI',FECHA_LECTURA:now,LEIDA_POR:'SISTEMA',ACTUALIZADO_EN:now});closed++;});
     return{creados:created,actualizados:updated,cerrados:closed};
   }
   function localOfficeQuickStatus(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
     let last={};try{last=JSON.parse(localStorage.getItem('flotas_oficina_virtual_ultimo_resultado_v1')||'{}');}catch(_){last={};}
-    return{nombre:'Oficina Virtual',version:'4.2.48',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
+    return{nombre:'NEXO IA',version:'4.2.48',modoAutomatico:localOfficeAutomaticMode(),puedeConfigurar:user.ROL_ID==='ROL-ADMIN',estado:last.estado||'PENDIENTE',ultimaRevision:last.fecha||'',problemas:Number(last.problemas||0),reparaciones:Number(last.reparaciones||0),avisosCreados:Number(last.avisosCreados||0),pendientesEnCache:false,totalTareas:Number(last.totalTareas||0),tareasUrgentes:Number(last.tareasUrgentes||0)};
   }
   function localOfficeTasksResponse(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
@@ -2069,12 +2069,12 @@
     const explicitReview=/solicito una revision general del sistema/.test(text);if(!issue&&!instruction&&!explicitReview)return null;
     const day=new Date().toISOString().slice(0,10),key=`OV-REPORTE-${user.ID}-${day}-${text.replace(/[^a-z0-9]+/g,'-').slice(0,160)}`;
     let row=activeRows(localDb.alerts).find(item=>item.CLAVE_UNICA===key),created=false;
-    if(!row){const now=iso();row={ID:id('ALT'),TIPO:'Reporte de conductor',NIVEL:issue?'Advertencia':'Info',TITULO:`Oficina Virtual: reporte de ${user.NOMBRE||user.ID}`,MENSAJE:`El Conductor informó: “${value}”. Oficina Virtual no ejecutó cambios. Un Administrador debe revisar y validar la situación.`,MODULO:'OFICINA_VIRTUAL',REGISTRO_ID:user.ID,CLAVE_UNICA:key,LEIDA:'NO',USUARIO_ID:'',FECHA_HORA:now,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.alerts.push(row);created=true;}
+    if(!row){const now=iso();row={ID:id('ALT'),TIPO:'Reporte de conductor',NIVEL:issue?'Advertencia':'Info',TITULO:`NEXO IA: reporte de ${user.NOMBRE||user.ID}`,MENSAJE:`El Conductor informó: “${value}”. NEXO IA no ejecutó cambios. Un Administrador debe revisar y validar la situación.`,MODULO:'OFICINA_VIRTUAL',REGISTRO_ID:user.ID,CLAVE_UNICA:key,LEIDA:'NO',USUARIO_ID:'',FECHA_HORA:now,CREADO_EN:now,ACTUALIZADO_EN:now,ELIMINADO:'NO'};localDb.alerts.push(row);created=true;}
     return{creado:created,instruccion:instruction,alertaId:row.ID};
   }
   function localOfficeRun(){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','LEER');
-    if(user.ROL_ID==='ROL-CONDUCTOR'){const report=localReportDriverOffice(user,'Solicito una revisión general del sistema desde Oficina Virtual.');saveLocal();return{...localOfficeQuickStatus(),solicitudAdministrador:true,reporteCreado:Boolean(report?.creado),mensaje:'La solicitud quedó informada a los Administradores. No se ejecutó ningún cambio.'};}
+    if(user.ROL_ID==='ROL-CONDUCTOR'){const report=localReportDriverOffice(user,'Solicito una revisión general del sistema desde NEXO IA.');saveLocal();return{...localOfficeQuickStatus(),solicitudAdministrador:true,reporteCreado:Boolean(report?.creado),mensaje:'La solicitud quedó informada a los Administradores. No se ejecutó ningún cambio.'};}
     const tasks=localOfficeTasks(user),notices=localSyncOfficeTasks(user,tasks),diagnostic={fecha:iso(),estado:'CORRECTO',problemas:0,reparaciones:0,avisosCreados:notices.creados,tareas:tasks,totalTareas:tasks.length,tareasUrgentes:tasks.filter(item=>item.prioridad==='Urgente').length,modoAutomatico:localOfficeAutomaticMode()};
     localStorage.setItem('flotas_oficina_virtual_ultimo_resultado_v1',JSON.stringify(diagnostic));audit(user,'REVISION_AUTOMATICA','OFICINA_VIRTUAL',`Pendientes ${tasks.length} · avisos nuevos ${notices.creados}`);saveLocal();return diagnostic;
   }
@@ -2090,16 +2090,16 @@
   function localOfficeAsk(payload){
     const user=requireLocalUser();requireLocalPermission(user,'OFICINA_VIRTUAL','CREAR');const data=payload.data||payload,question=String(data.MENSAJE||data.mensaje||data.PREGUNTA||'').trim();if(!question)throw new Error('CONSULTA_REQUERIDA');
     const text=question.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''),report=localReportDriverOffice(user,question);let response='';
-    if(report?.instruccion)response='Tu cuenta de Conductor no puede ordenar ni ejecutar cambios en el sistema. Registré tu solicitud como un reporte para los Administradores; Oficina Virtual solo sirve de puente y no modificó ninguna configuración.';
+    if(report?.instruccion)response='Tu cuenta de Conductor no puede ordenar ni ejecutar cambios en el sistema. Registré tu solicitud como un reporte para los Administradores; NEXO IA solo sirve de puente y no modificó ninguna configuración.';
     else if(/pendiente|por hacer|tarea|falta|vencid|document/.test(text)){const tasks=localOfficeTasks(user);response=tasks.length?`Encontré ${tasks.length} pendiente(s):\n${tasks.slice(0,8).map((task,index)=>`${index+1}. ${task.titulo}: ${task.detalle}`).join('\n')}`:'No tienes tareas ni documentos pendientes detectados.';}
     else if(/gps|mapa|ubicacion|seguimiento/.test(text))response='El GPS actualiza la posición y el mapa. En Conexiones en línea selecciona un usuario con coordenadas válidas y activa “Seguir” para acompañar su recorrido.';
     else if(/check.?in|revision|inspeccion/.test(text))response='El Check-in vehicular abre la revisión del vehículo. Las fallas críticas bloquean el uso hasta una nueva inspección o revisión autorizada.';
     else if(/combust|carga|litro|boleta/.test(text))response='Combustible registra litros, precio, kilometraje, estación y comprobante. El QR del vehículo puede abrir el formulario ya asociado.';
     else if(/qr|codigo|escan/.test(text))response='El lector QR identifica el vehículo y abre el flujo asociado de Operaciones, Combustible o Check-in.';
     else if(/modo automatic|automatico|auto/.test(text))response='El modo automático revisa problemas y pendientes. Solo un Administrador puede cambiarlo, y las reparaciones seguras no eliminan datos.';
-    else response='Soy Oficina Virtual. Puedo explicar GPS, rutas, operaciones, check-in, combustible, QR, documentos, alertas, permisos y mostrar tus pendientes.';
+    else response='Soy NEXO IA. Puedo explicar GPS, rutas, operaciones, check-in, combustible, QR, documentos, alertas, permisos y mostrar tus pendientes.';
     if(report&&!report.instruccion)response+='\n\nTu reporte quedó informado a los Administradores y permanecerá pendiente hasta que uno de ellos lo valide. No se ejecutó ningún cambio.';
-    audit(user,'CONSULTAR_ASISTENTE','OFICINA_VIRTUAL',`Consulta atendida: ${question.slice(0,180)}`);saveLocal();return{nombre:'Oficina Virtual',respuesta:response,sugerencias:['¿Qué tengo pendiente?','¿Cómo funciona el GPS?','¿Cómo uso un QR?','Revisar estado del sistema'],generadoEn:iso()};
+    audit(user,'CONSULTAR_ASISTENTE','OFICINA_VIRTUAL',`Consulta atendida: ${question.slice(0,180)}`);saveLocal();return{nombre:'NEXO IA',respuesta:response,sugerencias:['¿Qué tengo pendiente?','¿Cómo funciona el GPS?','¿Cómo uso un QR?','Revisar estado del sistema'],generadoEn:iso()};
   }
 
   async function localChangePassword(payload){const user=requireLocalUser();if(user.CONTRASENA_CIFRADA!==await digest(payload.contrasenaActual+':'+user.SAL_CONTRASENA))throw new Error('CONTRASENA_ACTUAL_INVALIDA');if(String(payload.nuevaContrasena??'').length===0)throw new Error('CONTRASENA_REQUERIDA');const salt=id('SALT');user.SAL_CONTRASENA=salt;user.CONTRASENA_CIFRADA=await digest(String(payload.nuevaContrasena)+':'+salt);user.ACTUALIZADO_EN=iso();saveLocal();return{changed:true};}

@@ -6,7 +6,7 @@
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
-      ['office','◆','Oficina Virtual IA','oficina-virtual.html','OFICINA_VIRTUAL'],
+      ['office','◆','NEXO IA','oficina-virtual.html','OFICINA_VIRTUAL'],
       ['routes','➜','Rutas asignadas','rutas.html','RUTAS'],
       ['checkin','✓','Check-in vehicular','checkin-vehicular.html','CHECKIN'],
       ['operations','⇄','Operaciones','operaciones.html','OPERACIONES'],
@@ -250,9 +250,9 @@
     try{
       await api.request('officeAutoMode',{data:{ACTIVO:active?'SI':'NO'}});
       oficinaConsultadaEn=Date.now();
-      cambiarEstado(active?'Oficina Virtual IA automática':'Oficina Virtual IA manual','listo');
+      cambiarEstado(active?'NEXO IA automática':'NEXO IA manual','listo');
       if(seccionActual==='office')abrirModulo('office',{forzar:true});
-    }catch(_){input.checked=!active;cambiarEstado('No se pudo cambiar Oficina Virtual IA','advertencia');}
+    }catch(_){input.checked=!active;cambiarEstado('No se pudo cambiar NEXO IA','advertencia');}
     finally{input.disabled=false;cargandoModoOficina=false;}
   }
   function escapar(texto){return String(texto??'').replace(/[&<>'"]/g,caracter=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[caracter]));}

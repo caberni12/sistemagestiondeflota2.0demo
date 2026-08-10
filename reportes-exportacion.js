@@ -69,7 +69,7 @@
   function hojasOficina(report,meta={}){
     const estado=report?.estadoOficina||{},diagnostico=report?.diagnostico||{};
     const resumen=[
-      {CAMPO:'Título',VALOR:meta.titulo||'Reporte de Oficina Virtual'},
+      {CAMPO:'Título',VALOR:meta.titulo||'Reporte de NEXO IA'},
       {CAMPO:'Fecha de generación',VALOR:fechaVisible(meta.fecha||report?.generadoEn||new Date())},
       {CAMPO:'Generado por',VALOR:meta.generadoPor||report?.generadoPor?.NOMBRE||report?.generadoPor?.CORREO||''},
       {CAMPO:'Resumen',VALOR:meta.resumen||''},
