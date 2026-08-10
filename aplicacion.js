@@ -83,6 +83,7 @@
   const cacheListasFormulario = new Map();
   const cacheRegistros = new Map();
   const expedientesDocumentalesActuales = new Map();
+  let actualizacionVehiculoAsignadoPendiente = false;
   const listasFormularioPendientes = new Map();
   const limitesRegistrosPermitidos = Object.freeze([100,150,200,1000,'TODOS']);
   const limiteRegistrosPredeterminado = 150;
@@ -303,6 +304,7 @@
     ['OPERACIONES','ELIMINAR_ADMIN',"Eliminar operación administrativamente"],
     ['CONFIGURACION','GESTIONAR_PUNTO_BASE',"Configurar punto operacional"],
     ['CONFIGURACION','LIMPIAR_DATOS',"Limpiar datos operativos"],
+    ['CONFIGURACION','RESPALDO_GENERAL',"Descargar respaldo general XLSX"],
     ['CHECKIN','VALIDAR_QR',"Validar QR de check-in"],
     ['CHECKIN_APROBACIONES','APROBAR',"Aprobar check-in"],
     ['CHECKIN_APROBACIONES','RECHAZAR',"Rechazar o bloquear check-in"],
@@ -323,6 +325,7 @@
     ['ALERTAS','CERRAR',"Validar y cerrar alertas"],
     ['CONEXIONES','SEGUIR',"Seguir usuario en el mapa"],
     ['CONEXIONES','ENVIAR_AVISO',"Enviar aviso desde conexiones"],
+    ['CONEXIONES','DESCONECTAR_USUARIO',"Desconectar usuario conectado"],
     ['REPORTES','EXPORTAR_CSV',"Exportar CSV"],
     ['REPORTES','EXPORTAR_XLSX',"Exportar Excel"],
     ['REPORTES','EXPORTAR_PDF',"Exportar PDF"],
@@ -356,14 +359,15 @@
   ]);
   function hasPermission(module,action='LEER'){
     const permissions=currentUser?.PERMISOS||[];
-    return esAdministrador()||permissions.includes('*:*')||permissions.includes(`${module}:${action}`);
+    return permissions.includes('*:*')||permissions.includes(`${module}:${action}`);
   }
   function puedeDesconectarUsuariosConectados(){return esAdministrador()&&hasPermission('CONEXIONES','DESCONECTAR_USUARIO');}
   function puedeAdministrarPuntoOperacion(){return hasPermission('CONFIGURACION','GESTIONAR_PUNTO_BASE')&&['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||''));}
   function puedeCierreExcepcional(){return hasPermission('OPERACIONES','CIERRE_EXCEPCIONAL')&&['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||''));}
   function puedeReenviarAlertaAsignacion(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').toUpperCase())&&hasPermission('NOTIFICACIONES','ENVIAR');}
-  function puedeAceptarAsignacionesAjenas(){return esAdministrador()||(String(currentUser?.ROL_ID||'').toUpperCase()==='ROL-SUPERVISOR'&&hasPermission('NOTIFICACIONES','ACEPTAR_ASIGNACIONES_AJENAS')&&hasPermission('NOTIFICACIONES','MARCAR_LEIDA'));}
+  function puedeAceptarAsignacionesAjenas(){const rol=String(currentUser?.ROL_ID||'').toUpperCase();return esAdministradorEstricto()||(['ROL-GERENCIA','ROL-SUPERVISOR'].includes(rol)&&hasPermission('NOTIFICACIONES','ACEPTAR_ASIGNACIONES_AJENAS')&&hasPermission('NOTIFICACIONES','MARCAR_LEIDA'));}
   function esAdministrador(){const rol=String(currentUser?.ROL_ID||currentUser?.ROL_NOMBRE||'').trim().toUpperCase();return ['ROL-ADMIN','ADMINISTRADOR','ROL-GERENCIA','GERENCIA'].includes(rol)||(Array.isArray(currentUser?.PERMISOS)&&currentUser.PERMISOS.includes('*:*'));}
+  function esAdministradorEstricto(){const rol=String(currentUser?.ROL_ID||currentUser?.ROL_NOMBRE||'').trim().toUpperCase();return ['ROL-ADMIN','ADMINISTRADOR'].includes(rol)||(Array.isArray(currentUser?.PERMISOS)&&currentUser.PERMISOS.includes('*:*'));}
   function puedeRevisarDocumentos(){return ['ROL-ADMIN','ROL-GERENCIA','ROL-SUPERVISOR'].includes(String(currentUser?.ROL_ID||'').trim().toUpperCase());}
   function puedeEliminarDocumentosPorRol(){const rol=String(currentUser?.ROL_ID||currentUser?.ROL_NOMBRE||'').trim().toUpperCase();return ['ROL-ADMIN','ADMINISTRADOR','ROL-GERENCIA','GERENCIA','ROL-SUPERVISOR','ROL-OPERADOR','SUPERVISOR','OPERADOR'].includes(rol);}
   function claveAvisosEmergentes(){return `flotas_avisos_emergentes_admin_v1_${String(currentUser?.ID||currentUser?.USUARIO_ID||'sin_usuario')}`;}
@@ -737,6 +741,13 @@
     });
     return [...mapa.values()];
   }
+  const ausenciasAvisosVisual={notification:new Map(),alert:new Map()};
+  function estabilizarAvisosVisuales(anteriores,nuevos,tipo){
+    const ausencias=ausenciasAvisosVisual[tipo]||new Map(),actuales=new Map((nuevos||[]).map(item=>[String(item.ID||''),item]).filter(([id])=>id));
+    const salida=[...actuales.values()];actuales.forEach((_,id)=>ausencias.delete(id));
+    (anteriores||[]).forEach(item=>{const id=String(item?.ID||'');if(!id||actuales.has(id))return;const faltas=(ausencias.get(id)||0)+1;if(faltas<2){ausencias.set(id,faltas);salida.push(item);}else ausencias.delete(id);});
+    return deduplicarAvisos(salida,tipo);
+  }
 
   async function refreshNotificationBadge(){
     if(!currentUser)return;
@@ -744,8 +755,11 @@
     try{
       const canNotifications=hasPermission('NOTIFICACIONES','LEER'),canAlerts=hasPermission('ALERTAS','LEER');
       const pendientes=(canNotifications||canAlerts)?await api.request('pendingNotices',{cache:false}):{};
-      const notifications=canNotifications?deduplicarAvisos((pendientes.notifications||pendientes.notificaciones||[]).filter(row=>row.LEIDA!=='SI'),'notification').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
-      const alerts=canAlerts?deduplicarAvisos((pendientes.alerts||pendientes.alertas||[]).filter(row=>row.LEIDA!=='SI'),'alert').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      const nuevasNotifications=canNotifications?deduplicarAvisos((pendientes.notifications||pendientes.notificaciones||[]).filter(row=>row.LEIDA!=='SI'),'notification').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      const nuevasAlerts=canAlerts?deduplicarAvisos((pendientes.alerts||pendientes.alertas||[]).filter(row=>row.LEIDA!=='SI'),'alert').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      const notifications=canNotifications?estabilizarAvisosVisuales(notificationCenterState.notifications,nuevasNotifications,'notification').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      const alerts=canAlerts?estabilizarAvisosVisuales(notificationCenterState.alerts,nuevasAlerts,'alert').sort((a,b)=>alertItemDate(b)-alertItemDate(a)):[];
+      if(!canNotifications)ausenciasAvisosVisual.notification.clear();if(!canAlerts)ausenciasAvisosVisual.alert.clear();
       notificationCenterState={notifications,alerts};
       const newNotifications=notifications.filter(row=>!knownNotificationIds.has(String(row.ID)));
       const newAlerts=alerts.filter(row=>!knownAlertIds.has(String(row.ID)));
@@ -786,7 +800,7 @@
     if(!embeddedMode){
       refreshNotificationBadge();
       // Ciclo exclusivo de campanita/avisos; no recarga ni reconstruye el módulo abierto.
-      notificationTimer=setInterval(refreshNotificationBadge,5000);
+      notificationTimer=setInterval(refreshNotificationBadge,10000);
     }
     resumeTrackingIfAllowed();
   }
@@ -1680,7 +1694,11 @@
     return `<article class="document-expedient-card ${state.completo?'complete':state.vencidos?'expired':'pending'}" data-document-expedient-card data-expedient-search="${esc(`${group.titulo} ${group.subtitulo} ${group.id}`.toLowerCase())}"><header><i>${group.tipo==='VEHICULO'?'🚐':'▤'}</i><div><span>${group.tipo==='VEHICULO'?'VEHÍCULO ASIGNADO':'EXPEDIENTE PERSONAL'}</span><h3>${esc(group.titulo)}</h3><p>${esc(group.subtitulo)}</p></div></header><div class="document-expedient-stats"><span><b>${number(group.rows.length)}</b> documentos</span><span class="${state.adjuntos===group.rows.length?'ok':'warning'}"><b>${number(state.adjuntos)}</b> digitalizados</span><span class="${state.vencidos?'danger':'ok'}"><b>${number(state.vencidos)}</b> vencidos</span><span class="${state.pendientes?'warning':'ok'}"><b>${number(state.pendientes)}</b> por revisar</span></div><p class="document-expedient-next">${ultimo?.FECHA_VENCIMIENTO?`Próximo vencimiento: ${esc(ultimo.TIPO||'Documento')} · ${fmtDate(ultimo.FECHA_VENCIMIENTO)}`:'Sin vencimientos registrados'}</p><button class="btn primary full" type="button" data-open-document-expedient="${esc(group.key)}">Ver expediente completo</button></article>`;
   }
   async function renderDocuments(){
-    const result=await solicitarListaPaginada('documents'),rows=result.rows||[];guardarListaFormulario('documents',rows);expedientesDocumentalesActuales.clear();
+    // Documentos del Conductor siempre solicita contexto fresco: la asignación
+    // vehicular puede haber cambiado sin que el usuario abandone su sesión.
+    actualizacionVehiculoAsignadoPendiente=false;
+    api.invalidate({resources:['documents','vehicles']});
+    const result=await solicitarListaPaginada('documents',{cache:false}),rows=result.rows||[];guardarListaFormulario('documents',rows);expedientesDocumentalesActuales.clear();
     const conductor=currentUser.ROL_ID==='ROL-CONDUCTOR',groups=[];
     if(conductor){
       const personal={key:`PERSONAL:${currentUser.ID}`,tipo:'PERSONAL',id:currentUser.ID,titulo:'Mis documentos personales',subtitulo:'Disponibles siempre en su cuenta',rows:rows.filter(row=>tipoAsociacionDocumento(row)==='PERSONAL')};
@@ -4246,7 +4264,7 @@
     const modo=String(user.MODO_PERMISOS||'ROL').toUpperCase()==='PERSONALIZADO'?'PERSONALIZADO':'ROL';
     const matrizActual=normalizarMatrizPermisosUsuario(user,'MATRIZ_PERMISOS');
     const mandatory=new Set(['PANEL_PRINCIPAL:LEER','CONEXIONES:CREAR','CONEXIONES:ACTUALIZAR']);
-    return `<div class="permission-help"><b>${admin?'Administrador con acceso completo':'Permisos de '+esc(user.NOMBRE)}</b><span>${admin?'Los permisos del administrador no pueden reducirse para evitar perder el control del sistema. Todos sus checkbox permanecen marcados.':'Cada casilla refleja el valor guardado en la base: marcada = true (permiso activo), vacía = false (sin permiso). La matriz se consulta nuevamente al servidor cada vez que se abre.'}</span></div><form id="userPermissionsForm" class="permission-form"><input type="hidden" name="USUARIO_ID" value="${esc(user.ID)}"><div class="permission-mode"><label><input type="radio" name="MODO_PERMISOS" value="ROL" ${modo==='ROL'||admin?'checked':''} ${admin?'disabled':''}><span>Usar permisos del rol</span></label><label><input type="radio" name="MODO_PERMISOS" value="PERSONALIZADO" ${modo==='PERSONALIZADO'&&!admin?'checked':''} ${admin?'disabled':''}><span>Personalizar permisos</span></label></div><div class="permission-boolean-legend"><span><i class="permission-legend-check">✓</i> Marcado = true</span><span><i class="permission-legend-empty"></i> Vacío = false</span></div><div class="permission-matrix ${modo==='PERSONALIZADO'&&!admin?'enabled':''}" data-permission-matrix><div class="permission-row permission-head"><b>Módulo</b>${permissionActions.map(([,label])=>`<b>${label}</b>`).join('')}</div>${permissionCatalog.map(([module,label])=>`<div class="permission-row"><span>${esc(label)}</span>${permissionActions.map(([action])=>{const value=`${module}:${action}`,required=mandatory.has(value),active=admin||required||matrizActual[value]===true;return `<label class="permission-cell" data-action-label="${esc(permissionActions.find(([clave])=>clave===action)?.[1]||action)}" title="${required?'Permiso técnico obligatorio':active?'Permiso activo (true)':'Sin permiso (false)'}"><input type="checkbox" name="PERMISOS" value="${value}" data-obligatorio="${required?'1':'0'}" data-valor-booleano="${active?'true':'false'}" aria-checked="${active?'true':'false'}" ${active?'checked':''} ${admin||required?'disabled':''}><i></i></label>`;}).join('')}</div>`).join('')}<div class="permission-button-section"><div class="permission-button-heading"><b>Botones y acciones específicas</b><span>Estos controles habilitan cada botón del sistema de forma independiente.</span></div><div class="permission-button-grid">${buttonPermissionCatalog.map(([module,action,label])=>{const value=`${module}:${action}`,active=admin||matrizActual[value]===true;return `<label class="permission-button-item" title="${active?'Botón habilitado':'Botón bloqueado'}"><input type="checkbox" name="PERMISOS" value="${value}" data-valor-booleano="${active?'true':'false'}" aria-checked="${active?'true':'false'}" ${active?'checked':''} ${admin?'disabled':''}><span><b>${esc(label)}</b><small>${esc(module.replaceAll('_',' '))}</small></span></label>`;}).join('')}</div></div></div><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit" ${admin?'disabled':''}>Guardar permisos sin cerrar sesión</button></div></form>`;
+    return `<div class="permission-help"><b>${admin?'Administrador con acceso completo':'Permisos de '+esc(user.NOMBRE)}</b><span>${admin?'Los permisos del administrador no pueden reducirse para evitar perder el control del sistema. Todos sus checkbox permanecen marcados.':'Cada casilla es editable. Si modifica una casilla mientras está usando permisos del rol, el sistema cambia automáticamente a Personalizado. Marcada = permiso activo; vacía = sin permiso.'}</span></div><form id="userPermissionsForm" class="permission-form"><input type="hidden" name="USUARIO_ID" value="${esc(user.ID)}"><div class="permission-mode"><label><input type="radio" name="MODO_PERMISOS" value="ROL" ${modo==='ROL'||admin?'checked':''} ${admin?'disabled':''}><span>Usar permisos del rol</span></label><label><input type="radio" name="MODO_PERMISOS" value="PERSONALIZADO" ${modo==='PERSONALIZADO'&&!admin?'checked':''} ${admin?'disabled':''}><span>Personalizar permisos</span></label></div><div class="permission-boolean-legend"><span><i class="permission-legend-check">✓</i> Marcado = true</span><span><i class="permission-legend-empty"></i> Vacío = false</span></div><div class="permission-matrix ${!admin?'enabled':''}" data-permission-matrix><div class="permission-row permission-head"><b>Módulo</b>${permissionActions.map(([,label])=>`<b>${label}</b>`).join('')}</div>${permissionCatalog.map(([module,label])=>`<div class="permission-row"><span>${esc(label)}</span>${permissionActions.map(([action])=>{const value=`${module}:${action}`,required=mandatory.has(value),active=admin||required||matrizActual[value]===true;return `<label class="permission-cell" data-action-label="${esc(permissionActions.find(([clave])=>clave===action)?.[1]||action)}" title="${required?'Permiso técnico obligatorio':active?'Permiso activo (true)':'Sin permiso (false)'}"><input type="checkbox" name="PERMISOS" value="${value}" data-obligatorio="${required?'1':'0'}" data-valor-booleano="${active?'true':'false'}" aria-checked="${active?'true':'false'}" ${active?'checked':''} ${admin||required?'disabled':''}><i></i></label>`;}).join('')}</div>`).join('')}<div class="permission-button-section"><div class="permission-button-heading"><b>Botones y acciones específicas</b><span>Estos controles habilitan cada botón del sistema de forma independiente.</span></div><div class="permission-button-grid">${buttonPermissionCatalog.map(([module,action,label])=>{const value=`${module}:${action}`,active=admin||matrizActual[value]===true;return `<label class="permission-button-item" title="${active?'Botón habilitado':'Botón bloqueado'}"><input type="checkbox" name="PERMISOS" value="${value}" data-valor-booleano="${active?'true':'false'}" aria-checked="${active?'true':'false'}" ${active?'checked':''} ${admin?'disabled':''}><span><b>${esc(label)}</b><small>${esc(module.replaceAll('_',' '))}</small></span></label>`;}).join('')}</div></div></div><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit" ${admin?'disabled':''}>Guardar permisos sin cerrar sesión</button></div></form>`;
   }
 
   async function openUserPermissionsModal(userId){
@@ -4271,14 +4289,48 @@
     let personalizadoInicializado=modoOriginal==='PERSONALIZADO'&&tienePersonalizados;
     $$('input[name="MODO_PERMISOS"]',form).forEach(radio=>radio.addEventListener('change',()=>{
       const personalizado=radio.value==='PERSONALIZADO'&&radio.checked;
-      matrix.classList.toggle('enabled',personalizado);
-      if(personalizado&&!personalizadoInicializado){aplicarMatrizCheckboxPermisos(form,matrizRol);personalizadoInicializado=true;toast('Permisos base cargados','La personalización comenzó con todos los permisos actuales del rol. Ahora puede activarlos o desactivarlos.');}
+      matrix.classList.toggle('enabled',true);
+      if(personalizado&&!personalizadoInicializado){aplicarMatrizCheckboxPermisos(form,matrizRol);personalizadoInicializado=true;toast('Modo personalizado activo','Partimos desde los permisos actuales del rol. Ahora cada casilla que cambie será guardada como personalizada.');}
       else aplicarMatrizCheckboxPermisos(form,personalizado?matrizPersonalizada:matrizRol);
     }));
     form.querySelectorAll('input[name="PERMISOS"]').forEach(input=>input.addEventListener('change',()=>{
+      if(input.disabled)return;
+      const radioPersonalizado=form.querySelector('input[name="MODO_PERMISOS"][value="PERSONALIZADO"]');
+      if(radioPersonalizado&&!radioPersonalizado.checked){
+        // El clic del usuario es la intención explícita de personalizar. No se
+        // reconstruye la matriz aquí para no deshacer la casilla recién pulsada.
+        radioPersonalizado.checked=true;personalizadoInicializado=true;matrix.classList.add('enabled');
+      }
       input.dataset.valorBooleano=input.checked?'true':'false';input.setAttribute('aria-checked',input.checked?'true':'false');
     }));
-    form.onsubmit=async event=>{event.preventDefault();const button=$('button[type="submit"]',form),mode=form.elements.MODO_PERMISOS.value,permissions=[...form.querySelectorAll('input[name="PERMISOS"]:checked')].map(input=>input.value);await conCargaBoton(button,'Guardando y verificando…',async()=>{try{const result=await api.request('saveUserPermissions',{data:{USUARIO_ID:userId,MODO_PERMISOS:mode,PERMISOS:permissions,INICIALIZAR_DESDE_ROL:'NO'}});if(api.isRemote()&&result.persistenciaConfirmada!==true)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');api.invalidate({actions:['me','dashboard'],resources:['users','audit']});let confirmed=result.row;const verification=await api.request('get',{resource:'users',id:userId,force:true,cache:false});if(verification?.row)confirmed=verification.row;if(!confirmed?.ID)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');guardarRegistro('users',confirmed);cacheVistasModulo.delete('users');if(currentUser.ID===userId){currentUser=confirmed;const auth=api.getAuth();api.setAuth({...auth,user:confirmed});postParent({tipo:'flotas:modulo-listo',usuario:confirmed,seccion:currentSection});}$('#modalBody').innerHTML=permissionMatrixMarkup(confirmed);const total=Object.values(normalizarMatrizPermisosUsuario(confirmed,'MATRIZ_PERMISOS')).filter(Boolean).length;toast('Permisos guardados y visibles',`${total} checkbox activos (true). Los demás permanecen vacíos (false). Versión ${number(confirmed.VERSION_PERMISOS||0)}.`);await actualizarSeccionEnSegundoPlano('users');setTimeout(()=>closeModal(),450);}catch(error){toast('No se pudieron confirmar los permisos',translateError(error),'error');}});};
+    form.onsubmit=async event=>{
+      event.preventDefault();
+      const button=$('button[type="submit"]',form),mode=form.elements.MODO_PERMISOS.value;
+      const permissions=[...form.querySelectorAll('input[name="PERMISOS"]:checked')].filter(input=>!input.disabled).map(input=>input.value);
+      await conCargaBoton(button,'Guardando y verificando…',async()=>{
+        try{
+          const result=await api.request('saveUserPermissions',{data:{USUARIO_ID:userId,MODO_PERMISOS:mode,PERMISOS:permissions,INICIALIZAR_DESDE_ROL:'NO'}});
+          if(api.isRemote()&&result.persistenciaConfirmada!==true)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');
+          api.invalidate({actions:['me','dashboard'],resources:['users','audit']});
+          // flotas-api ya releyó y comparó la fila dentro de la misma transacción lógica.
+          // Evitamos una segunda consulta que podría fallar si el usuario se retiró
+          // a sí mismo el permiso USUARIOS:LEER justo en este guardado.
+          const confirmed=result.row;
+          if(!confirmed?.ID||result?.verificacion?.coincide===false)throw new Error('PERMISOS_USUARIO_NO_CONFIRMADOS');
+          const confirmedMode=String(confirmed.MODO_PERMISOS||'ROL').toUpperCase();
+          const customSaved=new Set(Array.isArray(confirmed.PERMISOS_PERSONALIZADOS)?confirmed.PERMISOS_PERSONALIZADOS:[]);
+          const expected=new Set(mode==='PERSONALIZADO'?permissions:[]);
+          const exact=confirmedMode===mode&&expected.size===customSaved.size&&[...expected].every(key=>customSaved.has(key));
+          if(!exact)throw new Error('PERMISOS_USUARIO_NO_PERSISTIERON');
+          guardarRegistro('users',confirmed);cacheVistasModulo.delete('users');
+          if(currentUser.ID===userId){currentUser=confirmed;const auth=api.getAuth();api.setAuth({...auth,user:confirmed});postParent({tipo:'flotas:modulo-listo',usuario:confirmed,seccion:currentSection});}
+          $('#modalBody').innerHTML=permissionMatrixMarkup(confirmed);
+          const total=mode==='PERSONALIZADO'?customSaved.size:Object.values(normalizarMatrizPermisosUsuario(confirmed,'MATRIZ_PERMISOS')).filter(Boolean).length;
+          toast('Permisos confirmados en la base',`${total} permisos ${mode==='PERSONALIZADO'?'personalizados':'del rol'} activos. Versión ${number(confirmed.VERSION_PERMISOS||0)}.`);
+          await actualizarSeccionEnSegundoPlano('users');setTimeout(()=>closeModal(),500);
+        }catch(error){toast('Los permisos no quedaron confirmados',translateError(error),'error');}
+      });
+    };
   }
 
 
@@ -5210,7 +5262,14 @@
   function setTheme(dark){document.body.classList.toggle('dark',dark);document.documentElement.classList.toggle('tema-oscuro-inicial',dark);document.documentElement.style.colorScheme=dark?'dark':'light';localStorage.setItem('flotas_tema',dark?'dark':'light');window.TemaFlotas?.aplicarGuardado?.();}
 
   function openModal(){const token=++secuenciaModal;$('#modalBackdrop').classList.add('open');document.body.classList.add('modal-open');return token;}
-  function closeModal(){secuenciaModal+=1;$('#modalBackdrop').classList.remove('open');document.body.classList.remove('modal-open');}
+  function closeModal(){
+    secuenciaModal+=1;$('#modalBackdrop').classList.remove('open');document.body.classList.remove('modal-open');
+    if(actualizacionVehiculoAsignadoPendiente&&currentSection==='documents'){
+      actualizacionVehiculoAsignadoPendiente=false;
+      api.invalidate({resources:['documents','vehicles']});cacheVistasModulo.delete('documents');
+      setTimeout(()=>go('documents'),40);
+    }
+  }
   function openSidebar(){$('#sidebar').classList.add('open');$('#overlay').classList.add('open');}
   function closeSidebar(){$('#sidebar').classList.remove('open');$('#overlay').classList.remove('open');}
 
@@ -5338,6 +5397,20 @@
           buildNav();
           if(!hayInteraccionVisualActiva()){cacheVistasModulo.delete(currentSection);setTimeout(()=>go(currentSection),30);}
           else toast('Permisos actualizados','Los nuevos permisos ya están activos. Los controles se ajustarán al terminar la edición actual.','info');
+        }
+        return;
+      }
+      if(data.tipo==='flotas:vehiculo-asignado-actualizado'&&currentUser){
+        api.invalidate({resources:['documents','vehicles','drivers','checkins']});
+        cacheVistasModulo.delete('documents');cacheListasFormulario.delete('documents');
+        if(currentSection==='documents'){
+          if(hayInteraccionVisualActiva()){
+            actualizacionVehiculoAsignadoPendiente=true;
+            toast('Vehículo asignado actualizado','El expediente del nuevo vehículo se mostrará al cerrar la edición actual.','info');
+          }else{
+            actualizacionVehiculoAsignadoPendiente=false;
+            setTimeout(()=>go('documents'),30);
+          }
         }
         return;
       }

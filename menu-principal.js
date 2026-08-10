@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.7';
+  const VERSION='4.3.8';
   const grupos=[
     ['GENERAL',[
       ['dashboard','⌂','Panel principal','panel-principal.html','PANEL_PRINCIPAL'],
@@ -56,7 +56,10 @@
   let cargandoModoOficina=false;
   let consultaAvisosPendiente=null;
   let sincronizacionPermisosPendiente=null;
+  let firmaAsignacionVehiculoActual=null;
+  let vehiculoAsignadoActual='';
   let firmaAvisosRenderizada='';
+  const ausenciasAvisosMenu={notificacion:new Map(),alerta:new Map()};
   let consultaOficinaPendiente=null;
   let oficinaConsultadaEn=0;
   let oficinaUsuarioConsultado='';
@@ -80,7 +83,8 @@
     const administrador=rol==='ROL-ADMIN'||rol==='ADMINISTRADOR';
     if(administrador)return true;
     const gerencia=rol==='ROL-GERENCIA'||rol==='GERENCIA';
-    if(gerencia)return true;
+    // Gerencia obtiene acceso completo por defecto desde PERMISOS cuando usa
+    // el rol, pero una matriz PERSONALIZADA puede reducirlo en tiempo real.
     if((rol==='ROL-SUPERVISOR'||rol==='SUPERVISOR'||rol==='ROL-OPERADOR'||rol==='OPERADOR')&&['USUARIOS','CONEXIONES'].includes(modulo))return false;
     if(modulo==='CONEXIONES'&&!gerencia)return false;
     if(rol==='ROL-CONDUCTOR'){
@@ -182,7 +186,7 @@
   }
   function esAdministradorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-ADMIN'||rol==='ADMINISTRADOR'||rol==='ROL-GERENCIA'||rol==='GERENCIA';}
   function esOperadorMenu(){const rol=String(usuario?.ROL_ID||usuario?.ROL_NOMBRE||'').trim().toUpperCase();return rol==='ROL-SUPERVISOR'||rol==='SUPERVISOR';}
-  function puedeAceptarAsignacionesAjenasMenu(){const permisos=Array.isArray(usuario?.PERMISOS)?usuario.PERMISOS:[];return esAdministradorMenu()||(esOperadorMenu()&&(permisos.includes('*:*')||(permisos.includes('NOTIFICACIONES:ACEPTAR_ASIGNACIONES_AJENAS')&&permisos.includes('NOTIFICACIONES:MARCAR_LEIDA'))));}
+  function puedeAceptarAsignacionesAjenasMenu(){const permisos=Array.isArray(usuario?.PERMISOS)?usuario.PERMISOS:[],rol=String(usuario?.ROL_ID||'').toUpperCase(),adminEstricto=['ROL-ADMIN','ADMINISTRADOR'].includes(rol);return adminEstricto||(['ROL-GERENCIA','GERENCIA','ROL-SUPERVISOR','SUPERVISOR','ROL-OPERADOR','OPERADOR'].includes(rol)&&(permisos.includes('*:*')||(permisos.includes('NOTIFICACIONES:ACEPTAR_ASIGNACIONES_AJENAS')&&permisos.includes('NOTIFICACIONES:MARCAR_LEIDA'))));}
   function puedeConfigurarAvisosMenu(){return esAdministradorMenu()||esOperadorMenu();}
   function claveAvisosEmergentesMenu(){return `flotas_avisos_emergentes_admin_v1_${String(usuario?.ID||usuario?.USUARIO_ID||'sin_usuario')}`;}
   function avisosEmergentesActivosMenu(){
@@ -320,6 +324,19 @@
     (rows||[]).forEach(item=>{const key=claveAvisoMenu(item,tipo),actual=mapa.get(key);if(!actual||fechaOrdenAviso(item)>fechaOrdenAviso(actual))mapa.set(key,item);});
     return [...mapa.values()];
   }
+  function estabilizarAvisosMenu(anteriores,nuevos,tipo){
+    const ausencias=ausenciasAvisosMenu[tipo]||new Map(),actuales=new Map((nuevos||[]).map(item=>[String(item.ID||''),item]).filter(([id])=>id));
+    const salida=[...actuales.values()];
+    actuales.forEach((_,id)=>ausencias.delete(id));
+    (anteriores||[]).forEach(item=>{
+      const id=String(item?.ID||'');if(!id||actuales.has(id))return;
+      const faltas=(ausencias.get(id)||0)+1;
+      // Una sola lectura vacía/parcial nunca hace desaparecer un pendiente.
+      // Se exige una segunda instantánea consecutiva para confirmar que realmente dejó de estar pendiente.
+      if(faltas<2){ausencias.set(id,faltas);salida.push(item);}else ausencias.delete(id);
+    });
+    return deduplicarAvisosMenu(salida,tipo);
+  }
 
   function renderizarAvisos(){const notifications=estadoAvisos.notifications||[],alerts=estadoAvisos.alerts||[],etiquetaAceptar=esAdministradorMenu()?'Aceptar como Administrador':puedeAceptarAsignacionesAjenasMenu()?'Aceptar como Operador':'Aceptar asignación',mezclados=[...alerts.map(item=>({item,tipo:'alerta'})),...notifications.map(item=>({item,tipo:'notificacion'}))].sort((a,b)=>fechaOrdenAviso(b.item)-fechaOrdenAviso(a.item)).slice(0,14);$('#totalNotificacionesMenu').textContent=notifications.length;$('#totalAlertasMenu').textContent=alerts.length;$('#listaAvisosMenu').innerHTML=mezclados.length?mezclados.map(({item,tipo})=>`<article class="aviso-menu-item ${tipo}" data-modulo-aviso="${tipo==='alerta'?'alerts':'notifications'}"><i>${tipo==='alerta'?'!':'🔔'}</i><div><b>${escapar(item.TITULO|| (tipo==='alerta'?'Alerta':'Notificación'))}</b><span>${escapar(item.MENSAJE||'')}</span><small>${escapar(fechaAviso(item))}</small>${esAlertaAsignacion(item)?`<button type="button" class="aceptar-aviso-menu" data-aceptar-asignacion-menu="${escapar(item.ID)}">✓ ${etiquetaAceptar}</button>`:''}</div></article>`).join(''):'<p class="sin-avisos-menu">No existen avisos pendientes.</p>';document.querySelectorAll('[data-modulo-aviso]').forEach(item=>item.addEventListener('click',event=>{if(event.target.closest('[data-aceptar-asignacion-menu]'))return;cerrarPanelAvisos();abrirModulo(item.dataset.moduloAviso);}));document.querySelectorAll('[data-aceptar-asignacion-menu]').forEach(boton=>boton.addEventListener('click',event=>{event.stopPropagation();const item=notifications.find(row=>String(row.ID)===String(boton.dataset.aceptarAsignacionMenu));if(item)responderAlertaAsignacionMenu(item,'ACEPTADA',boton);}));}
   function firmaColeccionAvisos(rows){return rows.map(item=>`${item.ID}:${item.ACTUALIZADO_EN||item.FECHA_LECTURA||item.FECHA_ENVIO||item.FECHA_HORA||''}`).join('|');}
@@ -332,6 +349,27 @@
       modoPermisos:String(estado.modoPermisos||estado.MODO_PERMISOS||'ROL').trim().toUpperCase()
     };
   }
+  function estadoAsignacionRespuesta(respuesta){
+    const estado=respuesta?.assignmentState||respuesta?.estadoAsignacion||null;if(!estado)return null;
+    return{
+      conductorId:String(estado.driverId||estado.CONDUCTOR_ID||''),
+      vehiculoId:String(estado.vehicleId||estado.VEHICULO_ID||''),
+      asignacionId:String(estado.assignmentId||estado.ASIGNACION_ID||''),
+      estado:String(estado.estado||estado.ESTADO||''),
+      patente:String(estado.patente||estado.PATENTE||''),
+      firma:String(estado.firma||estado.FIRMA||'')
+    };
+  }
+  function sincronizarAsignacionVehiculoSesion(respuesta){
+    if(!usuario)return false;const estado=estadoAsignacionRespuesta(respuesta);if(!estado)return false;
+    const firma=estado.firma||[estado.conductorId,estado.vehiculoId,estado.asignacionId,estado.estado].join('|');
+    if(firmaAsignacionVehiculoActual===null){firmaAsignacionVehiculoActual=firma;vehiculoAsignadoActual=estado.vehiculoId;return false;}
+    if(firma===firmaAsignacionVehiculoActual&&estado.vehiculoId===vehiculoAsignadoActual)return false;
+    const anterior=vehiculoAsignadoActual;firmaAsignacionVehiculoActual=firma;vehiculoAsignadoActual=estado.vehiculoId;
+    enviar({tipo:'flotas:vehiculo-asignado-actualizado',estadoAsignacion:estado,vehiculoAnteriorId:anterior});
+    return true;
+  }
+
   async function sincronizarPermisosSesion(respuesta){
     if(!usuario)return false;const estado=estadoPermisosRespuesta(respuesta);if(!estado||!estado.userId||estado.userId!==String(usuario.ID||usuario.USUARIO_ID||''))return false;
     const versionActual=Number(usuario.VERSION_PERMISOS||0),rolActual=String(usuario.ROL_ID||'').trim().toUpperCase(),modoActual=String(usuario.MODO_PERMISOS||'ROL').trim().toUpperCase();
@@ -360,8 +398,13 @@
       // que una autorización recién otorgada se aplique sin cambiar de perfil.
       const pendientes=await api.request('pendingNotices',{cache:false});
       await sincronizarPermisosSesion(pendientes);
-      const notifications=puedeAvisos('NOTIFICACIONES')?deduplicarAvisosMenu((pendientes.notifications||pendientes.notificaciones||[]).filter(item=>item.LEIDA!=='SI'),'notificacion'):[];
-      const alerts=puedeAvisos('ALERTAS')?deduplicarAvisosMenu((pendientes.alerts||pendientes.alertas||[]).filter(item=>item.LEIDA!=='SI'),'alerta'):[];
+      sincronizarAsignacionVehiculoSesion(pendientes);
+      const puedeNotificaciones=puedeAvisos('NOTIFICACIONES'),puedeAlertas=puedeAvisos('ALERTAS');
+      const notificacionesNuevas=puedeNotificaciones?deduplicarAvisosMenu((pendientes.notifications||pendientes.notificaciones||[]).filter(item=>item.LEIDA!=='SI'),'notificacion'):[];
+      const alertasNuevas=puedeAlertas?deduplicarAvisosMenu((pendientes.alerts||pendientes.alertas||[]).filter(item=>item.LEIDA!=='SI'),'alerta'):[];
+      const notifications=puedeNotificaciones?estabilizarAvisosMenu(estadoAvisos.notifications,notificacionesNuevas,'notificacion'):[];
+      const alerts=puedeAlertas?estabilizarAvisosMenu(estadoAvisos.alerts,alertasNuevas,'alerta'):[];
+      if(!puedeNotificaciones)ausenciasAvisosMenu.notificacion.clear();if(!puedeAlertas)ausenciasAvisosMenu.alerta.clear();
       const nuevasNotificaciones=notifications.filter(item=>!idsNotificacionesConocidas.has(String(item.ID)));
       const nuevasAlertas=alerts.filter(item=>!idsAlertasConocidas.has(String(item.ID)));
       const nuevasAsignaciones=notifications.filter(esAlertaAsignacion).filter(item=>!idsAsignacionesMostradas.has(String(item.ID)));
@@ -396,7 +439,7 @@
       await actualizarAvisos();
       // Ciclo independiente de la campanita: nunca reconstruye el módulo abierto.
       // Mantiene pendientes no leídos y reduce tráfico respecto del antiguo sondeo de 2 s.
-      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:5000);
+      if(!cerrandoSesion&&usuario)programarAvisos(document.hidden?30000:10000);
     },Math.max(100,Number(retraso||0)));
   }
   function iniciarAvisos(){if(temporizadorAvisos||consultaAvisosPendiente)return;programarAvisos(900);}
