@@ -9,7 +9,7 @@
     create:'crear', update:'actualizar', delete:'eliminar', startOperation:'iniciarOperacion',
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
     changePassword:'cambiarContrasena', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
-    assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', routeWeather:'climaRuta', sendNotification:'enviarNotificacion',
+    routeSyncState:'estadoSincronizacionRutas', assignRoute:'asignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', routeWeather:'climaRuta', sendNotification:'enviarNotificacion',
     readNotification:'marcarNotificacionLeida', pendingNotices:'avisosPendientes', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
@@ -60,7 +60,7 @@
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
-  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','backupCatalog','backupTable']);
+  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','routeSyncState','backupCatalog','backupTable']);
   const clientIpCacheKey = 'flotas_ip_publica_v1';
   const claveCachePersistente = config.CLAVE_CACHE_MODULOS_LOCAL || 'sistema_gestion_flotas_cache_modulos_v1';
   const accionesCachePersistente = new Set(['dashboard','operationsSummary','list','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint']);
@@ -992,6 +992,7 @@
       case 'vehicleQrLabel': return localVehicleQrLabel(payload);
       case 'saveLocation': return localSaveLocation(payload);
       case 'latestLocations': return localLatestLocations(payload);
+      case 'routeSyncState': return localRouteSyncState();
       case 'assignRoute': return localAssignRoute(payload);
       case 'startRoute': return localUpdateRouteStatus({...payload,ESTADO:'En curso'});
       case 'completeRoute': return localUpdateRouteStatus({...payload,ESTADO:'Completada'});
@@ -1669,6 +1670,16 @@
     if(!documentacionPersonal.COMPLETO)localNotifyRoles(['ROL-ADMIN','ROL-GERENCIA'],{TITULO:`Documentación personal pendiente: ${driver.NOMBRE}`,MENSAJE:`La ruta ${route.NOMBRE} fue asignada, pero el expediente personal no posee un documento digital vigente.`,TIPO:'Documento',PRIORIDAD:'Urgente',RUTA_ID:route.ID,CREADO_POR:user.ID,CLAVE_UNICA:`RUTA-DOCUMENTACION-PERSONAL-${route.ID}`});
     audit(user,'ASIGNAR','RUTAS',`Ruta asignada a ${driver.NOMBRE}`,route.ID);saveLocal();return{row:route,notification,documentacionPersonal};
   }
+  function localRouteSyncState(){
+    const user=requireLocalUser(),related=['RUTAS','OPERACIONES','VEHICULOS','CONDUCTORES','CHECKIN','COMBUSTIBLE','REPORTES','NOTIFICACIONES','HISTORIAL','PANEL_PRINCIPAL'];
+    if(!related.some(module=>hasLocalPermission(user,module,'LEER')))throw new Error('PERMISO_DENEGADO');
+    const canReadRoutes=hasLocalPermission(user,'RUTAS','LEER');
+    const rows=localFilterRows('routes',activeRows(localDb.routes),user).slice().sort((a,b)=>new Date(b.ACTUALIZADO_EN||b.CREADO_EN||0)-new Date(a.ACTUALIZADO_EN||a.CREADO_EN||0)||String(b.ID||'').localeCompare(String(a.ID||''))).slice(0,8);
+    const raw=rows.length?rows.map(row=>`${row.ID||''}@${row.ACTUALIZADO_EN||''}@${row.ESTADO||''}`).join('|'):'SIN_RUTAS';
+    let h=2166136261;for(const ch of raw){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}const revision=(h>>>0).toString(36).toUpperCase(),latest=canReadRoutes?(rows[0]||{}):{};
+    return{REVISION:revision,revision,ULTIMA_RUTA_ID:latest.ID||'',ULTIMO_ESTADO:latest.ESTADO||'',ACTUALIZADO_EN:latest.ACTUALIZADO_EN||'',serverTime:iso()};
+  }
+
   function localUpdateRouteStatus(payload){
     const user=requireLocalUser(),route=find('routes',payload.id||payload.RUTA_ID||payload.data?.RUTA_ID);requireLocalPermission(user,'RUTAS','ACTUALIZAR');
     if(!route)throw new Error('RUTA_NO_ENCONTRADA');if(!localFilterRows('routes',[route],user).length)throw new Error('PERMISO_DENEGADO');

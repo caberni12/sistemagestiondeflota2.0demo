@@ -138,6 +138,11 @@
   // conservan sus ciclos independientes y no reconstruyen el módulo abierto.
   let bloqueoRefrescoVisualHasta = 0;
   let accionesInterfazEnCurso = 0;
+  let routeSyncTimer = null;
+  let routeSyncRevision = '';
+  let routeSyncPendingRefresh = false;
+  let routeSyncRequestPending = false;
+  const routeSyncSections = new Set(['dashboard','routes','operations','vehicles','drivers','checkin','fuel','notifications','history','reports']);
   const bloquearRefrescoVisualTemporal = (milisegundos=8000) => { bloqueoRefrescoVisualHasta = Math.max(bloqueoRefrescoVisualHasta, Date.now()+Math.max(500,Number(milisegundos)||0)); };
   const hayEdicionUsuarioActiva = () => {
     if (Date.now() < bloqueoRefrescoVisualHasta) return true;
@@ -788,9 +793,39 @@
     $('#modalBody').innerHTML=`<label class="assignment-alert-switch"><input type="checkbox" data-assignment-voice-toggle ${vozAsignacionesActiva()?'checked':''}><i></i><span><b>Voz de nuevas asignaciones</b><small>Puede silenciarla; la tarjeta emergente, la campanita y los avisos pendientes seguirán activos.</small></span></label><div class="notification-center-summary"><div class="info-item"><span>Notificaciones pendientes</span><b>${notifications.length}</b></div><div class="info-item"><span>Alertas pendientes</span><b>${alerts.length}</b></div></div><div class="notification-dashboard"><article class="card"><div class="card-header"><div><h3>Notificaciones</h3><p>Mensajes dirigidos a su usuario.</p></div></div><div class="notification-list">${notificationRows||empty('✓','Sin notificaciones','No hay mensajes pendientes.')}</div><button class="btn soft full" type="button" data-center-nav="notifications">Abrir notificaciones</button></article><article class="card"><div class="card-header"><div><h3>Alertas</h3><p>Eventos generados automáticamente por el sistema.</p></div></div><div class="notification-list">${alertRows||empty('✓','Sin alertas','No hay alertas pendientes.')}</div><button class="btn soft full" type="button" data-center-nav="alerts">Abrir alertas</button></article></div>`;
     openModal();$('[data-assignment-voice-toggle]',$('#modalBody'))?.addEventListener('change',event=>{const activa=event.target.checked;if(!guardarVozAsignaciones(activa)){event.target.checked=!activa;toast('No se pudo guardar','La preferencia de voz no pudo guardarse en este navegador.','error');return;}toast(activa?'Voz activada':'Voz silenciada',activa?'Las nuevas asignaciones también se anunciarán por voz.':'Las alertas visuales y pendientes continuarán funcionando.');});$$('[data-center-nav]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{closeModal();navigateSection(button.dataset.centerNav);}));$$('[data-read-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readNotification(button.dataset.readNotification))));$$('[data-accept-assignment]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Aceptando…',()=>responderAvisoAsignacionWeb({ID:button.dataset.acceptAssignment},'ACEPTADA',button))));$$('[data-checkin-route-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{const item=notifications.find(row=>String(row.ID)===String(button.dataset.checkinRouteNotification));if(item?.CHECKIN_ID)openCheckinDetailModal(item.CHECKIN_ID,{notificacion:item});}));$$('[data-read-alert]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readAlert(button.dataset.readAlert))));
   }
+  function stopRouteRealtimeSync(){if(routeSyncTimer)clearTimeout(routeSyncTimer);routeSyncTimer=null;routeSyncRequestPending=false;routeSyncPendingRefresh=false;routeSyncRevision='';}
+  function scheduleRouteRealtimeSync(delay){if(routeSyncTimer)clearTimeout(routeSyncTimer);routeSyncTimer=setTimeout(routeRealtimeSyncTick,Math.max(500,Number(delay)||1000));}
+  async function refreshVisibleSectionAfterRouteChange(info={}){
+    invalidarListasFormulario('routes','vehicles','drivers','operations','notifications','checkins','fuel');
+    ['routes','dashboard','operations','vehicles','drivers','checkin','fuel','notifications'].forEach(section=>cacheVistasModulo.delete(section));
+    if(!routeSyncSections.has(currentSection))return;
+    if(hayInteraccionVisualActiva()){routeSyncPendingRefresh=true;setSave(`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea · refresco pendiente`);return;}
+    routeSyncPendingRefresh=false;
+    await actualizarSeccionEnSegundoPlano(currentSection);
+    refreshNotificationBadge().catch(()=>{});
+    setSave(`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea`);
+  }
+  async function routeRealtimeSyncTick(){
+    routeSyncTimer=null;
+    if(!currentUser){return;}
+    const interval=Math.max(750,Number(config.INTERVALO_SINCRONIZACION_RUTAS_MILISEGUNDOS||1000));
+    if(document.hidden||!routeSyncSections.has(currentSection)){scheduleRouteRealtimeSync(Math.max(1500,interval));return;}
+    if(routeSyncPendingRefresh&&!hayInteraccionVisualActiva()){refreshVisibleSectionAfterRouteChange({ULTIMA_RUTA_ID:''}).catch(()=>{});}
+    if(routeSyncRequestPending){scheduleRouteRealtimeSync(interval);return;}
+    routeSyncRequestPending=true;
+    try{
+      const info=await api.request('routeSyncState',{cache:false,force:true});
+      const revision=String(info?.REVISION||info?.revision||'');
+      if(!routeSyncRevision){routeSyncRevision=revision;}
+      else if(revision&&revision!==routeSyncRevision){routeSyncRevision=revision;await refreshVisibleSectionAfterRouteChange(info||{});}
+    }catch(error){if(api.isAuthError?.(error)){forceLogout();return;}}
+    finally{routeSyncRequestPending=false;}
+    scheduleRouteRealtimeSync(interval);
+  }
+  function startRouteRealtimeSync(){stopRouteRealtimeSync();scheduleRouteRealtimeSync(250);}
   function stopRealtimeServices(){
     [heartbeatTimer,notificationTimer].forEach(timer=>{if(timer)clearInterval(timer);});
-    heartbeatTimer=null;notificationTimer=null;
+    heartbeatTimer=null;notificationTimer=null;stopRouteRealtimeSync();
   }
   function startRealtimeServices(){
     stopRealtimeServices();updateBattery();
@@ -802,6 +837,7 @@
       // Ciclo exclusivo de campanita/avisos; no recarga ni reconstruye el módulo abierto.
       notificationTimer=setInterval(refreshNotificationBadge,10000);
     }
+    startRouteRealtimeSync();
     resumeTrackingIfAllowed();
   }
 
@@ -1001,6 +1037,7 @@
     if (!renderers[section]) section = 'dashboard';
     const sequence = ++secuenciaNavegacion;
     cleanupSection(); currentSection=section; buildNav();
+    if(currentUser&&routeSyncSections.has(section))scheduleRouteRealtimeSync(200);
     if (options.force) {
       invalidarCacheSeccion(section);
       precargaIniciada = false;
