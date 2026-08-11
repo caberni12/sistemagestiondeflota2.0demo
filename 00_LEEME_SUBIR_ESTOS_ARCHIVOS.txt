@@ -4,4 +4,6 @@ Suba TODOS estos archivos juntos en la raíz del sitio. No se requieren subcarpe
 
 Protecciones: módulos directos vuelven al login; ticket efímero por pestaña; validación API antes de abrir módulos; modo local deshabilitado en producción; postMessage limitado al iframe/origen; identidad y permisos solo se aceptan desde la API; JavaScript de negocio empaquetado/ofuscado sin source maps.
 
+Publicación Android: si se interrumpe la carga, la Web consulta el estado de Drive y continúa desde el último byte confirmado. Si Drive terminó el APK pero se perdió la respuesta final, el servidor lo recupera por uploadId sin duplicarlo. La confirmación admite hasta 180 segundos.
+
 Nota: en un hosting estático el código que ejecuta el navegador nunca puede ser 100% secreto. La seguridad real está en la API, que valida sesión, rol, permisos y alcance.
