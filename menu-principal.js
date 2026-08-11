@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.8';
+  const VERSION='4.3.12';
   const ORIGEN_MENSAJES=location.origin==='null'?'*':location.origin;
   const CLAVE_TICKET_SHELL='sgf_shell_ticket_v1';
   function crearTicketShell(){
@@ -38,6 +38,7 @@
       ['company','🏢','Empresa','empresa.html','CONFIGURACION'],
       ['reports','▥','Reportes','reportes.html','REPORTES'],
       ['audit','☷','Auditoría','auditoria.html','BITACORA'],
+      ['appUpdates','⬆','Actualización de Aplicación','actualizaciones-app.html','ACTUALIZACIONES_APP'],
       ['settings','⚒','Configuración','configuracion.html','CONFIGURACION']
     ]]
   ];

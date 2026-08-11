@@ -17,7 +17,7 @@
     officeStatus:'estadoOficinaVirtual', officeAsk:'consultarOficinaVirtual', officeAutoMode:'configurarModoOficinaVirtual',
     officeRun:'ejecutarRevisionOficinaVirtual', officeRepair:'repararOficinaVirtual', officeUploadDocument:'cargarDocumentoOficinaVirtual', officeReportFailure:'informarFallaOficinaVirtual', officeGenerateReport:'generarReporteOficinaVirtual', officeIncidents:'listarIncidentesOficinaVirtual', officeResolveIncident:'resolverIncidenteOficinaVirtual',
     validateVehicleQr:'validarQrVehiculo', vehicleQrLabel:'obtenerEtiquetaQrVehiculo', assignCheckinVehicle:'asignarVehiculoCheckin', currentCheckinAssignment:'asignacionCheckinActual', createVehicleCheckin:'crearCheckinVehicular',
-    reviewVehicleCheckin:'revisarCheckinVehicular', availableCheckins:'checkinsDisponibles',
+    reviewVehicleCheckin:'revisarCheckinVehicular', availableCheckins:'checkinsDisponibles', validateRouteCheckin:'validarCheckinRuta',
     bulkImport:'importarMasivo', registerConnectionIp:'registrarIpConexion', fuelSummary:'resumenCombustible',
     requestFuelDeletion:'solicitarEliminacionCombustible', resolveFuelDeletion:'resolverSolicitudEliminacionCombustible', deleteFuel:'eliminarCargaCombustible', uploadDriveFile:'subirArchivoDrive', documentFile:'obtenerArchivoDocumento', approveDocument:'aprobarDocumento', rejectDocument:'rechazarDocumento', updateLocationAddress:'actualizarDireccionUbicacion', restoreRolePermissions:'restaurarPermisosRoles', backupCatalog:'catalogoRespaldoBaseDatos', backupTable:'obtenerTablaRespaldoBaseDatos', runAutomaticAlerts:'ejecutarAlertasAutomaticas'
   });
@@ -996,6 +996,7 @@
       case 'createVehicleCheckin': return localCreateVehicleCheckin(payload);
       case 'reviewVehicleCheckin': return localReviewVehicleCheckin(payload);
       case 'availableCheckins': return localAvailableCheckins(payload);
+      case 'validateRouteCheckin': return localValidateRouteCheckin(payload);
       case 'validateVehicleQr': return localValidateVehicleQr(payload);
       case 'vehicleQrLabel': return localVehicleQrLabel(payload);
       case 'saveLocation': return localSaveLocation(payload);
@@ -1522,6 +1523,16 @@
     if(user.ROL_ID==='ROL-CONDUCTOR'){const own=localDriver(user);if(!own)throw new Error('CONDUCTOR_NO_ASOCIADO');driverId=own.ID;}
     const vehicleId=String(data.VEHICULO_ID||''),now=Date.now();let rows=activeRows(localDb.checkins).filter(row=>row.ESTADO_REVISION==='Aprobado'&&new Date(row.VIGENTE_HASTA||0).getTime()>now&&(!vehicleId||row.VEHICULO_ID===vehicleId)&&(!driverId||row.CONDUCTOR_ID===driverId));
     rows=localFilterRows('checkins',rows,user).sort((a,b)=>new Date(b.FECHA_HORA)-new Date(a.FECHA_HORA));return{rows:rows.slice(0,50).map(cleanRow),total:rows.length};
+  }
+  function localValidateRouteCheckin(payload){
+    const user=requireLocalUser(),data=payload.data||payload;requireLocalPermission(user,'RUTAS','CREAR');
+    const driverId=String(data.CONDUCTOR_ID||''),vehicleId=String(data.VEHICULO_ID||'');
+    if(!driverId||!vehicleId)return{VALIDO:false,valido:false,CODIGO:'CHECKIN_PAREJA_REQUERIDA',MENSAJE:'Seleccione conductor y vehículo para validar el Check-in.'};
+    const rows=activeRows(localDb.checkins).filter(row=>row.CONDUCTOR_ID===driverId&&row.VEHICULO_ID===vehicleId&&String(row.ESTADO_REVISION||'').toLowerCase()==='aprobado'&&new Date(row.VIGENTE_HASTA||0).getTime()>Date.now()).sort((a,b)=>new Date(b.FECHA_HORA||b.CREADO_EN||0)-new Date(a.FECHA_HORA||a.CREADO_EN||0));
+    const checkin=rows[0];
+    if(!checkin)return{VALIDO:false,valido:false,CODIGO:'CHECKIN_APROBADO_REQUERIDO',MENSAJE:'El conductor no posee un Check-in aprobado y vigente para el vehículo seleccionado.'};
+    const vehicle=find('vehicles',vehicleId)||{};
+    return{VALIDO:true,valido:true,CHECKIN_ID:checkin.ID,VIGENTE_HASTA:checkin.VIGENTE_HASTA,FECHA_CHECKIN:checkin.FECHA_HORA||checkin.CREADO_EN,PATENTE:vehicle.PATENTE||vehicleId,VEHICULO_ID:vehicleId,CONDUCTOR_ID:driverId,CHECKIN:cleanRow(checkin),MENSAJE:`Check-in vigente y aprobado para ${vehicle.PATENTE||vehicleId}.`};
   }
   function localValidateCheckinForOperation(checkinId,vehicleId,driverId){
     if(!checkinId)throw new Error('CHECKIN_REQUERIDO');const row=find('checkins',checkinId);if(!row)throw new Error('CHECKIN_NO_ENCONTRADO');
