@@ -18,13 +18,13 @@ def pack(files,dest,label):
     (out/dest).write_text(loader,encoding='utf-8')
     return dest, hashlib.sha256((out/dest).read_bytes()).hexdigest(), len(raw), (out/dest).stat().st_size
 bundles=[pack(['configuracion.js','conexion.js','acceso.js'],'sgf-login.438.js','LOGIN'),pack(['configuracion.js','conexion.js','menu-principal.js'],'sgf-shell.438.js','SHELL'),pack(['configuracion.js','mapa.js','conexion.js','jszip.min.js','qr-flotas.js','reportes-exportacion.js','aplicacion.js'],'sgf-module.438.js','MODULO')]
-p=out/'index.html';t=p.read_text();t=re.sub(r'<script src="configuracion\.js[^>]*></script>\s*<script src="conexion\.js[^>]*></script>\s*<script src="acceso\.js[^>]*></script>','<script src="sgf-login.438.js?v=sec2"></script>',t);p.write_text(t)
-p=out/'main.html';t=p.read_text();t=re.sub(r'<script src="configuracion\.js[^>]*></script>\s*<script src="conexion\.js[^>]*></script>\s*<script src="menu-principal\.js[^>]*></script>','<script src="sgf-shell.438.js?v=sec2"></script>',t);p.write_text(t)
+p=out/'index.html';t=p.read_text();t=re.sub(r'<script src="configuracion\.js[^>]*></script>\s*<script src="conexion\.js[^>]*></script>\s*<script src="acceso\.js[^>]*></script>','<script src="sgf-login.438.js?v=sec5-checkin24"></script>',t);p.write_text(t)
+p=out/'main.html';t=p.read_text();t=re.sub(r'<script src="configuracion\.js[^>]*></script>\s*<script src="conexion\.js[^>]*></script>\s*<script src="menu-principal\.js[^>]*></script>','<script src="sgf-shell.438.js?v=sec5-checkin24"></script>',t);p.write_text(t)
 for name in [x for x in htmls if x not in ('index.html','main.html')]:
     p=out/name;t=p.read_text()
     for js in ['configuracion.js','mapa.js','conexion.js','jszip.min.js','qr-flotas.js','reportes-exportacion.js']:
         t=re.sub(rf'\s*<script src="{re.escape(js)}[^>]*></script>','',t)
-    t=re.sub(r'<script src="aplicacion\.js[^>]*></script>','<script src="sgf-module.438.js?v=sec2"></script>',t)
+    t=re.sub(r'<script src="aplicacion\.js[^>]*></script>','<script src="sgf-module.438.js?v=sec5-checkin24"></script>',t)
     p.write_text(t)
 (out/'00_LEEME_SUBIR_ESTOS_ARCHIVOS.txt').write_text('''SGF WEB 4.3.8 - PRODUCCION SEGURA PLANA\n\nSuba TODOS estos archivos juntos en la raíz del sitio. No se requieren subcarpetas.\n\nProtecciones: módulos directos vuelven al login; ticket efímero por pestaña; validación API antes de abrir módulos; modo local deshabilitado en producción; postMessage limitado al iframe/origen; identidad y permisos solo se aceptan desde la API; JavaScript de negocio empaquetado/ofuscado sin source maps.\n\nNota: en un hosting estático el código que ejecuta el navegador nunca puede ser 100% secreto. La seguridad real está en la API, que valida sesión, rol, permisos y alcance.\n''',encoding='utf-8')
 lines=['SGF WEB PRODUCCION SEGURA PLANA 4.3.8','']+[f'{d} | SHA256 {h} | fuente {a} | distribuido {b}' for d,h,a,b in bundles]

@@ -16,7 +16,7 @@
 4. Si hay observaciones leves, Administrador o Supervisor revisa en `checkin-aprobaciones.html`.
 5. Una falla crítica bloquea la salida.
 6. El módulo Operaciones solo acepta un check-in aprobado, vigente, sin utilizar y coincidente.
-7. Al iniciar, el check-in queda vinculado a la operación y marcado como utilizado.
+7. Al iniciar, el check-in queda vinculado a la operación como referencia, pero continúa vigente por 24 horas para el mismo conductor y vehículo. Solo vence por tiempo o por reasignación del vehículo a otro conductor.
 8. La trazabilidad queda disponible en `checkin-historial.html`.
 
 ## Flujo de primera configuración
