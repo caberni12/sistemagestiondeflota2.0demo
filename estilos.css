@@ -5,22 +5,56 @@
   --sidebar-width:272px;--topbar-height:78px;
 }
 
-/* Publicación Android automática · SGF 4.3.12 */
-.app-update-upload-form .app-apk-drop{min-height:150px}
-.app-apk-metadata{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
-.app-apk-metadata>span{display:flex;flex-direction:column;gap:3px;min-width:0}
-.app-apk-metadata small{color:var(--muted,#63706d);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.app-apk-metadata b{overflow-wrap:anywhere}
-.app-apk-metadata .hash{grid-column:1/-1}
-.app-apk-metadata .hash b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
-.app-upload-progress{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
-.app-upload-progress-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:9px}
-.app-upload-progress-track{height:11px;overflow:hidden;border-radius:999px;background:#dfe9e7}
-.app-upload-progress-track i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0b756c,#30b39f);transition:width .2s ease}
-.app-upload-success{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #79c8a9;border-radius:14px;background:#effbf5;color:#125f43}
-.app-upload-success>i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#1b9366;color:white;font-style:normal;font-weight:800}
-.app-upload-success div{display:flex;flex-direction:column;gap:2px}
-@media(max-width:680px){.app-apk-metadata{grid-template-columns:1fr 1fr}.app-apk-metadata .hash{grid-column:1/-1}}
+/* Publicación Android automática · SGF 4.3.12 · ajuste estético responsive */
+.app-update-upload-form{min-width:0;width:100%;max-width:100%}
+.app-update-upload-form>*{min-width:0;max-width:100%}
+.app-update-upload-form .app-apk-drop{min-height:150px;width:100%;max-width:100%;overflow:hidden;padding-inline:clamp(16px,3vw,28px)}
+.app-update-upload-form .app-apk-drop :where(b,span){max-width:100%;overflow-wrap:anywhere;word-break:break-word;text-align:center}
+.app-update-upload-form .field{min-width:0;max-width:100%}
+.app-update-upload-form :where(input,select,textarea){min-width:0;max-width:100%}
+.app-update-upload-form textarea{resize:vertical;overflow-wrap:anywhere}
+.app-update-upload-form .form-actions{min-width:0;max-width:100%;display:flex;flex-wrap:wrap;gap:10px}
+.app-update-upload-form .form-actions .btn{max-width:100%;min-width:0;white-space:normal;text-align:center;line-height:1.25}
+.app-apk-metadata{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%;max-width:100%;min-width:0;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);overflow:hidden}
+.app-apk-metadata>span{display:flex;flex-direction:column;gap:3px;min-width:0;max-width:100%;padding:2px 4px}
+.app-apk-metadata small{color:var(--muted,#63706d);font-size:11px;text-transform:uppercase;letter-spacing:.06em;overflow-wrap:anywhere}
+.app-apk-metadata b{display:block;min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.app-apk-metadata .hash{grid-column:1/-1;padding-top:8px;border-top:1px solid var(--line)}
+.app-apk-metadata .hash b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;word-break:break-all}
+.app-upload-progress{min-width:0;max-width:100%;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);overflow:hidden}
+.app-upload-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:9px;min-width:0}
+.app-upload-progress-head b{min-width:0;flex:1;overflow-wrap:anywhere;word-break:break-word}
+.app-upload-progress-head span{flex:0 0 auto;white-space:nowrap}
+.app-upload-progress-track{height:11px;width:100%;max-width:100%;overflow:hidden;border-radius:999px;background:#dfe9e7}
+.app-upload-progress-track i{display:block;width:0;max-width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0b756c,#30b39f);transition:width .2s ease}
+.app-upload-success{display:flex;align-items:flex-start;gap:12px;min-width:0;max-width:100%;padding:14px;border:1px solid #79c8a9;border-radius:14px;background:#effbf5;color:#125f43;overflow:hidden}
+.app-upload-success>i{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:#1b9366;color:white;font-style:normal;font-weight:800}
+.app-upload-success div{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}
+.app-upload-success :where(b,span){overflow-wrap:anywhere;word-break:break-word}
+/* Las tarjetas del módulo nunca deben ensanchar el dashboard. */
+.content .dashboard-grid>.card:has(.app-update-upload-form){min-width:0;max-width:100%;overflow:hidden}
+.content .dashboard-grid>.card:has(.app-update-upload-form) .card-header{min-width:0;max-width:100%;gap:12px;flex-wrap:wrap}
+.content .dashboard-grid>.card:has(.app-update-upload-form) .card-header>div{min-width:0;flex:1 1 280px}
+.content .dashboard-grid>.card:has(.app-update-upload-form) .card-header :where(h3,p){overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:900px){
+  .app-apk-metadata{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .app-apk-metadata .hash{grid-column:1/-1}
+}
+@media(max-width:680px){
+  .app-update-upload-form .app-apk-drop{min-height:132px;padding:18px 14px}
+  .app-apk-metadata{grid-template-columns:1fr;gap:8px;padding:10px}
+  .app-apk-metadata .hash{grid-column:1}
+  .app-upload-progress-head{flex-direction:column;gap:5px}
+  .app-upload-success{align-items:flex-start}
+  .app-update-upload-form .form-actions{display:grid;width:100%}
+  .app-update-upload-form .form-actions .btn{width:100%}
+}
+@media(max-width:420px){
+  .app-apk-metadata{padding:9px;border-radius:12px}
+  .app-apk-metadata>span{padding:3px 2px}
+  .app-apk-metadata .hash b{font-size:10px}
+  .app-update-upload-form .app-apk-drop{min-height:120px}
+}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}img{max-width:100%}a{color:inherit}.hidden{display:none!important}.noscript{padding:12px;background:#8f2635;color:#fff;text-align:center}body.dark{--bg:var(--tema-fondo-oscuro,#071725);--surface:var(--tema-superficie-oscura,#0d2638);--surface-2:var(--tema-superficie-oscura-2,#102d42);--surface-3:var(--tema-superficie-oscura-3,#173a51);--text:var(--tema-texto-oscuro,#e9f1f7);--muted:var(--tema-texto-suave-oscuro,#9eb0bf);--line:var(--tema-borde-oscuro,#214359);--shadow:0 14px 40px rgba(0,0,0,.25)}body.modal-open{overflow:hidden}
 
 /* Authentication */
