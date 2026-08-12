@@ -676,3 +676,144 @@ body.dark .mapa-marcador>span>small{color:#b7c7d2}
 .route-multi-sequence{display:flex;gap:7px;overflow-x:auto;padding:2px 0 5px;scrollbar-width:thin}.route-stop{min-width:160px;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--border,#dce3ea);background:var(--card,#fff)}
 .route-stop i{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:.76rem;border:1px solid currentColor;flex:0 0 24px}.route-stop b{font-size:.8rem;line-height:1.2}.route-stop.done{opacity:.62}.route-stop.active{box-shadow:0 0 0 2px rgba(59,130,246,.18);font-weight:700}.route-stop.pending{opacity:.8}
 @media(max-width:640px){.route-stop{min-width:145px}.route-multi-summary{align-items:flex-start;flex-direction:column}}
+
+/* ========================================================================== */
+/* SGF Web 4.3.12 · UI estética 2 · Actualización de Aplicación              */
+/* Estado última publicación: filtros y tabla contenidos / responsive         */
+/* SOLO PRESENTACIÓN: no modifica JS, API, publicación APK ni datos.           */
+/* ========================================================================== */
+.modulo-actualizaciones-app .content,
+.modulo-actualizaciones-app .dashboard-grid,
+.modulo-actualizaciones-app .dashboard-grid > .card,
+.modulo-actualizaciones-app .card,
+.modulo-actualizaciones-app .table-wrap,
+.modulo-actualizaciones-app .advanced-filter-panel{
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+/* El filtro decide automáticamente cuántas columnas caben. Nunca comprime
+   un control por debajo de un ancho legible ni empuja la tarjeta hacia fuera. */
+.modulo-actualizaciones-app .advanced-filter-panel{
+  width:100%;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:12px;
+  padding:14px;
+  overflow:hidden;
+  align-items:end;
+}
+.modulo-actualizaciones-app .advanced-filter-panel label{
+  min-width:0;
+  width:100%;
+}
+.modulo-actualizaciones-app .advanced-filter-panel label > span{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.25;
+}
+.modulo-actualizaciones-app .advanced-filter-panel input,
+.modulo-actualizaciones-app .advanced-filter-panel select{
+  display:block;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  text-overflow:ellipsis;
+}
+.modulo-actualizaciones-app .advanced-filter-panel .btn{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  white-space:normal;
+  line-height:1.2;
+  min-height:40px;
+}
+.modulo-actualizaciones-app .advanced-filter-panel > [data-filter-count]{
+  grid-column:1/-1;
+  min-width:0;
+  text-align:left;
+  overflow-wrap:anywhere;
+}
+
+/* La tabla nunca invade el resto del módulo. En pantallas estrechas conserva
+   sus columnas y se desplaza únicamente dentro de su contenedor. */
+.modulo-actualizaciones-app .card > .table-wrap{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  scrollbar-width:thin;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--surface);
+}
+.modulo-actualizaciones-app .card > .table-wrap table{
+  width:100%;
+  min-width:780px;
+  max-width:none;
+  table-layout:auto;
+  white-space:nowrap;
+}
+.modulo-actualizaciones-app .card > .table-wrap th,
+.modulo-actualizaciones-app .card > .table-wrap td{
+  box-sizing:border-box;
+  vertical-align:middle;
+}
+.modulo-actualizaciones-app .card > .table-wrap td:first-child{
+  min-width:200px;
+  white-space:normal;
+}
+.modulo-actualizaciones-app .card > .table-wrap td:first-child .muted{
+  display:block;
+  margin-top:3px;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.modulo-actualizaciones-app .card > .table-wrap td:nth-child(2){min-width:125px}
+.modulo-actualizaciones-app .card > .table-wrap td:nth-child(3){min-width:150px}
+.modulo-actualizaciones-app .card > .table-wrap td:nth-child(4){min-width:150px;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+.modulo-actualizaciones-app .card > .table-wrap td:nth-child(5){min-width:160px}
+
+/* Separación visual más moderna del bloque de seguimiento. */
+.modulo-actualizaciones-app .dashboard-grid > .card{
+  overflow:hidden;
+}
+.modulo-actualizaciones-app .dashboard-grid > .card .card-header{
+  padding-bottom:4px;
+}
+.modulo-actualizaciones-app .dashboard-grid > .card .advanced-filter-panel{
+  margin-top:12px;
+}
+
+@media(max-width:760px){
+  .modulo-actualizaciones-app .advanced-filter-panel{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    padding:12px;
+  }
+  .modulo-actualizaciones-app .advanced-filter-panel label:nth-of-type(2){
+    grid-column:auto;
+  }
+  .modulo-actualizaciones-app .card > .table-wrap table{min-width:720px}
+}
+
+@media(max-width:520px){
+  .modulo-actualizaciones-app .advanced-filter-panel{
+    grid-template-columns:1fr;
+    gap:11px;
+    padding:12px;
+  }
+  .modulo-actualizaciones-app .advanced-filter-panel label,
+  .modulo-actualizaciones-app .advanced-filter-panel label:nth-of-type(2),
+  .modulo-actualizaciones-app .advanced-filter-panel .btn{
+    grid-column:1;
+  }
+  .modulo-actualizaciones-app .card > .table-wrap{
+    margin-inline:0;
+    border-radius:12px;
+  }
+  .modulo-actualizaciones-app .card > .table-wrap table{min-width:680px}
+}
