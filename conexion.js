@@ -8,7 +8,7 @@
     quickLoad:'cargaRapida',
     create:'crear', update:'actualizar', delete:'eliminar', startOperation:'iniciarOperacion',
     finishOperation:'finalizarOperacion', editOperationAdmin:'editarOperacionAdministrativa', deleteOperationAdmin:'eliminarOperacionAdministrativa', diagnoseAvailability:'diagnosticarDisponibilidad', saveLocation:'guardarUbicacion', latestLocations:'ultimasUbicaciones',
-    changePassword:'cambiarContrasena', updateProfilePhoto:'actualizarFotoPerfil', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
+    changePassword:'cambiarContrasena', updateProfilePhoto:'actualizarFotoPerfil', profilePhoto:'obtenerFotoPerfil', saveUserPermissions:'actualizarPermisosUsuario', saveCompany:'guardarEmpresa', saveOperationalPoint:'guardarPuntoOperacion', getOperationalPoint:'obtenerPuntoOperacion', clearOperationalData:'limpiarDatosOperativos',
     routeSyncState:'estadoSincronizacionRutas', assignRoute:'asignarRuta', reassignRoute:'reasignarRuta', startRoute:'iniciarRuta', completeRoute:'completarRuta', updateRouteStatus:'actualizarEstadoRuta', registerRouteEvidence:'registrarEvidenciaRuta', routeEvidenceImage:'obtenerImagenEvidenciaRuta', routeWeather:'climaRuta', sendNotification:'enviarNotificacion',
     readNotification:'marcarNotificacionLeida', pendingNotices:'avisosPendientes', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
@@ -61,7 +61,7 @@
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
-  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','connectionClientConfig','getConnectionConfig','testConnectionConfig','routeEvidenceImage','routeSyncState','backupCatalog','backupTable']);
+  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','connectionClientConfig','getConnectionConfig','testConnectionConfig','routeEvidenceImage','routeSyncState','backupCatalog','backupTable','profilePhoto']);
   const clientIpCacheKey = 'flotas_ip_publica_v1';
   const claveCachePersistente = config.CLAVE_CACHE_MODULOS_LOCAL || 'sistema_gestion_flotas_cache_modulos_v1';
   const accionesCachePersistente = new Set(['dashboard','operationsSummary','list','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint']);

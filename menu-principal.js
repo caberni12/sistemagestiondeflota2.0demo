@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.20';
+  const VERSION='4.3.21';
   const ORIGEN_MENSAJES=location.origin==='null'?'*':location.origin;
   const CLAVE_TICKET_SHELL='sgf_shell_ticket_v1';
   function crearTicketShell(){
@@ -182,12 +182,18 @@
     marco.src=`${modulo[3]}?v=${VERSION}&__sgf=${encodeURIComponent(ticketShell)}${recarga}`;
   }
 
+  async function cargarFotoPerfilMenu(){
+    const avatar=$('#avatarMenu');if(!avatar||!usuario)return;
+    avatar.textContent=iniciales(usuario.NOMBRE);avatar.classList.remove('con-foto');
+    if(!String(usuario.FOTO_PERFIL_RUTA||'').trim())return;
+    try{const result=await api.request('profilePhoto',{cache:false,force:true,data:{USUARIO_ID:usuario.ID}});const url=String(result.url||result.URL||'').trim();if(!url)return;avatar.innerHTML=`<img src="${url.replace(/"/g,'&quot;')}" alt="Foto de perfil">`;avatar.classList.add('con-foto');}catch(_){ }
+  }
   function aplicarUsuario(nuevoUsuario){
     usuario=nuevoUsuario||null;
     if(!usuario)return;
     $('#nombreUsuarioMenu').textContent=usuario.NOMBRE||'Usuario';
     $('#rolUsuarioMenu').textContent=usuario.ROL_NOMBRE||usuario.ROL_ID||'Usuario';
-    $('#avatarMenu').textContent=iniciales(usuario.NOMBRE);
+    $('#avatarMenu').textContent=iniciales(usuario.NOMBRE);cargarFotoPerfilMenu();
     construirMenu();
     programarInterruptorOficinaVirtual();
     actualizarInterruptorAvisosEmergentes();
