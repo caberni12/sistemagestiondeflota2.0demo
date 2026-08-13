@@ -159,6 +159,30 @@
     return { value: ((first & 0x7fff) << 16) | view.getUint16(offset + 2, true), bytes: 4 };
   }
 
+  function offsetConfirmado(response) {
+    const range = response && response.headers ? response.headers.get('Range') || '' : '';
+    const match = range.match(/bytes=0-(\d+)/i);
+    return match ? Number(match[1]) + 1 : 0;
+  }
+
+  async function consultarEstadoCarga(sessionUrl, totalBytes) {
+    const response = await fetch(sessionUrl, {
+      method: 'PUT',
+      headers: { 'Content-Range': `bytes */${totalBytes}` },
+      body: new Blob([]),
+      cache: 'no-store'
+    });
+    if (response.ok) {
+      const metadata = await response.json();
+      return { completa: true, offset: totalBytes, metadata };
+    }
+    if (response.status === 308)
+      return { completa: false, offset: offsetConfirmado(response), metadata: null };
+    if (response.status === 404 || response.status === 410)
+      throw new Error('SESION_DRIVE_EXPIRADA');
+    throw new Error(`DRIVE_ESTADO_HTTP_${response.status}`);
+  }
+
   async function uploadResumable(file, sessionUrl, onProgress) {
     if (!/^https:\/\/www\.googleapis\.com\/upload\/drive\//i.test(sessionUrl || ''))
       throw new Error('SESION_DRIVE_INVALIDA');
@@ -166,31 +190,55 @@
     let finalMetadata = null;
 
     while (offset < file.size) {
-      const endExclusive = Math.min(offset + CHUNK_BYTES, file.size);
-      const chunk = file.slice(offset, endExclusive, MIME_APK);
+      const startOffset = offset;
+      const endExclusive = Math.min(startOffset + CHUNK_BYTES, file.size);
+      const chunk = file.slice(startOffset, endExclusive, MIME_APK);
       let response = null;
-      for (let attempt = 0; attempt < 4; attempt++) {
+      let lastNetworkError = null;
+
+      for (let attempt = 0; attempt < 6; attempt++) {
         try {
           response = await fetch(sessionUrl, {
             method: 'PUT',
             headers: {
               'Content-Type': MIME_APK,
-              'Content-Range': `bytes ${offset}-${endExclusive - 1}/${file.size}`
+              'Content-Range': `bytes ${startOffset}-${endExclusive - 1}/${file.size}`
             },
             body: chunk,
             cache: 'no-store'
           });
-          if (response.status < 500) break;
+          if (response.status < 500 && response.status !== 429) break;
+          lastNetworkError = new Error(`DRIVE_CARGA_HTTP_${response.status}`);
         } catch (error) {
-          if (attempt === 3) throw error;
+          lastNetworkError = error;
         }
-        await delay(600 * Math.pow(2, attempt));
+
+        emit(onProgress, 'RECUPERACION_DRIVE', 18 + Math.round((offset / file.size) * 72),
+          `Conexión interrumpida. Recuperando carga… intento ${attempt + 1}/6`);
+        try {
+          const estado = await consultarEstadoCarga(sessionUrl, file.size);
+          if (estado.completa && estado.metadata && estado.metadata.id)
+            return estado.metadata;
+          if (estado.offset !== startOffset) {
+            offset = estado.offset;
+            response = null;
+            break;
+          }
+        } catch (statusError) {
+          lastNetworkError = statusError;
+        }
+        await delay(800 * Math.pow(2, attempt));
       }
-      if (!response) throw new Error('DRIVE_SIN_RESPUESTA');
+
+      if (offset !== startOffset) continue;
+      if (!response) {
+        const error = new Error('DRIVE_CARGA_INTERRUMPIDA_RECUPERABLE');
+        error.cause = lastNetworkError;
+        throw error;
+      }
       if (response.status === 308) {
-        const range = response.headers.get('Range') || '';
-        const match = range.match(/bytes=0-(\d+)/i);
-        offset = match ? Number(match[1]) + 1 : endExclusive;
+        offset = offsetConfirmado(response);
+        if (offset <= startOffset) throw new Error('DRIVE_NO_CONFIRMACION_DEL_BLOQUE');
       } else if (response.ok) {
         finalMetadata = await response.json();
         offset = file.size;
@@ -199,10 +247,15 @@
       }
       const uploadPercent = file.size ? offset / file.size : 0;
       emit(onProgress, 'CARGA_DRIVE', 18 + Math.round(uploadPercent * 72),
-        `Subiendo a Google Drive… ${Math.round(uploadPercent * 100)}%`);
+        `Subiendo archivo de forma segura… ${Math.round(uploadPercent * 100)}%`);
     }
     if (!finalMetadata || !finalMetadata.id) throw new Error('DRIVE_NO_DEVOLVIO_FILE_ID');
     return finalMetadata;
+  }
+
+  function errorRecuperableConfirmacion(error) {
+    const message = String(error && error.message ? error.message : error || '');
+    return /Failed to fetch|NetworkError|Load failed|TIEMPO_DE_ESPERA|SIN_CONEXION|CONEXION.*NO_DISPONIBLE|HTTP_(?:408|429|5\d\d)|RESPUESTA_NO_VALIDA|CARGA_DRIVE_AUN_NO_CONFIRMADA/i.test(message);
   }
 
   async function publish(options) {
@@ -225,23 +278,54 @@
       NOTAS: String(options.notes || '').trim()
     };
 
-    emit(onProgress, 'PREPARACION', 19, 'Preparando la sesión segura de Drive…');
+    emit(onProgress, 'PREPARACION', 19, 'Preparando la carga segura…');
     const prepared = await api.request('prepararCargaActualizacionAndroid', { data: common });
     const sessionUrl = prepared.sessionUrl || prepared.SESSION_URL;
     const uploadId = prepared.uploadId || prepared.UPLOAD_ID;
     if (!sessionUrl || !uploadId) throw new Error('API_NO_ENTREGO_SESION_DRIVE');
 
-    const driveFile = await uploadResumable(file, sessionUrl, onProgress);
+    let driveFile = null;
+    let uploadError = null;
+    try {
+      driveFile = await uploadResumable(file, sessionUrl, onProgress);
+    } catch (error) {
+      uploadError = error;
+      emit(onProgress, 'RECUPERACION_DRIVE', 91,
+        'Verificando si el archivo fue completado…');
+    }
+
     emit(onProgress, 'VERIFICACION', 93, 'Verificando carpeta, tamaño y acceso público…');
-    const result = await api.request('confirmarPublicacionActualizacionAndroid', {
-      data: Object.assign({}, common, {
-        UPLOAD_ID: uploadId,
-        DRIVE_FILE_ID: driveFile.id
-      })
-    });
+    let result = null;
+    let confirmError = null;
+    const maxConfirmAttempts = 4;
+    for (let attempt = 0; attempt < maxConfirmAttempts; attempt++) {
+      try {
+        result = await api.request('confirmarPublicacionActualizacionAndroid', {
+          data: Object.assign({}, common, {
+            UPLOAD_ID: uploadId,
+            DRIVE_FILE_ID: driveFile && driveFile.id ? driveFile.id : '',
+            RECUPERAR_DRIVE: uploadError ? 'SI' : 'NO'
+          })
+        });
+        break;
+      } catch (error) {
+        confirmError = error;
+        if (!errorRecuperableConfirmacion(error)) throw error;
+        if (attempt + 1 < maxConfirmAttempts) {
+          emit(onProgress, 'RECUPERACION_DRIVE', 92,
+            `Confirmando publicación… intento ${attempt + 2}/${maxConfirmAttempts}`);
+          await delay(1500 * (attempt + 1));
+        }
+      }
+    }
+    if (!result) {
+      if (uploadError) throw new Error('CARGA_DRIVE_INTERRUMPIDA_REINTENTE');
+      if (confirmError) throw new Error('CONFIRMACION_SERVIDOR_INTERRUMPIDA_REINTENTE');
+      throw new Error('PUBLICACION_NO_CONFIRMADA');
+    }
     if (!result || result.persistenciaConfirmada !== true) throw new Error('PUBLICACION_NO_CONFIRMADA');
     emit(onProgress, 'COMPLETA', 100, 'Publicada correctamente. Notificaciones enviadas.');
-    return Object.assign({ metadata: meta, driveFile }, result);
+    return Object.assign({ metadata: meta, driveFile: driveFile || result.drive || null }, result);
   }
 
   function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }

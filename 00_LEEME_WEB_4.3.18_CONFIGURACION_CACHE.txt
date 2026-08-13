@@ -1,0 +1,5 @@
+WEB 4.3.18 - CORRECCIÓN DEFINITIVA CONFIGURACIÓN
+
+Suba WEB_PRODUCCION_PLANA completo. Esta versión cambia físicamente los nombres de los bundles y actualiza el identificador del iframe a 4.3.18 para impedir que el navegador reutilice la versión antigua del módulo Configuración.
+
+No requiere SQL ni cambios en Android o flotas-api.

@@ -13,6 +13,7 @@
     readNotification:'marcarNotificacionLeida', pendingNotices:'avisosPendientes', assignmentAlerts:'listarAvisosAsignacion', respondAssignmentAlert:'responderAvisoAsignacion', resendAssignmentAlert:'reenviarAvisoAsignacion', readAlert:'marcarAlertaLeida', heartbeat:'actualizarConexion', realtimeSummary:'resumenTiempoReal', connectionsOnline:'resumenConexionesAdministrador', saveConnectionTracking:'guardarSeguimientoConexionUsuario',
     connectionTrackingLive:'seguimientoConexionTiempoReal', sendConnectionsNotice:'enviarAvisoConexiones', disconnectConnectedUser:'desconectarUsuarioConectado',
     diagnoseSystem:'diagnosticoSistema', repairSystem:'repararSistema',
+    connectionClientConfig:'configuracionConexionCliente', getConnectionConfig:'obtenerConfiguracionConexiones', saveConnectionConfig:'guardarConfiguracionConexiones', testConnectionConfig:'probarConfiguracionConexiones',
     officeQuickStatus:'estadoRapidoOficinaVirtual', officeTasks:'pendientesOficinaVirtual',
     officeStatus:'estadoOficinaVirtual', officeAsk:'consultarOficinaVirtual', officeAutoMode:'configurarModoOficinaVirtual',
     officeRun:'ejecutarRevisionOficinaVirtual', officeRepair:'repararOficinaVirtual', officeUploadDocument:'cargarDocumentoOficinaVirtual', officeReportFailure:'informarFallaOficinaVirtual', officeGenerateReport:'generarReporteOficinaVirtual', officeIncidents:'listarIncidentesOficinaVirtual', officeResolveIncident:'resolverIncidenteOficinaVirtual',
@@ -60,7 +61,7 @@
   const qrAuthorizations = new Map();
   const cacheRespuestas = new Map();
   const solicitudesPendientes = new Map();
-  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','routeEvidenceImage','routeSyncState','backupCatalog','backupTable']);
+  const accionesLectura = new Set(['status','me','dashboard','operationsSummary','reportsKpiSummary','reportsKpiDetail','list','assignmentAlerts','realtimeSummary','connectionsOnline','connectionTrackingLive','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint','fuelSummary','connectionClientConfig','getConnectionConfig','testConnectionConfig','routeEvidenceImage','routeSyncState','backupCatalog','backupTable']);
   const clientIpCacheKey = 'flotas_ip_publica_v1';
   const claveCachePersistente = config.CLAVE_CACHE_MODULOS_LOCAL || 'sistema_gestion_flotas_cache_modulos_v1';
   const accionesCachePersistente = new Set(['dashboard','operationsSummary','list','diagnoseSystem','officeQuickStatus','officeTasks','officeStatus','officeIncidents','getOperationalPoint']);
@@ -129,6 +130,55 @@
     } catch (_) { return false; }
   }
 
+  const claveConfiguracionConexionesLocal = config.CLAVE_CONFIGURACION_CONEXIONES_LOCAL || 'sistema_gestion_flotas_configuracion_conexiones_v1';
+  function cargarConfiguracionConexionesLocal() {
+    try {
+      const guardada = JSON.parse(localStorage.getItem(claveConfiguracionConexionesLocal) || 'null');
+      if (!guardada || typeof guardada !== 'object') return null;
+      const directorioUrl = urlHttpsValida(guardada.directorioUrl) ? String(guardada.directorioUrl).trim() : '';
+      const apiRespaldoUrl = urlHttpsValida(guardada.apiRespaldoUrl) ? String(guardada.apiRespaldoUrl).trim() : '';
+      if (!directorioUrl && !apiRespaldoUrl) return null;
+      return { directorioUrl, apiRespaldoUrl, version:Number(guardada.version || 0), guardadaEn:String(guardada.guardadaEn || '') };
+    } catch (_) { return null; }
+  }
+  let configuracionConexionesLocal = cargarConfiguracionConexionesLocal();
+  function direccionDirectorioActual() {
+    if (configuracionConexionesLocal?.directorioUrl && urlHttpsValida(configuracionConexionesLocal.directorioUrl)) return configuracionConexionesLocal.directorioUrl;
+    return String(config.DIRECTORIO_EMPRESAS_URL || '').trim();
+  }
+  function obtenerConfiguracionConexionesLocal() {
+    return {
+      directorioUrl: direccionDirectorioActual(),
+      apiRespaldoUrl: configuracionConexionesLocal?.apiRespaldoUrl || '',
+      version: Number(configuracionConexionesLocal?.version || 0),
+      guardadaEn: configuracionConexionesLocal?.guardadaEn || '',
+      usaPredeterminado: !(configuracionConexionesLocal?.directorioUrl && urlHttpsValida(configuracionConexionesLocal.directorioUrl))
+    };
+  }
+  function aplicarConfiguracionConexionCliente(datos = {}, {forzar=false} = {}) {
+    const cfg = datos.configuracion || datos.CONFIGURACION || datos;
+    const directorioUrl = String(cfg.DIRECTORIO_URL || cfg.directorioUrl || '').trim();
+    const apiRespaldoUrl = String(cfg.API_RESPALDO_URL || cfg.apiRespaldoUrl || '').trim();
+    const version = Math.max(0, Number(cfg.VERSION_CONFIG || cfg.version || 0));
+    if (!urlHttpsValida(directorioUrl)) throw new Error('DIRECTORIO_URL_HTTPS_REQUERIDA');
+    if (apiRespaldoUrl && !urlHttpsValida(apiRespaldoUrl)) throw new Error('API_RESPALDO_URL_HTTPS_REQUERIDA');
+    const actual = obtenerConfiguracionConexionesLocal();
+    if (!forzar && actual.version > 0 && version > 0 && version < actual.version) return actual;
+    configuracionConexionesLocal = { directorioUrl, apiRespaldoUrl, version, guardadaEn:new Date().toISOString() };
+    localStorage.setItem(claveConfiguracionConexionesLocal, JSON.stringify(configuracionConexionesLocal));
+    window.dispatchEvent(new CustomEvent('flotas:configuracion-conexion-cambiada', { detail:obtenerConfiguracionConexionesLocal() }));
+    return obtenerConfiguracionConexionesLocal();
+  }
+  function guardarDirectorioConexionLocal(url, {apiRespaldoUrl='',version=0} = {}) {
+    return aplicarConfiguracionConexionCliente({DIRECTORIO_URL:url,API_RESPALDO_URL:apiRespaldoUrl,VERSION_CONFIG:version},{forzar:true});
+  }
+  function restaurarDirectorioPredeterminado() {
+    configuracionConexionesLocal = null;
+    localStorage.removeItem(claveConfiguracionConexionesLocal);
+    window.dispatchEvent(new CustomEvent('flotas:configuracion-conexion-cambiada', { detail:obtenerConfiguracionConexionesLocal() }));
+    return obtenerConfiguracionConexionesLocal();
+  }
+
   function cargarConexionEmpresa() {
     try {
       const guardada = JSON.parse(localStorage.getItem(config.CLAVE_CONEXION_EMPRESA) || 'null');
@@ -143,7 +193,7 @@
   }
 
   function directorioEmpresasConfigurado() {
-    const direccion = String(config.DIRECTORIO_EMPRESAS_URL || '').trim();
+    const direccion = direccionDirectorioActual();
     return urlHttpsValida(direccion) && !direccion.includes('REEMPLAZAR_');
   }
 
@@ -192,7 +242,7 @@
       };
       window[callback] = datos => finalizar(null, datos);
       script.onerror = () => finalizar(new Error('DIRECTORIO_EMPRESAS_NO_DISPONIBLE'));
-      const direccion = new URL(config.DIRECTORIO_EMPRESAS_URL);
+      const direccion = new URL(direccionDirectorioActual());
       direccion.searchParams.set('accion', 'resolverConexion');
       direccion.searchParams.set('rut', rut);
       direccion.searchParams.set('callback', callback);
@@ -273,6 +323,17 @@
     // de ACTIVA/BLOQUEADA se realiza por separado al abrir el acceso y justo
     // antes de crear una nueva sesión.
     return obtenerConexionEmpresa();
+  }
+
+  async function sincronizarConfiguracionConexionServidor({silencioso=true}={}) {
+    if (!auth?.token || !isRemote()) return obtenerConfiguracionConexionesLocal();
+    try {
+      const resultado = await request('connectionClientConfig',{cache:false,force:true});
+      if (resultado?.configuracion) return aplicarConfiguracionConexionCliente(resultado.configuracion);
+    } catch (error) {
+      if (!silencioso) throw error;
+    }
+    return obtenerConfiguracionConexionesLocal();
   }
 
   function borrarConexionEmpresa() {
@@ -802,10 +863,13 @@
     if (!direccionAplicacion) throw new Error('CONEXION_EMPRESA_REQUERIDA');
     const controller = new AbortController();
     const timeoutOperaciones=new Set(['operationsSummary','startOperation','finishOperation','editOperationAdmin','deleteOperationAdmin','startRoute','completeRoute','updateRouteStatus','uploadDriveFile','routeEvidenceImage','bulkImport']);
+    const timeoutPublicacionAndroid=new Set(['prepararCargaActualizacionAndroid','confirmarPublicacionActualizacionAndroid']);
     const timeout=action==='connectionTrackingLive'
       ? Number(config.TIEMPO_ESPERA_SEGUIMIENTO_CONEXION_MILISEGUNDOS||8000)
       : action==='connectionsOnline'
       ? Number(config.TIEMPO_ESPERA_CONEXIONES_MILISEGUNDOS||15000)
+      : timeoutPublicacionAndroid.has(action)
+        ? Number(config.TIEMPO_ESPERA_PUBLICACION_ANDROID_MILISEGUNDOS||180000)
       : action==='bulkImport'
         ? Number(config.TIEMPO_ESPERA_IMPORTACION_MILISEGUNDOS||120000)
         : timeoutOperaciones.has(action)
@@ -2213,6 +2277,11 @@
     resolverConexionEmpresa,
     validarEmpresaActivaParaAcceso,
     sincronizarConexionEmpresa,
+    sincronizarConfiguracionConexionServidor,
+    getConfiguracionConexionesLocal: obtenerConfiguracionConexionesLocal,
+    aplicarConfiguracionConexionCliente,
+    guardarDirectorioConexionLocal,
+    restaurarDirectorioPredeterminado,
     borrarConexionEmpresa,
     cacheInfo: informacionCache,
     latestCacheUpdate: ultimaActualizacionCache,

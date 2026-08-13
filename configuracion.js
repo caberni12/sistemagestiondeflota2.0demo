@@ -3,14 +3,15 @@
  * Conexión rápida a Base de Datos central.
  */
 window.CONFIGURACION_FLOTAS = Object.freeze({
-  VERSION: '4.3.12',
+  VERSION: '4.3.18',
   GPS_AUTOMATICO_OBLIGATORIO: true,
   MODO: 'produccion',
   PRODUCCION_SEGURA: true,
   PERMITIR_MODO_LOCAL: false,
   MODO_MODULAR: true,
   DIRECCION_APLICACION: '',
-  DIRECTORIO_EMPRESAS_URL: 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec',
+  DIRECTORIO_EMPRESAS_URL: 'https://script.google.com/macros/s/AKfycbyPAsAMUmGzYTMKmOxaKGoOvYbHVAzfpy2FFPXiz-7iYZWju_sYkJNSV0H1JYnkjd0lag/exec',
+  CLAVE_CONFIGURACION_CONEXIONES_LOCAL: 'sistema_gestion_flotas_configuracion_conexiones_v1',
   DIRECTORIO_EMPRESAS_OBLIGATORIO: true,
   CLAVE_CONEXION_EMPRESA: 'sistema_gestion_flotas_conexion_empresa_v1',
   TIEMPO_ESPERA_DIRECTORIO_MILISEGUNDOS: 18000,

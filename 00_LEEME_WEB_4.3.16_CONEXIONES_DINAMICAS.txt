@@ -1,0 +1,14 @@
+SGF WEB 4.3.16 - OFICIAL
+
+HOTFIX VISUAL REPORTES
+- Corrige Distribución por estado: anillo completo dentro de la tarjeta.
+- Centro del gráfico anclado correctamente.
+- Responsive compacto en escritorio, tablet y móvil.
+- Hasta 560 px mantiene gráfico + leyenda lado a lado cuando hay espacio.
+- En pantallas muy estrechas se apila sin recortar.
+- Conserva hover, click y touch.
+- No cambia cálculos, API, SQL, permisos ni datos.
+
+COMPATIBILIDAD OFICIAL
+- flotas-api 4.3.16
+- Android 3.4.17

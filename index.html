@@ -11,10 +11,10 @@
   <meta name="description" content="Acceso al Sistema de Gestión de Flotas">
   <title>Iniciar sesión · Sistema de Gestión de Flotas</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="acceso.css?v=4.2.50-ui11">
-  <link rel="stylesheet" href="responsive.css?v=4.2.50-ui11">
-  <link rel="stylesheet" href="interfaz-moderna.css?v=4.2.50-ui11">
-  <script src="tema.js?v=4.2.50-ui11"></script>
+  <link rel="stylesheet" href="acceso.css?v=4.3.18-cache-final">
+  <link rel="stylesheet" href="responsive.css?v=4.3.18-cache-final">
+  <link rel="stylesheet" href="interfaz-moderna.css?v=4.3.18-cache-final">
+  <script src="tema.js?v=4.3.18-cache-final"></script>
 </head>
 <body>
   <noscript><div class="aviso-sin-js">Debe habilitar JavaScript para iniciar sesión.</div></noscript>
@@ -118,7 +118,27 @@
       </form>
     </section>
   </main>
+  <dialog class="dialogo-conexion-avanzada" id="dialogoConexionAvanzada">
+    <form method="dialog" id="formularioConexionAvanzada" class="conexion-avanzada-form">
+      <div class="encabezado-formulario">
+        <span class="etiqueta">RECUPERACIÓN DE CONEXIÓN</span>
+        <h2>Directorio de conexión</h2>
+        <p>Use esta opción solo cuando cambie la dirección del directorio. Quedará guardada en este dispositivo y ya no requiere modificar el código.</p>
+      </div>
+      <div class="mensaje-formulario oculto" id="mensajeConexionAvanzada" role="alert"></div>
+      <label class="campo"><span>Dirección HTTPS del directorio</span><input id="urlDirectorioAvanzada" name="urlDirectorio" type="url" inputmode="url" autocomplete="off" required placeholder="https://.../exec"></label>
+      <label class="aceptacion-preconfig"><input id="confirmarCambioDirectorio" type="checkbox" required><span>Confirmo que esta dirección corresponde al directorio autorizado del sistema.</span></label>
+      <div class="acciones-dialogo-conexion">
+        <button class="boton-enlace" id="restaurarDirectorio" type="button">Restaurar dirección predeterminada</button>
+        <button class="boton-enlace" value="cancel" type="button" id="cerrarConexionAvanzada">Cancelar</button>
+        <button class="boton-principal" id="guardarConexionAvanzada" type="submit">Guardar conexión</button>
+      </div>
+      <small class="detalle-servicio">La dirección queda guardada únicamente en este dispositivo. Al iniciar sesión, Administración puede sincronizar el perfil central.</small>
+    </form>
+  </dialog>
 
-  <script src="sgf-login.439.js?v=sec11-reportes-donut-fix"></script>
+  <script src="configuracion.js?v=4.3.18-cache-final"></script>
+  <script src="conexion.js?v=4.3.18-cache-final"></script>
+  <script src="acceso.js?v=4.3.18-cache-final"></script>
 </body>
 </html>

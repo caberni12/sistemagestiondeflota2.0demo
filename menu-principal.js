@@ -2,7 +2,7 @@
   'use strict';
   const $=(selector,root=document)=>root.querySelector(selector);
   const api=window.ConexionFlotas;
-  const VERSION='4.3.12';
+  const VERSION='4.3.18';
   const ORIGEN_MENSAJES=location.origin==='null'?'*':location.origin;
   const CLAVE_TICKET_SHELL='sgf_shell_ticket_v1';
   function crearTicketShell(){

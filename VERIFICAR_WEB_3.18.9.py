@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 root = Path(__file__).resolve().parent
-url = 'https://script.google.com/macros/s/AKfycbwQ84N6sYM5QLL05N_fB5YRvtayf5EIzABP9nZbrLoE5aKTEBPcaxHG1XXRuoe-1ss60w/exec'
+url = 'https://script.google.com/macros/s/AKfycbyPAsAMUmGzYTMKmOxaKGoOvYbHVAzfpy2FFPXiz-7iYZWju_sYkJNSV0H1JYnkjd0lag/exec'
 errors = []
 config = (root / 'configuracion.js').read_text(encoding='utf-8')
 code = (root / 'Codigo_Completo.gs').read_text(encoding='utf-8')
