@@ -145,6 +145,7 @@
   let routeSyncRevision = '';
   let routeSyncPendingRefresh = false;
   let routeSyncRequestPending = false;
+  let routeSyncActiveIds = '';
   const routeSyncSections = new Set(['dashboard','routes','operations','vehicles','drivers','checkin','fuel','notifications','history','reports']);
   const bloquearRefrescoVisualTemporal = (milisegundos=8000) => { bloqueoRefrescoVisualHasta = Math.max(bloqueoRefrescoVisualHasta, Date.now()+Math.max(500,Number(milisegundos)||0)); };
   const hayEdicionUsuarioActiva = () => {
@@ -430,7 +431,7 @@
     const base=`${parts.day}/${parts.month}/${parts.year}`;
     return time?`${base}:${parts.hour}:${parts.minute}`:base;
   };
-  // Compatibilidad 4.3.19: evita que cualquier bloque legado que aún invoque formatDate detenga Configuración.
+  // Compatibilidad 4.3.20: evita que cualquier bloque legado que aún invoque formatDate detenga Configuración.
   const formatDate = fmtDate;
   const fechaVisualIso = (value, time = false) => {
     const raw=String(value||'').trim();if(!raw)return '';
@@ -826,17 +827,28 @@
     $('#modalBody').innerHTML=`<label class="assignment-alert-switch"><input type="checkbox" data-assignment-voice-toggle ${vozAsignacionesActiva()?'checked':''}><i></i><span><b>Voz de nuevas asignaciones</b><small>Puede silenciarla; la tarjeta emergente, la campanita y los avisos pendientes seguirán activos.</small></span></label><div class="notification-center-summary"><div class="info-item"><span>Notificaciones pendientes</span><b>${notifications.length}</b></div><div class="info-item"><span>Alertas pendientes</span><b>${alerts.length}</b></div></div><div class="notification-dashboard"><article class="card"><div class="card-header"><div><h3>Notificaciones</h3><p>Mensajes dirigidos a su usuario.</p></div></div><div class="notification-list">${notificationRows||empty('✓','Sin notificaciones','No hay mensajes pendientes.')}</div><button class="btn soft full" type="button" data-center-nav="notifications">Abrir notificaciones</button></article><article class="card"><div class="card-header"><div><h3>Alertas</h3><p>Eventos generados automáticamente por el sistema.</p></div></div><div class="notification-list">${alertRows||empty('✓','Sin alertas','No hay alertas pendientes.')}</div><button class="btn soft full" type="button" data-center-nav="alerts">Abrir alertas</button></article></div>`;
     openModal();$('[data-assignment-voice-toggle]',$('#modalBody'))?.addEventListener('change',event=>{const activa=event.target.checked;if(!guardarVozAsignaciones(activa)){event.target.checked=!activa;toast('No se pudo guardar','La preferencia de voz no pudo guardarse en este navegador.','error');return;}toast(activa?'Voz activada':'Voz silenciada',activa?'Las nuevas asignaciones también se anunciarán por voz.':'Las alertas visuales y pendientes continuarán funcionando.');});$$('[data-center-nav]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{closeModal();navigateSection(button.dataset.centerNav);}));$$('[data-read-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readNotification(button.dataset.readNotification))));$$('[data-accept-assignment]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Aceptando…',()=>responderAvisoAsignacionWeb({ID:button.dataset.acceptAssignment},'ACEPTADA',button))));$$('[data-checkin-route-notification]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>{const item=notifications.find(row=>String(row.ID)===String(button.dataset.checkinRouteNotification));if(item?.CHECKIN_ID)openCheckinDetailModal(item.CHECKIN_ID,{notificacion:item});}));$$('[data-read-alert]',$('#modalBody')).forEach(button=>button.addEventListener('click',()=>conCargaBoton(button,'Actualizando…',()=>readAlert(button.dataset.readAlert))));
   }
-  function stopRouteRealtimeSync(){if(routeSyncTimer)clearTimeout(routeSyncTimer);routeSyncTimer=null;routeSyncRequestPending=false;routeSyncPendingRefresh=false;routeSyncRevision='';}
+  function stopRouteRealtimeSync(){if(routeSyncTimer)clearTimeout(routeSyncTimer);routeSyncTimer=null;routeSyncRequestPending=false;routeSyncPendingRefresh=false;routeSyncRevision='';routeSyncActiveIds='';}
   function scheduleRouteRealtimeSync(delay){if(routeSyncTimer)clearTimeout(routeSyncTimer);routeSyncTimer=setTimeout(routeRealtimeSyncTick,Math.max(500,Number(delay)||1000));}
-  async function refreshVisibleSectionAfterRouteChange(info={}){
+  function depurarContextoRutaReasignadaWeb(info={}){
+    if(String(currentUser?.ROL_ID||'').toUpperCase()!=='ROL-CONDUCTOR')return false;
+    const activas=Array.isArray(info.RUTAS_ACTIVAS_IDS)?info.RUTAS_ACTIVAS_IDS.map(String):[];
+    let depurado=false;
+    const rutaSeguida=String(routeTrackingContext?.RUTA_ID||'');
+    if(rutaSeguida&&!activas.includes(rutaSeguida)){guardarContextoSeguimientoRuta(null);depurado=true;}
+    const pendiente=leerJsonLocal(pendingRouteCheckinKey),rutaPendiente=String(pendiente?.RUTA_ID||'');
+    if(rutaPendiente&&!activas.includes(rutaPendiente)){try{localStorage.removeItem(pendingRouteCheckinKey);}catch(_){}depurado=true;}
+    if(depurado){assignmentAlertQueue=assignmentAlertQueue.filter(item=>!item?.RUTA_ID||activas.includes(String(item.RUTA_ID)));if(currentSection==='routes')closeModal();}
+    return depurado;
+  }
+  async function refreshVisibleSectionAfterRouteChange(info={},forzar=false){
     invalidarListasFormulario('routes','vehicles','drivers','operations','notifications','checkins','fuel');
     ['routes','dashboard','operations','vehicles','drivers','checkin','fuel','notifications'].forEach(section=>cacheVistasModulo.delete(section));
     if(!routeSyncSections.has(currentSection))return;
-    if(hayInteraccionVisualActiva()){routeSyncPendingRefresh=true;setSave(`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea · refresco pendiente`);return;}
+    if(hayInteraccionVisualActiva()&&!forzar){routeSyncPendingRefresh=true;setSave(`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea · refresco pendiente`);return;}
     routeSyncPendingRefresh=false;
     await actualizarSeccionEnSegundoPlano(currentSection);
     refreshNotificationBadge().catch(()=>{});
-    setSave(`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea`);
+    setSave(forzar?'Asignación de ruta actualizada inmediatamente':`Ruta ${info.ULTIMA_RUTA_ID||''} actualizada en línea`);
   }
   async function routeRealtimeSyncTick(){
     routeSyncTimer=null;
@@ -849,8 +861,14 @@
     try{
       const info=await api.request('routeSyncState',{cache:false,force:true});
       const revision=String(info?.REVISION||info?.revision||'');
+      const esConductor=String(currentUser?.ROL_ID||'').toUpperCase()==='ROL-CONDUCTOR';
+      const idsActivos=esConductor&&Array.isArray(info?.RUTAS_ACTIVAS_IDS)?info.RUTAS_ACTIVAS_IDS.map(String).sort():[];
+      const firmaIds=esConductor?idsActivos.join('|'):'';
+      let cambioPropiedad=false;
+      if(esConductor){if(routeSyncActiveIds==='')routeSyncActiveIds=firmaIds;else if(firmaIds!==routeSyncActiveIds){routeSyncActiveIds=firmaIds;cambioPropiedad=true;depurarContextoRutaReasignadaWeb(info||{});}}
       if(!routeSyncRevision){routeSyncRevision=revision;}
-      else if(revision&&revision!==routeSyncRevision){routeSyncRevision=revision;await refreshVisibleSectionAfterRouteChange(info||{});}
+      else if(revision&&revision!==routeSyncRevision){routeSyncRevision=revision;await refreshVisibleSectionAfterRouteChange(info||{},cambioPropiedad);}
+      else if(cambioPropiedad){await refreshVisibleSectionAfterRouteChange(info||{},true);}
     }catch(error){if(api.isAuthError?.(error)){forceLogout();return;}}
     finally{routeSyncRequestPending=false;}
     scheduleRouteRealtimeSync(interval);
