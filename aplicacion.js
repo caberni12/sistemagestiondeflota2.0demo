@@ -323,6 +323,7 @@
     ['RUTAS','INICIAR',"Iniciar ruta"],
     ['RUTAS','COMPLETAR',"Completar ruta"],
     ['RUTAS','CANCELAR',"Cancelar ruta"],
+    ['RUTAS','REASIGNAR',"Reasignar ruta por contingencia"],
     ['RUTAS','CARGAR_EVIDENCIA',"Cargar respaldo fotográfico"],
     ['COMBUSTIBLE','REGISTRAR',"Registrar carga de combustible"],
     ['COMBUSTIBLE','EDITAR',"Editar carga de combustible"],
@@ -429,7 +430,7 @@
     const base=`${parts.day}/${parts.month}/${parts.year}`;
     return time?`${base}:${parts.hour}:${parts.minute}`:base;
   };
-  // Compatibilidad 4.3.18: evita que cualquier bloque legado que aún invoque formatDate detenga Configuración.
+  // Compatibilidad 4.3.19: evita que cualquier bloque legado que aún invoque formatDate detenga Configuración.
   const formatDate = fmtDate;
   const fechaVisualIso = (value, time = false) => {
     const raw=String(value||'').trim();if(!raw)return '';
@@ -1418,6 +1419,7 @@
     if(id&&state==='Asignada'&&canStart)actions.push(`<button class="btn primary small" type="button" data-route-state="${esc(id)}:En curso">Iniciar ruta</button>`);
     if(id&&['Asignada','En curso'].includes(state)&&canComplete)actions.push(`<button class="btn primary small" type="button" data-route-state="${esc(id)}:Completada" title="Disponible siempre. Si finaliza antes del destino, el sistema registrará auditoría y alertará a los roles autorizados.">Completar ruta</button>`);
     if(id&&['Asignada','En curso'].includes(state)&&canCancel)actions.push(`<button class="btn danger small" type="button" data-route-state="${esc(id)}:Cancelada">Cancelar</button>`);
+    if(id&&['Asignada','En curso'].includes(state)&&hasPermission('RUTAS','REASIGNAR'))actions.push(`<button class="btn soft small" type="button" data-route-reassign="${esc(id)}">↻ Reasignar</button>`);
     if(id&&canEvidence)actions.push(`<button class="btn soft small" type="button" data-route-evidence="${esc(id)}">📷 Respaldo</button>`);
     if(id)actions.push(`<button class="btn soft small" type="button" data-route-weather="${esc(id)}">☁ Clima de la ruta</button>`);
     if(id&&puedeReenviarAlertaAsignacion())actions.push(`<button class="btn soft small" type="button" data-resend-assignment="RUTA:${esc(id)}">🔔 Reenviar alerta</button>`);
@@ -3900,6 +3902,7 @@
     $$('[data-route-state]').forEach(btn=>btn.addEventListener('click',()=>conCargaBoton(btn,'Actualizando…',()=>changeRouteState(btn.dataset.routeState))));
     $$('[data-route-evidence]').forEach(btn=>btn.addEventListener('click',()=>openRouteEvidenceModal(btn.dataset.routeEvidence)));
     $$('[data-route-weather]').forEach(btn=>btn.addEventListener('click',()=>openRouteWeatherModal(btn.dataset.routeWeather)));
+    $$('[data-route-reassign]').forEach(btn=>btn.addEventListener('click',()=>openRouteReassignModal(btn.dataset.routeReassign,btn)));
     $$('[data-resend-assignment]').forEach(btn=>btn.addEventListener('click',()=>{const [tipo,id]=String(btn.dataset.resendAssignment||'').split(':');conCargaBoton(btn,'Reenviando…',()=>reenviarAlertaAsignacion(tipo,id,btn));}));
     enlazarVisoresRuta($('#content'));
     enlazarGaleriasRuta($('#content'));
@@ -4657,6 +4660,22 @@
       });
     };
   }
+  async function openRouteReassignModal(routeId,sourceButton=null){
+    if(!hasPermission('RUTAS','REASIGNAR'))return toast('Acceso restringido','Su cuenta no tiene permiso para reasignar rutas.','error');
+    const route=registroFormulario('routes',routeId);if(!route)return toast('Ruta no encontrada','Actualice el módulo e intente nuevamente.','error');
+    const original=sourceButton?.textContent||'';if(sourceButton){sourceButton.disabled=true;sourceButton.textContent='Cargando…';}
+    try{
+      const result=await api.request('list',{resource:'drivers',limit:1000,cache:false}),rows=Array.isArray(result.rows)?result.rows:[];
+      const disponibles=rows.filter(d=>String(d.ID)!==String(route.CONDUCTOR_ID)&&String(d.ESTADO||'Disponible').toLowerCase()==='disponible');
+      if(!disponibles.length)return toast('Sin conductores disponibles','No existe otro conductor disponible para esta contingencia.','warning');
+      $('#modalEyebrow').textContent='CONTINGENCIA OPERACIONAL';$('#modalTitle').textContent='Reasignar la misma ruta';
+      $('#modalBody').innerHTML=`<form class="form-grid" id="routeReassignForm"><div class="module-diagnostic warning full"><i>↻</i><div><b>${esc(route.NOMBRE||route.ID)}</b><span>${esc(route.ORIGEN||'')} → ${esc(route.DESTINO||'')}</span></div></div><p class="helper full">La ruta conservará vehículo, destinos e historial. Por esta reasignación autorizada no se exigirá un nuevo Check-in al conductor receptor.</p><label class="field full"><span>Nuevo conductor disponible</span><select name="CONDUCTOR_ID" required>${disponibles.map(d=>`<option value="${esc(d.ID)}">${esc(d.NOMBRE||d.ID)}${d.RUT?` · ${esc(d.RUT)}`:''}</option>`).join('')}</select></label><label class="field full"><span>Motivo de la reasignación</span><textarea name="MOTIVO" required minlength="4" placeholder="Ej. contingencia del conductor original"></textarea></label><div class="form-actions full"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Confirmar reasignación</button></div></form>`;
+      openModal();const form=$('#routeReassignForm');$('[data-cancel-modal]',form).onclick=closeModal;
+      form.onsubmit=event=>{event.preventDefault();const button=$('button[type="submit"]',form);conCargaBoton(button,'Reasignando…',async()=>{try{const data=Object.fromEntries(new FormData(form).entries());data.RUTA_ID=route.ID;await api.request('reassignRoute',{id:route.ID,data});invalidarListasFormulario('routes','drivers','vehicles','notifications');['routes','dashboard','operations'].forEach(x=>cacheVistasModulo.delete(x));closeModal();toast('Ruta reasignada','El nuevo conductor fue notificado. La excepción de Check-in quedó auditada.');actualizarSeccionEnSegundoPlano('routes');}catch(error){toast('No se pudo reasignar',translateError(error),'error');throw error;}});};
+    }catch(error){toast('No se pudo preparar la reasignación',translateError(error),'error');}
+    finally{if(sourceButton){sourceButton.disabled=false;sourceButton.textContent=original;}}
+  }
+
   async function openRouteWeatherModal(routeId){
     const route=registroFormulario('routes',routeId);if(!route)return;$('#modalEyebrow').textContent='CLIMA DE LA RUTA';$('#modalTitle').textContent=route.NOMBRE||'Condiciones meteorológicas';$('#modalBody').innerHTML='<div class="modal-loading"><i></i><span>Consultando origen y destino…</span></div>';openModal();
     try{const result=await api.request('routeWeather',{data:{RUTA_ID:routeId}}),card=point=>`<article class="weather-route-card ${point.DISPONIBLE?'':'unavailable'}"><span>${point.DISPONIBLE?'☁':'!'}</span><div><small>${esc(point.NOMBRE||'Punto de ruta')}</small><h3>${point.DISPONIBLE?`${number(point.TEMPERATURA_C)} °C`:'Sin datos'}</h3><b>${esc(point.DESCRIPCION||point.MENSAJE||'Condición no disponible')}</b>${point.DISPONIBLE?`<p>Sensación ${number(point.SENSACION_C)} °C · lluvia ${number(point.PRECIPITACION_MM)} mm · viento ${number(point.VIENTO_KMH)} km/h</p>`:''}</div></article>`;$('#modalBody').innerHTML=`<div class="weather-route-grid">${card(result.origen||{})}${card(result.destino||{})}</div><div class="tracking-notice active"><i>✓</i><div><b>Consulta actualizada</b><span>${fmtDate(result.consultadoEn,true)} · ${esc(result.proveedor||'servicio meteorológico')}</span></div></div><div class="form-actions"><button class="btn primary" type="button" data-cancel-modal>Cerrar</button></div>`;$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;}catch(error){$('#modalBody').innerHTML=`<div class="tracking-notice warning"><i>!</i><div><b>No se pudo consultar el clima</b><span>${esc(translateError(error))}</span></div></div><div class="form-actions"><button class="btn primary" type="button" data-cancel-modal>Cerrar</button></div>`;$('[data-cancel-modal]',$('#modalBody')).onclick=closeModal;}
@@ -5566,7 +5585,12 @@
 
   function logout(){const cierre=api.request('logout',{data:{SESION_CLIENTE_ID:clientSessionId}}).catch(()=>{});forceLogout();return cierre;}
   function forceLogout(){limpiarAmbienteCumpleanos();cleanupSection();stopRealtimeServices();stopCamera();guardarContextoSeguimientoRuta(null);stopTracking({remember:false,silent:true});ultimaPosicionConocida=null;ultimaPosicionConfiableNavegador=null;ultimaUbicacionEnviada=null;gpsPendingPosition=null;currentUser=null;appInicializada=false;connectionTrackedUserId='';connectionTrackedPositionKey='';connectionTrackingServerLoaded=false;connectionTrackingSavePending=false;connectionTrackedVisibility=null;notificationSnapshotReady=false;knownNotificationIds=new Set();knownAlertIds=new Set();knownAssignmentAlertIds=new Set();assignmentAlertNode?.remove();assignmentAlertNode=null;assignmentAlertQueue=[];nexoSpeedAlertNode?.remove();nexoSpeedAlertNode=null;notificationCenterState={notifications:[],alerts:[]};precargaIniciada=false;modulosSincronizadosSesion.clear();actualizacionesModuloPendientes.clear();cacheVistasModulo.clear();invalidarListasFormulario();api.setAuth({});postParent({tipo:'flotas:sesion-cerrada'});$('#appShell').classList.add('hidden');if(embeddedMode)return;$('#authScreen').classList.remove('hidden');checkSystem();}
-  function showProfile(){openInfoModal('Mi perfil',[['Nombre',currentUser.NOMBRE],['Correo',currentUser.CORREO],['Rol',currentUser.ROL_NOMBRE],['Estado',currentUser.ESTADO],['Último acceso',fmtDate(currentUser.ULTIMO_ACCESO,true)]]);}
+  function showProfile(){
+    $('#modalEyebrow').textContent='MI CUENTA';$('#modalTitle').textContent='Mi perfil';
+    const foto=String(currentUser?.FOTO_PERFIL_URL||'').trim();
+    $('#modalBody').innerHTML=`<form class="form-grid" id="profilePhotoForm"><div class="profile-photo-editor full"><div class="profile-photo-preview">${foto?`<img src="${esc(foto)}" alt="Foto de perfil">`:`<span>${esc(initials(currentUser.NOMBRE||'U'))}</span>`}</div><div><b>${esc(currentUser.NOMBRE||'Usuario')}</b><p>${esc(currentUser.CORREO||'')} · ${esc(currentUser.ROL_NOMBRE||currentUser.ROL_ID||'')}</p><small>JPG, PNG o WEBP · máximo 5 MB</small></div></div><div class="info-grid full"><div class="info-item"><span>Estado</span><b>${esc(currentUser.ESTADO||'—')}</b></div><div class="info-item"><span>Último acceso</span><b>${esc(fmtDate(currentUser.ULTIMO_ACCESO,true)||'—')}</b></div></div><label class="field full"><span>Cambiar foto de perfil</span><input name="FOTO" type="file" accept="image/jpeg,image/png,image/webp" required></label><div class="form-actions full"><button class="btn soft" type="button" data-cancel-modal>Cerrar</button><button class="btn primary" type="submit">Guardar foto</button></div></form>`;openModal();
+    const form=$('#profilePhotoForm');$('[data-cancel-modal]',form).onclick=closeModal;form.onsubmit=event=>{event.preventDefault();const file=form.elements.FOTO.files?.[0],button=$('button[type="submit"]',form);if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))return toast('Formato no válido','Use una imagen JPG, PNG o WEBP.','error');if(file.size>5*1024*1024)return toast('Imagen demasiado grande','La foto de perfil no puede superar 5 MB.','error');conCargaBoton(button,'Guardando…',async()=>{try{const dataUrl=await leerArchivoDataUrl(file),result=await api.request('updateProfilePhoto',{data:{NOMBRE_ARCHIVO:file.name,TIPO_MIME:file.type,ARCHIVO_BASE64:dataUrl}}),user=result.user||result.usuario;if(user){currentUser=user;const auth=api.getAuth();api.setAuth({...auth,user});postParent({tipo:'flotas:usuario-actualizado',usuario:user,seccion:currentSection});}closeModal();toast('Foto actualizada','La nueva foto de perfil quedó guardada en su cuenta.');}catch(error){toast('No se pudo guardar la foto',translateError(error),'error');throw error;}});};
+  }
   function openInfoModal(title,items){$('#modalEyebrow').textContent='INFORMACIÓN';$('#modalTitle').textContent=title;$('#modalBody').innerHTML=`<div class="info-grid">${items.map(([a,b])=>`<div class="info-item"><span>${a}</span><b>${esc(b||'—')}</b></div>`).join('')}</div>`;openModal();}
   function openPasswordModal(){$('#modalEyebrow').textContent='SEGURIDAD';$('#modalTitle').textContent='Cambiar contraseña';$('#modalBody').innerHTML=`<form class="form-grid" id="passwordForm"><label class="field full"><span>Contraseña actual</span><input name="contrasenaActual" type="password" required></label><label class="field full"><span>Nueva contraseña</span><input name="nuevaContrasena" type="password" required placeholder="Letras, números o símbolos"></label><p class="helper full">Puede elegir cualquier combinación. La contraseña distingue mayúsculas y minúsculas.</p><div class="form-actions"><button class="btn soft" type="button" data-cancel-modal>Cancelar</button><button class="btn primary" type="submit">Cambiar contraseña</button></div></form>`;openModal();$('[data-cancel-modal]').onclick=closeModal;$('#passwordForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=$('button[type="submit"]',form);await conCargaBoton(button,'Actualizando…',async()=>{try{await api.request('changePassword',Object.fromEntries(new FormData(form).entries()));invalidarListasFormulario('users');closeModal();toast('Contraseña actualizada');}catch(error){toast('No se pudo cambiar',translateError(error),'error');}});};}
 

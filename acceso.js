@@ -44,7 +44,7 @@
   function cambiarEstado(texto,tipo=''){estado.className=`estado-conexion ${tipo}`;$('span',estado).textContent=texto;}
   function bloquear(boton,activo,texto,normal){boton.disabled=activo;boton.textContent=activo?texto:normal;}
   function aplicarEmpresa(empresa){if(!empresa)return;window.TemaFlotas?.aplicarEmpresa?.(empresa,{guardar:true});const nombre=empresa.NOMBRE_FANTASIA||empresa.RAZON_SOCIAL||empresa.NOMBRE||'';const logo=empresa.DIRECCION_LOGOTIPO||'';if(nombre)$('#nombreEmpresaAcceso').textContent=nombre;if(logo)$('#logoEmpresaAcceso').src=logo;}
-  function entrar(){location.replace('main.html?v=4.3.18');}
+  function entrar(){location.replace('main.html?v=4.3.19');}
   function mostrarPreconfiguracion(){companyForm.classList.add('oculto');loginForm.classList.add('oculto');setupForm.classList.remove('oculto');cambiarEstado('Preconfiguración requerida','preconfig');$('#detalleServicio').textContent='Sin usuarios registrados';setTimeout(()=>setupForm.elements.nombreEmpresa?.focus(),80);}
   function mostrarAcceso(){companyForm.classList.add('oculto');setupForm.classList.add('oculto');loginForm.classList.remove('oculto');}
   function mostrarSeleccionEmpresa(){loginForm.classList.add('oculto');setupForm.classList.add('oculto');companyForm.classList.remove('oculto');setTimeout(()=>$('#rutConexionEmpresa')?.focus(),80);}
